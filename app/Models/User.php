@@ -2,34 +2,28 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Laravel\Sanctum\HasApiTokens; // <--- تأكد من وجود هذا السطر
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens; // ضروري للـ Token
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
-use HasApiTokens, Notifiable; // <--- الخطوة 2: إضافة التريت (Trait) داخل الكلاس
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasApiTokens, HasFactory, Notifiable;
+
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * الحقول التي يسمح بتعبئتها (Mass Assignable)
      */
     protected $fillable = [
         'name',
         'phone',
-        'email',
-        'password',
+        'birth_date',
+        // 'password', // اتركها فقط إذا كنت ستستخدم باسوورد لليوزر لاحقاً
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
+     * الحقول المخفية عند تحويل الموديل لـ JSON
      */
     protected $hidden = [
         'password',
@@ -37,14 +31,12 @@ use HasApiTokens, Notifiable; // <--- الخطوة 2: إضافة التريت (T
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * تحويل أنواع البيانات (Casting)
      */
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
+            'birth_date' => 'date', // ليتعامل معها لارافيل كـ Carbon object
             'password' => 'hashed',
         ];
     }
