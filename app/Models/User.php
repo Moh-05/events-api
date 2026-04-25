@@ -19,6 +19,8 @@ class User extends Authenticatable
         'name',
         'phone',
         'birth_date',
+        'profile_image',
+        'location'
         // 'password', // اتركها فقط إذا كنت ستستخدم باسوورد لليوزر لاحقاً
     ];
 
