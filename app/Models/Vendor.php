@@ -13,16 +13,18 @@ class Vendor extends Authenticatable
     protected $fillable = [
         'name',
         'phone',
+        'birth_date',
         'business_name',
         'vendor_type',
         'booking_style',
         'profile_image',
-        'location',
+        'latitude',
+        'longitude',
+        'address',
         'bio',
         'rating_avg',
         'is_approved',
         'is_active',
-        'birth_date',
     ];
 
     protected $hidden = [
@@ -35,17 +37,17 @@ class Vendor extends Authenticatable
             'is_approved' => 'boolean',
             'is_active'   => 'boolean',
             'rating_avg'  => 'decimal:2',
-            'birth_date' => 'date',
+            'birth_date'  => 'date',
+            'latitude'    => 'decimal:8',
+            'longitude'   => 'decimal:8',
         ];
     }
 
-    // علاقة الـ products
-   public function products()
+    public function products()
     {
         return $this->hasMany(VendorProduct::class);
     }
 
-    // علاقة الـ bookings
     public function bookings()
     {
         return $this->hasMany(Booking::class);

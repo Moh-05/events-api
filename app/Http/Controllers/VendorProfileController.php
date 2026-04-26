@@ -42,18 +42,20 @@ class VendorProfileController extends Controller
     }
 
     // Complete profile setup
-    public function  update(Request $request)
+    public function update(Request $request)
     {
         $request->validate([
             'business_name' => 'sometimes|string|max:255',
-            'location'      => 'sometimes|string|max:255',
             'bio'           => 'sometimes|string|max:1000',
+            'birth_date'    => 'sometimes|date',
+            'latitude'      => 'sometimes|numeric|between:-90,90',
+            'longitude'     => 'sometimes|numeric|between:-180,180',
+            'address'       => 'sometimes|string|max:255',
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
-            'birth_date'=>'sometimes|date',
         ]);
 
         $vendor = $request->user();
-        $data   = $request->only(['business_name', 'location', 'bio','birth_date']);
+        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address']);
 
         if ($request->hasFile('profile_image')) {
             if ($vendor->profile_image) {

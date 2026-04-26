@@ -21,16 +21,17 @@ class UserProfileController extends Controller
     {
         $request->validate([
             'name'          => 'sometimes|string|max:255',
-            'location'      => 'sometimes|string|max:255',
             'birth_date'    => 'sometimes|date',
+            'latitude'      => 'sometimes|numeric|between:-90,90',
+            'longitude'     => 'sometimes|numeric|between:-180,180',
+            'address'       => 'sometimes|string|max:255',
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $user = $request->user();
-        $data = $request->only(['name', 'location', 'birth_date']);
+        $data = $request->only(['name', 'birth_date', 'latitude', 'longitude', 'address']);
 
         if ($request->hasFile('profile_image')) {
-            // Delete old image if exists
             if ($user->profile_image) {
                 Storage::disk('public')->delete($user->profile_image);
             }
