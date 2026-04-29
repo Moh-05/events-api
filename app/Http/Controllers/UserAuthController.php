@@ -17,9 +17,9 @@ class UserAuthController extends Controller
         ]);
 
         $otp = rand(100000, 999999);
-        Cache::put('otp_'.$request->phone, $otp, now()->addMinutes(5));
+        Cache::put('otp_' . $request->phone, $otp, now()->addMinutes(5));
 
-        $response = Http::asForm()->post("https://api.ultramsg.com/".env('ULTRAMSG_INSTANCE_ID')."/messages/chat", [
+        $response = Http::asForm()->post("https://api.ultramsg.com/" . env('ULTRAMSG_INSTANCE_ID') . "/messages/chat", [
             'token' => env('ULTRAMSG_TOKEN'),
             'to'    => $request->phone,
             'body'  => "Verification Code: $otp",
@@ -42,12 +42,12 @@ class UserAuthController extends Controller
             'otp'   => 'required|integer|digits:6',
         ]);
 
-        $cachedOtp = Cache::get('otp_'.$request->phone);
+        $cachedOtp = Cache::get('otp_' . $request->phone);
         if (!$cachedOtp || $cachedOtp != $request->otp) {
             return response()->json(['message' => 'Invalid OTP'], 400);
         }
 
-        Cache::forget('otp_'.$request->phone);
+        Cache::forget('otp_' . $request->phone);
         $user = User::where('phone', $request->phone)->first();
 
         if ($user) {
@@ -59,7 +59,7 @@ class UserAuthController extends Controller
         }
 
         $regToken = Str::random(64);
-        Cache::put('reg_token_'.$regToken, $request->phone, now()->addMinutes(15));
+        Cache::put('reg_token_' . $regToken, $request->phone, now()->addMinutes(15));
 
         return response()->json(['status' => 'new_user', 'registration_token' => $regToken]);
     }
@@ -68,20 +68,24 @@ class UserAuthController extends Controller
     {
         $request->validate([
             'registration_token' => 'required|string|size:64',
-            'name'               => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'first_name'         => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'city'               => 'nullable|string|min:2|max:100',
             'birth_date'         => 'required|date|before:today|after:1900-01-01',
         ]);
 
-        $phone = Cache::get('reg_token_'.$request->registration_token);
+        $phone = Cache::get('reg_token_' . $request->registration_token);
         if (!$phone) return response()->json(['message' => 'Expired'], 403);
 
         $user = User::create([
             'phone'      => $phone,
-            'name'       => $request->name,
+            'first_name' => $request->first_name,
+            'last_name'  => $request->last_name,
+            'city'       => $request->city,
             'birth_date' => $request->birth_date,
         ]);
 
-        Cache::forget('reg_token_'.$request->registration_token);
+        Cache::forget('reg_token_' . $request->registration_token);
 
         return response()->json([
             'token' => $user->createToken('auth_token')->plainTextToken,
