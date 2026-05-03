@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\AuthVendorController;
+use App\Http\Controllers\VendorAuthController;
 use App\Http\Controllers\UserAuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserProfileController;
@@ -18,9 +18,9 @@ Route::post('/verify-otp', [UserAuthController::class, 'verifyOtp']);
 Route::post('/complete-registration', [UserAuthController::class, 'completeRegistration']);
 
 // Vendor Auth
-Route::post('/vendor/send-otp', [AuthVendorController::class, 'sendOtp']);
-Route::post('/vendor/verify-otp', [AuthVendorController::class, 'verifyOtp']);
-Route::post('/vendor/complete-registration', [AuthVendorController::class, 'completeRegistration']);
+Route::post('/vendor/send-otp', [VendorAuthController::class, 'sendOtp']);
+Route::post('/vendor/verify-otp', [VendorAuthController::class, 'verifyOtp']);
+Route::post('/vendor/complete-registration', [VendorAuthController::class, 'completeRegistration']);
 
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum

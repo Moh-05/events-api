@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class AuthVendorController extends Controller
+class VendorAuthController extends Controller
 {
     public function sendOtp(Request $request)
     {
