@@ -11,22 +11,28 @@ class VendorProduct extends Model
         'name',
         'description',
         'price',
-        'image',
         'meta',
         'is_available',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'meta'         => 'array',
-            'is_available' => 'boolean',
-            'price'        => 'decimal:2',
-        ];
-    }
+    protected $casts = [
+        'meta' => 'array',
+        'is_available' => 'boolean',
+        'price' => 'decimal:2',
+    ];
 
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function images()
+    {
+        return $this->hasMany(VendorProductImage::class);
+    }
+
+    public function primaryImage()
+    {
+        return $this->hasOne(VendorProductImage::class)->where('is_primary', true);
     }
 }
