@@ -2,121 +2,189 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\VendorProduct;
 use Illuminate\Http\Request;
+use App\Models\VendorProduct;
 use Illuminate\Support\Facades\Storage;
 
 class VendorProductController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    // Get all products across all vendors
     public function index()
     {
-        //
+        $products = VendorProduct::with('images')->get();
+
+        return response()->json([
+            'status'   => 'success',
+            'products' => $products,
+        ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    // Get all available products for a specific vendor
+    public function getVendorProducts($vendorId)
     {
-        //
+        $products = VendorProduct::where('vendor_id', $vendorId)
+            ->where('is_available', true)
+            ->with('images')
+            ->get();
+
+        return response()->json([
+            'status'   => 'success',
+            'products' => $products,
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-{
-    $request->validate([
-        'name'        => 'required|string|max:255',
-        'description' => 'sometimes|string',
-        'price'       => 'required|numeric|min:0',
-        'meta'        => 'sometimes|array',
-        'images'      => 'sometimes|array',
-        'images.*'    => 'image|mimes:jpg,jpeg,png|max:2048',
-        'primary_image_index' => 'sometimes|integer',
-    ]);
+    // Search products by name within a specific vendor
+    public function searchVendorProducts(Request $request, $vendorId)
+    {
+        $query = VendorProduct::where('vendor_id', $vendorId)
+            ->with('images');
 
-    $vendor = $request->user();
-
-    $product = VendorProduct::create([
-        'vendor_id'   => $vendor->id,
-        'name'        => $request->name,
-        'description' => $request->description,
-        'price'       => $request->price,
-        'meta'        => $request->meta ?? [],
-    ]);
-
-    if ($request->hasFile('images')) {
-        $primaryIndex = $request->primary_image_index ?? 0;
-
-        foreach ($request->file('images') as $index => $image) {
-            $path = $image->store('product_images', 'public');
-
-            $product->images()->create([
-                'image_path' => $path,
-                'is_primary' => $index === $primaryIndex,
-            ]);
+        if ($request->filled('name')) {
+            $query->where('name', 'like', '%' . $request->name . '%');
         }
+
+        return response()->json([
+            'status'   => 'success',
+            'products' => $query->get(),
+        ]);
     }
 
-    return response()->json([
-        'status'  => 'success',
-        'product' => $product->load('images'),
-    ]);
-}
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    // Create a new product — name, price, description are optional, images are required
+    public function store(Request $request)
     {
-        //
+        $request->validate([
+            'name'                => 'sometimes|nullable|string|max:255',
+            'description'         => 'sometimes|nullable|string',
+            'price'               => 'sometimes|nullable|numeric|min:0',
+            'meta'                => 'sometimes|array',
+            'images'              => 'required|array',
+            'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
+            'primary_image_index' => 'sometimes|integer',
+        ]);
+
+        $vendor = $request->user();
+
+        $product = VendorProduct::create([
+            'vendor_id'   => $vendor->id,
+            'name'        => $request->name ?? null,
+            'description' => $request->description ?? null,
+            'price'       => $request->price ?? null,
+            'meta'        => $request->meta ?? [],
+        ]);
+
+        if ($request->hasFile('images')) {
+            $primaryIndex = $request->primary_image_index ?? 0;
+
+            foreach ($request->file('images') as $index => $image) {
+                $path = $image->store('product_images', 'public');
+
+                $product->images()->create([
+                    'image_path' => $path,
+                    'is_primary' => $index === $primaryIndex,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'product' => $product->load('images'),
+        ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    // Get a single product — vendor can only access their own
+    public function show(Request $request, $id)
     {
-        //
+        $vendor = $request->user();
+
+        $product = VendorProduct::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->with('images')
+            ->firstOrFail();
+
+        return response()->json([
+            'status'  => 'success',
+            'product' => $product,
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    // Update product data and manage images (add new / delete existing)
+    public function update(Request $request, $id)
     {
-        //
+        $request->validate([
+            'name'                => 'sometimes|nullable|string|max:255',
+            'description'         => 'sometimes|nullable|string',
+            'price'               => 'sometimes|nullable|numeric|min:0',
+            'meta'                => 'sometimes|array',
+            'images'              => 'sometimes|array',
+            'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
+            'primary_image_index' => 'sometimes|integer',
+            'delete_image_ids'    => 'sometimes|array',
+            'delete_image_ids.*'  => 'integer',
+        ]);
+
+        $vendor = $request->user();
+
+        $product = VendorProduct::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->firstOrFail();
+
+        $product->update($request->only([
+            'name',
+            'description',
+            'price',
+            'meta',
+        ]));
+
+        // Delete selected images from storage and DB
+        if ($request->has('delete_image_ids')) {
+            $imagesToDelete = $product->images()
+                ->whereIn('id', $request->delete_image_ids)
+                ->get();
+
+            foreach ($imagesToDelete as $image) {
+                Storage::disk('public')->delete($image->image_path);
+                $image->delete();
+            }
+        }
+
+        // Upload and attach new images
+        if ($request->hasFile('images')) {
+            $primaryIndex = $request->primary_image_index ?? null;
+
+            foreach ($request->file('images') as $index => $image) {
+                $path = $image->store('product_images', 'public');
+
+                $product->images()->create([
+                    'image_path' => $path,
+                    'is_primary' => $index === $primaryIndex,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'product' => $product->load('images'),
+        ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    
+    // Delete product and remove all associated images from storage
+    public function destroy($id)
+    {
+        $vendor = request()->user();
 
-public function destroy($id)
-{
-    $vendor = request()->user();
+        $product = VendorProduct::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->firstOrFail();
 
-    $product = VendorProduct::where('id', $id)
-        ->where('vendor_id', $vendor->id)
-        ->firstOrFail();
+        foreach ($product->images as $image) {
+            Storage::disk('public')->delete($image->image_path);
+        }
 
-    // حذف الصور من السيرفر
-    foreach ($product->images as $image) {
-        Storage::disk('public')->delete($image->image_path);
+        $product->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Product deleted successfully',
+        ]);
     }
-
-    // حذف المنتج (الصور بتتحذف تلقائياً بسبب cascadeOnDelete)
-    $product->delete();
-
-    return response()->json([
-        'status'  => 'success',
-        'message' => 'تم حذف المنتج'
-    ]);
-}
-
 }

@@ -19,7 +19,7 @@ return new class extends Migration
                 'photographer',
                 'cake_shop',
                 'dj',
-             'store',
+                'store',
             ])->nullable();
             $table->enum('booking_style', [
                 'appointment',
