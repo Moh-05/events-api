@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('vendor_products', function (Blueprint $table) {
             $table->id();
             $table->foreignId('vendor_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
+            $table->string('name')->nullable();
             $table->text('description')->nullable();
-            $table->decimal('price', 10, 2);
+            $table->decimal('price', 10, 2)->nullable();
             $table->json('meta')->nullable();
             $table->boolean('is_available')->default(true);
             $table->timestamps();

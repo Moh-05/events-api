@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class VendorProductController extends Controller
 {
-
+    // Get all products across all vendors
     public function index()
     {
         $products = VendorProduct::with('images')->get();
@@ -19,9 +19,7 @@ class VendorProductController extends Controller
         ]);
     }
 
-
-
-
+    // Get all available products for a specific vendor
     public function getVendorProducts($vendorId)
     {
         $products = VendorProduct::where('vendor_id', $vendorId)
@@ -35,6 +33,7 @@ class VendorProductController extends Controller
         ]);
     }
 
+    // Search products by name within a specific vendor
     public function searchVendorProducts(Request $request, $vendorId)
     {
         $query = VendorProduct::where('vendor_id', $vendorId)
@@ -49,15 +48,17 @@ class VendorProductController extends Controller
             'products' => $query->get(),
         ]);
     }
+
+    // Create a new product — name, price, description are optional, images are required
     public function store(Request $request)
     {
         $request->validate([
-            'name'        => 'required|string|max:255',
-            'description' => 'sometimes|string',
-            'price'       => 'required|numeric|min:0',
-            'meta'        => 'sometimes|array',
-            'images'      => 'sometimes|array',
-            'images.*'    => 'image|mimes:jpg,jpeg,png|max:2048',
+            'name'                => 'sometimes|nullable|string|max:255',
+            'description'         => 'sometimes|nullable|string',
+            'price'               => 'sometimes|nullable|numeric|min:0',
+            'meta'                => 'sometimes|array',
+            'images'              => 'required|array',
+            'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
             'primary_image_index' => 'sometimes|integer',
         ]);
 
@@ -65,9 +66,9 @@ class VendorProductController extends Controller
 
         $product = VendorProduct::create([
             'vendor_id'   => $vendor->id,
-            'name'        => $request->name,
-            'description' => $request->description,
-            'price'       => $request->price,
+            'name'        => $request->name ?? null,
+            'description' => $request->description ?? null,
+            'price'       => $request->price ?? null,
             'meta'        => $request->meta ?? [],
         ]);
 
@@ -90,9 +91,7 @@ class VendorProductController extends Controller
         ]);
     }
 
-
-
-
+    // Get a single product — vendor can only access their own
     public function show(Request $request, $id)
     {
         $vendor = $request->user();
@@ -108,13 +107,13 @@ class VendorProductController extends Controller
         ]);
     }
 
-
+    // Update product data and manage images (add new / delete existing)
     public function update(Request $request, $id)
     {
         $request->validate([
-            'name'                => 'sometimes|string|max:255',
-            'description'         => 'sometimes|string',
-            'price'               => 'sometimes|numeric|min:0',
+            'name'                => 'sometimes|nullable|string|max:255',
+            'description'         => 'sometimes|nullable|string',
+            'price'               => 'sometimes|nullable|numeric|min:0',
             'meta'                => 'sometimes|array',
             'images'              => 'sometimes|array',
             'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
@@ -129,15 +128,14 @@ class VendorProductController extends Controller
             ->where('vendor_id', $vendor->id)
             ->firstOrFail();
 
-        // تحديث البيانات الأساسية
         $product->update($request->only([
             'name',
             'description',
             'price',
-            'meta'
+            'meta',
         ]));
 
-        // حذف صور محددة
+        // Delete selected images from storage and DB
         if ($request->has('delete_image_ids')) {
             $imagesToDelete = $product->images()
                 ->whereIn('id', $request->delete_image_ids)
@@ -149,7 +147,7 @@ class VendorProductController extends Controller
             }
         }
 
-        // إضافة صور جديدة
+        // Upload and attach new images
         if ($request->hasFile('images')) {
             $primaryIndex = $request->primary_image_index ?? null;
 
@@ -168,9 +166,8 @@ class VendorProductController extends Controller
             'product' => $product->load('images'),
         ]);
     }
-    /**
-     * Remove the specified resource from storage.
-     */
+
+    // Delete product and remove all associated images from storage
     public function destroy($id)
     {
         $vendor = request()->user();
@@ -179,17 +176,15 @@ class VendorProductController extends Controller
             ->where('vendor_id', $vendor->id)
             ->firstOrFail();
 
-        // حذف الصور من السيرفر
         foreach ($product->images as $image) {
             Storage::disk('public')->delete($image->image_path);
         }
 
-        // حذف المنتج (الصور بتتحذف تلقائياً بسبب cascadeOnDelete)
         $product->delete();
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'تم حذف المنتج'
+            'message' => 'Product deleted successfully',
         ]);
     }
 }

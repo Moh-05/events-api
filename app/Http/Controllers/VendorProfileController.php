@@ -20,12 +20,12 @@ class VendorProfileController extends Controller
     public function setType(Request $request)
     {
         $request->validate([
-            'vendor_type' => 'required|in:wedding_venue,photographer,cake_shop,dj,catering,beauty,decor,accessories',
+            'vendor_type' => 'required|in:wedding_venue,photographer,cake_shop,dj',
         ]);
 
         $vendor = $request->user();
 
-        $bookingStyle = in_array($request->vendor_type, ['cake_shop', 'decor', 'accessories', 'catering'])
+        $bookingStyle = in_array($request->vendor_type, ['cake_shop'])
             ? 'order'
             : 'appointment';
 
