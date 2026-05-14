@@ -20,9 +20,11 @@ class VendorProductController extends Controller
     }
 
     // Get all available products for a specific vendor
-    public function getVendorProducts($vendorId)
+    public function getVendorProducts(Request $request)
     {
-        $products = VendorProduct::where('vendor_id', $vendorId)
+        $user = $request->user();
+
+        $products = VendorProduct::where('vendor_id', $user->id)
             ->where('is_available', true)
             ->with('images')
             ->get();
@@ -73,14 +75,14 @@ class VendorProductController extends Controller
         ]);
 
         if ($request->hasFile('images')) {
-            $primaryIndex = $request->primary_image_index ?? 0;
-
+            $primaryIndex = (int) ($request->primary_image_index ?? 0);
             foreach ($request->file('images') as $index => $image) {
                 $path = $image->store('product_images', 'public');
 
                 $product->images()->create([
                     'image_path' => $path,
                     'is_primary' => $index === $primaryIndex,
+
                 ]);
             }
         }

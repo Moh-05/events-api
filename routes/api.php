@@ -41,9 +41,9 @@ Route::middleware('auth:vendors')->group(function () {
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
     // Products
-    Route::get('/vendor/products', [VendorProductController::class, 'index']);
     Route::post('/vendor/products', [VendorProductController::class, 'store']);
-    Route::get('/vendor/products/{id}', [VendorProductController::class, 'show']);
     Route::post('/vendor/products/{id}', [VendorProductController::class, 'update']);
     Route::delete('/vendor/products/{id}', [VendorProductController::class, 'destroy']);
+    Route::get('/vendor/products/{id}', [VendorProductController::class, 'show']);
+    Route::get('/vendor/products', [VendorProductController::class, 'getVendorProducts']);
 });

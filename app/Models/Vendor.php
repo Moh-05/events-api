@@ -11,8 +11,11 @@ class Vendor extends Authenticatable
     use HasApiTokens, Notifiable;
 
     protected $fillable = [
+        'first_name',
+        'last_name',
         'name',
         'phone',
+        'city',
         'birth_date',
         'business_name',
         'vendor_type',
