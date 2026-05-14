@@ -20,7 +20,9 @@ class UserProfileController extends Controller
     public function update(Request $request)
     {
         $request->validate([
-            'name'          => 'sometimes|string|max:255',
+            'first_name'    => 'sometimes|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'last_name'     => 'sometimes|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'city'          => 'sometimes|nullable|string|min:2|max:100',
             'birth_date'    => 'sometimes|date',
             'latitude'      => 'sometimes|numeric|between:-90,90',
             'longitude'     => 'sometimes|numeric|between:-180,180',
@@ -29,7 +31,7 @@ class UserProfileController extends Controller
         ]);
 
         $user = $request->user();
-        $data = $request->only(['name', 'birth_date', 'latitude', 'longitude', 'address']);
+        $data = $request->only(['first_name', 'last_name', 'city', 'birth_date', 'latitude', 'longitude', 'address']);
 
         if ($request->hasFile('profile_image')) {
             if ($user->profile_image) {

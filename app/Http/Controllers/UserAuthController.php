@@ -70,7 +70,7 @@ class UserAuthController extends Controller
             'registration_token' => 'required|string|size:64',
             'first_name'         => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
             'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
-            'city'               => 'nullable|string|min:2|max:100',
+            'city'               => 'required|string|min:2|max:100',
             'birth_date'         => 'required|date|before:today|after:1900-01-01',
         ]);
 

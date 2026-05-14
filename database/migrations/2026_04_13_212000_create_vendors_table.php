@@ -10,8 +10,10 @@ return new class extends Migration
     {
         Schema::create('vendors', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('first_name')->nullable();
+            $table->string('last_name')->nullable();
             $table->string('phone')->unique();
+            $table->string('city')->nullable();
             $table->date('birth_date')->nullable();
             $table->string('business_name')->nullable();
             $table->enum('vendor_type', [
@@ -19,10 +21,7 @@ return new class extends Migration
                 'photographer',
                 'cake_shop',
                 'dj',
-                'catering',
-                'beauty',
-                'decor',
-                'accessories'
+                'store',
             ])->nullable();
             $table->enum('booking_style', [
                 'appointment',

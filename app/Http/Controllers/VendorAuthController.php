@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class AuthVendorController extends Controller
+class VendorAuthController extends Controller
 {
     public function sendOtp(Request $request)
     {
@@ -71,7 +71,9 @@ class AuthVendorController extends Controller
     {
         $request->validate([
             'registration_token' => 'required|string|size:64',
-            'name'               => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'first_name'         => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            'city'               => 'required|string|min:2|max:100',
             'birth_date'         => 'required|date|before:today|after:1900-01-01',
         ]);
 
@@ -80,7 +82,10 @@ class AuthVendorController extends Controller
 
         $vendor = Vendor::create([
             'phone'      => $phone,
-            'name'       => $request->name,
+            'name'       => trim($request->first_name . ' ' . $request->last_name),
+            'first_name' => $request->first_name,
+            'last_name'  => $request->last_name,
+            'city'       => $request->city,
             'birth_date' => $request->birth_date,
         ]);
 
