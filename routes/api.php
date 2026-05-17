@@ -40,11 +40,6 @@ Route::middleware('auth:vendors')->group(function () {
     Route::post('/vendor/profile/type', [VendorProfileController::class, 'setType']);
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 0b097c559a67779539bad63a064a1df6b26a1b31
     // Products
     Route::get('/vendor/products', [VendorProductController::class, 'index']);
     Route::post('/vendor/products', [VendorProductController::class, 'store']);
