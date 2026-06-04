@@ -123,6 +123,8 @@ class BookingController extends Controller
             'delivery_address',
         ]));
 
+        $booking->refresh();
+
         return response()->json([
             'status'  => 'success',
             'booking' => $booking->load(['vendor', 'vendor_product']),

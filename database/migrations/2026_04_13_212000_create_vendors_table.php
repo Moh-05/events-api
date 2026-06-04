@@ -35,6 +35,7 @@ return new class extends Migration
             $table->decimal('rating_avg', 3, 2)->default(0);
             $table->boolean('is_approved')->default(false);
             $table->boolean('is_active')->default(true);
+            $table->string('fcm_token')->nullable();
             $table->timestamps();
         });
     }

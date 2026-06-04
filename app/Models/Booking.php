@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 class Booking extends Model
 {
     protected $fillable = [
-        'customer_id',
+        'user_id',
         'vendor_id',
         'vendor_product_id',
         'booking_style',
         'status',
         'event_date',
         'event_type',
+        'event_location',
         'duration_hours',
         'details',
         'delivery_date',
@@ -42,8 +43,14 @@ class Booking extends Model
         return $this->belongsTo(Vendor::class);
     }
 
-    public function product()
+
+    public function vendor_product()
     {
         return $this->belongsTo(VendorProduct::class, 'vendor_product_id');
+    }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class);
     }
 }

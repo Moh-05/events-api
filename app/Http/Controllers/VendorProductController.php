@@ -170,9 +170,9 @@ class VendorProductController extends Controller
     }
 
     // Delete product and remove all associated images from storage
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $vendor = request()->user();
+        $vendor = $request->user();
 
         $product = VendorProduct::where('id', $id)
             ->where('vendor_id', $vendor->id)
