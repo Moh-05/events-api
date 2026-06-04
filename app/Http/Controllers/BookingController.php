@@ -51,7 +51,7 @@ class BookingController extends Controller
             'vendor_product_id' => $product->id,
             'booking_style'     => $vendor->booking_style,
             'event_type'        => $vendor->vendor_type,
-            'status'            => 'pending',
+            'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
             'notes'             => $request->notes,
 
             // Appointment
@@ -136,9 +136,11 @@ class BookingController extends Controller
     public function cancel(Request $request, $id)
     {
         $user    = $request->user();
+        // Only an unpaid draft can be cancelled freely. Once paid (pending) a
+        // refund is required, so cancelling a paid booking waits for the pay API.
         $booking = Booking::where('id', $id)
             ->where('user_id', $user->id)
-            ->whereIn('status', ['pending'])
+            ->whereIn('status', ['awaiting_payment'])
             ->firstOrFail();
 
         $booking->update(['status' => 'cancelled']);
@@ -151,7 +153,7 @@ class BookingController extends Controller
 
 
 
-    // Vendor approves a booking
+    // Vendor approves a booking — sets completed directly until scheduled auto-complete is built
     public function approve(Request $request, $id)
     {
         $vendor  = $request->user();
@@ -160,7 +162,8 @@ class BookingController extends Controller
             ->where('status', 'pending')
             ->firstOrFail();
 
-        $booking->update(['status' => 'approved']);
+        $booking->update(['status' => 'completed']);
+        $booking->refresh();
 
         return response()->json([
             'status'  => 'success',
@@ -185,22 +188,6 @@ class BookingController extends Controller
         ]);
     }
 
-    // Vendor marks booking as complete
-    public function complete(Request $request, $id)
-    {
-        $vendor  = $request->user();
-        $booking = Booking::where('id', $id)
-            ->where('vendor_id', $vendor->id)
-            ->where('status', 'approved')
-            ->firstOrFail();
-
-        $booking->update(['status' => 'completed']);
-
-        return response()->json([
-            'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
-        ]);
-    }
     // Get all bookings (user or vendor)
     public function index(Request $request)
     {

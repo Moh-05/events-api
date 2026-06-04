@@ -17,12 +17,13 @@ return new class extends Migration
                 $table->foreignId('vendor_product_id')->nullable()->constrained('vendor_products')->nullOnDelete();
                 $table->enum('booking_style', ['appointment', 'order']);
                 $table->enum('status', [
-                    'pending',
+                    'awaiting_payment', // draft — hidden from vendor until payment
+                    'pending',          // paid — vendor can accept or decline
                     'approved',
                     'declined',
                     'completed',
                     'cancelled'
-                ])->default('pending');
+                ])->default('awaiting_payment');
 
                 // Appointment fields
                 $table->dateTime('event_date')->nullable();

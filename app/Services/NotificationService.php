@@ -37,31 +37,28 @@ class NotificationService
         }
     }
 
-    public function send(string $fcmToken, string $title, string $body, array $data = []): void
+    public function send(string $fcmToken, string $title, string $body, array $data = []): array
     {
         $accessToken = $this->getAccessToken();
 
         if (!$accessToken) {
-            return;
+            return [];
         }
 
-        $config = json_decode(file_get_contents($this->credentialsPath), true);
+        $config    = json_decode(file_get_contents($this->credentialsPath), true);
         $projectId = $config['project_id'] ?? null;
 
         if (!$projectId) {
             Log::error("Firebase Project ID could not be extracted.");
-            return;
+            return [];
         }
 
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
 
         $payload = [
             'message' => [
-                'token' => $fcmToken,
-                'notification' => [
-                    'title' => $title,
-                    'body'  => $body,
-                ],
+                'token'        => $fcmToken,
+                'notification' => ['title' => $title, 'body' => $body],
             ]
         ];
 
@@ -76,21 +73,36 @@ class NotificationService
 
         if (!$response->successful()) {
             Log::error("FCM Notification failed to send", $response->json());
+            return ['sent' => false, 'firebase_response' => $response->json()];
         }
+
+        return ['sent' => true];
     }
 
-    public function notifyUser(User $user, string $title, string $body): void
+    public function notifyUser(User $user, string $title, string $body): array
     {
-        if ($user->fcm_token) {
-            $this->send($user->fcm_token, $title, $body);
+        if (!$user->fcm_token) {
+            // no device token yet — expected during testing before Flutter sends it
+            return ['sent' => false, 'reason' => 'no_device_token', 'title' => $title, 'body' => $body];
         }
+
+        $result          = $this->send($user->fcm_token, $title, $body);
+        $result['title'] = $title;
+        $result['body']  = $body;
+        return $result;
     }
 
-    public function notifyVendor(Vendor $vendor, string $title, string $body): void
+    public function notifyVendor(Vendor $vendor, string $title, string $body): array
     {
-        if ($vendor->fcm_token) {
-            $this->send($vendor->fcm_token, $title, $body);
+        if (!$vendor->fcm_token) {
+            // no device token yet — expected during testing before Flutter sends it
+            return ['sent' => false, 'reason' => 'no_device_token', 'title' => $title, 'body' => $body];
         }
+
+        $result          = $this->send($vendor->fcm_token, $title, $body);
+        $result['title'] = $title;
+        $result['body']  = $body;
+        return $result;
     }
 
     //for Admin based on role
