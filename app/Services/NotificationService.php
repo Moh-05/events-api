@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Google\Auth\Credentials\ServiceAccountCredentials;
+use App\Models\User;
+use App\Models\Vendor;
+use App\Models\Admin;
+
+class NotificationService
+{
+    protected string $credentialsPath;
+
+    public function __construct()
+    {
+        $this->credentialsPath = base_path(env('FIREBASE_CREDENTIALS'));
+    }
+
+    private function getAccessToken(): ?string
+    {
+        if (!file_exists($this->credentialsPath)) {
+            Log::error("Firebase credentials file not found at: {$this->credentialsPath}");
+            return null;
+        }
+
+        $scopes = ['https://www.googleapis.com/auth/cloud-platform'];
+
+        try {
+            $creds = new ServiceAccountCredentials($scopes, $this->credentialsPath);
+            $authToken = $creds->fetchAuthToken();
+            return $authToken['access_token'] ?? null;
+        } catch (\Exception $e) {
+            Log::error("Failed to generate Firebase Access Token: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function send(string $fcmToken, string $title, string $body, array $data = []): void
+    {
+        $accessToken = $this->getAccessToken();
+
+        if (!$accessToken) {
+            return;
+        }
+
+        $config = json_decode(file_get_contents($this->credentialsPath), true);
+        $projectId = $config['project_id'] ?? null;
+
+        if (!$projectId) {
+            Log::error("Firebase Project ID could not be extracted.");
+            return;
+        }
+
+        $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        $payload = [
+            'message' => [
+                'token' => $fcmToken,
+                'notification' => [
+                    'title' => $title,
+                    'body'  => $body,
+                ],
+            ]
+        ];
+
+        if (!empty($data)) {
+            $payload['message']['data'] = array_map('strval', $data);
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $accessToken,
+            'Content-Type'  => 'application/json',
+        ])->post($url, $payload);
+
+        if (!$response->successful()) {
+            Log::error("FCM Notification failed to send", $response->json());
+        }
+    }
+
+    public function notifyUser(User $user, string $title, string $body): void
+    {
+        if ($user->fcm_token) {
+            $this->send($user->fcm_token, $title, $body);
+        }
+    }
+
+    public function notifyVendor(Vendor $vendor, string $title, string $body): void
+    {
+        if ($vendor->fcm_token) {
+            $this->send($vendor->fcm_token, $title, $body);
+        }
+    }
+
+    //for Admin based on role
+    /*
+    public function notifyAdmins(string $role, string $title, string $body): void
+    {
+        Admin::where('role', $role)
+            ->whereNotNull('fcm_token')
+            ->each(fn($admin) => $this->send($admin->fcm_token, $title, $body));
+    }
+    */
+}

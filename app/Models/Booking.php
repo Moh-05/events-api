@@ -14,6 +14,7 @@ class Booking extends Model
         'status',
         'event_date',
         'event_type',
+        'event_location',
         'duration_hours',
         'details',
         'delivery_date',
@@ -42,10 +43,16 @@ class Booking extends Model
         return $this->belongsTo(Vendor::class);
     }
 
-    public function product()
+    public function vendor_product()
     {
         return $this->belongsTo(VendorProduct::class, 'vendor_product_id');
     }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class);
+    }
+
     public function review()
     {
         return $this->hasOne(Review::class);
