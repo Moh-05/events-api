@@ -113,6 +113,7 @@ class BookingController extends Controller
             }
         }
 
+
         $booking->update($request->only([
             'notes',
             'event_date',
@@ -122,6 +123,8 @@ class BookingController extends Controller
             'delivery_date',
             'delivery_address',
         ]));
+
+        $booking->refresh();
 
         return response()->json([
             'status'  => 'success',
@@ -143,6 +146,99 @@ class BookingController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Booking cancelled successfully',
+        ]);
+    }
+
+
+
+    // Vendor approves a booking
+    public function approve(Request $request, $id)
+    {
+        $vendor  = $request->user();
+        $booking = Booking::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->where('status', 'pending')
+            ->firstOrFail();
+
+        $booking->update(['status' => 'approved']);
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking->load(['vendor', 'vendor_product']),
+        ]);
+    }
+
+    // Vendor declines a booking
+    public function decline(Request $request, $id)
+    {
+        $vendor  = $request->user();
+        $booking = Booking::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->where('status', 'pending')
+            ->firstOrFail();
+
+        $booking->update(['status' => 'declined']);
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking->load(['vendor', 'vendor_product']),
+        ]);
+    }
+
+    // Vendor marks booking as complete
+    public function complete(Request $request, $id)
+    {
+        $vendor  = $request->user();
+        $booking = Booking::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->where('status', 'approved')
+            ->firstOrFail();
+
+        $booking->update(['status' => 'completed']);
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking->load(['vendor', 'vendor_product']),
+        ]);
+    }
+    // Get all bookings (user or vendor)
+    public function index(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user instanceof \App\Models\Vendor) {
+            $bookings = Booking::where('vendor_id', $user->id)
+                ->with(['vendor_product'])
+                ->latest()
+                ->get();
+        } else {
+            $bookings = Booking::where('user_id', $user->id)
+                ->with(['vendor', 'vendor_product'])
+                ->latest()
+                ->get();
+        }
+
+        return response()->json([
+            'status'   => 'success',
+            'bookings' => $bookings,
+        ]);
+    }
+
+
+    //الايام المحجوزه للمواعيد
+    // Vendor gets their booked dates
+    public function bookedDates(Request $request)
+    {
+        $vendor = $request->user();
+
+        $dates = Booking::where('vendor_id', $vendor->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->whereNotNull('event_date')
+            ->pluck('event_date');
+
+        return response()->json([
+            'status' => 'success',
+            'dates'  => $dates,
         ]);
     }
 }

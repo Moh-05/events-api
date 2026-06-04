@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Booking extends Model
 {
     protected $fillable = [
-        'customer_id',
+        'user_id',
         'vendor_id',
         'vendor_product_id',
         'booking_style',
@@ -45,5 +45,9 @@ class Booking extends Model
     public function product()
     {
         return $this->belongsTo(VendorProduct::class, 'vendor_product_id');
+    }
+    public function review()
+    {
+        return $this->hasOne(Review::class);
     }
 }
