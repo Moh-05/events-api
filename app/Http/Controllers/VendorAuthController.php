@@ -82,7 +82,6 @@ class VendorAuthController extends Controller
 
         $vendor = Vendor::create([
             'phone'      => $phone,
-            'name'       => trim($request->first_name . ' ' . $request->last_name),
             'first_name' => $request->first_name,
             'last_name'  => $request->last_name,
             'city'       => $request->city,
