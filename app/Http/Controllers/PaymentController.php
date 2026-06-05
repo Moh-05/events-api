@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\ShamCashService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
@@ -17,9 +18,10 @@ class PaymentController extends Controller
         ]);
 
         $user    = $request->user();
+        // Pay-first: only an unpaid draft can be paid for.
         $booking = Booking::where('id', $request->booking_id)
             ->where('user_id', $user->id)
-            ->where('status', 'pending')
+            ->where('status', 'awaiting_payment')
             ->firstOrFail();
 
         // تأكد إن الحجز ما اتدفع قبل
@@ -83,15 +85,33 @@ class PaymentController extends Controller
             'status'         => 'verified',
         ]);
 
-        // حدّث الـ booking
+        // payment confirmed — move from awaiting_payment to pending (vendor can now see it)
         $booking->update(['status' => 'pending']);
         $booking->refresh();
+
+        $notification = new NotificationService();
+
+        $notifyUser   = $notification->notifyUser(
+            $user,
+            'Payment Received ✅',
+            'Your payment was confirmed. Your booking is now waiting for vendor approval.'
+        );
+
+        $notifyVendor = $notification->notifyVendor(
+            $vendor,
+            'New Paid Booking 🔔',
+            'You have a new paid booking #' . $booking->id . '. Please accept or decline.'
+        );
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Payment verified successfully',
             'booking' => $booking->load(['vendor', 'vendor_product']),
             'payment' => $payment,
+            'debug_notifications' => [
+                'user'   => $notifyUser,
+                'vendor' => $notifyVendor,
+            ],
         ]);
     }
 }
