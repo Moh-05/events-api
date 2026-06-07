@@ -28,6 +28,7 @@ class Vendor extends Authenticatable
         'rating_avg',
         'is_approved',
         'is_active',
+        'fcm_token',
     ];
 
     protected $hidden = [

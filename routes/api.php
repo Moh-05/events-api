@@ -8,6 +8,7 @@ use App\Http\Controllers\VendorProductController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -38,6 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile', [UserProfileController::class, 'update']);
     Route::delete('/profile/image', [UserProfileController::class, 'deleteImage']);
 
+    // Device FCM token (sent by the Flutter app)
+    Route::post('/fcm-token', [UserProfileController::class, 'updateFcmToken']);
+
     // Bookings (User)
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'store']);
@@ -49,6 +53,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Payments
     Route::post('/payments/verify', [PaymentController::class, 'verify']);
+
+    // Notifications (inbox / bell icon)
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 });
 
 
@@ -63,6 +72,9 @@ Route::middleware('auth:vendors')->group(function () {
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
 
+    // Device FCM token (sent by the Flutter app)
+    Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);
+
     // Products
     Route::get('/vendor/products', [VendorProductController::class, 'getVendorProducts']);
     Route::post('/vendor/products', [VendorProductController::class, 'store']);
@@ -76,4 +88,9 @@ Route::middleware('auth:vendors')->group(function () {
     Route::post('/vendor/bookings/{id}/decline', [BookingController::class, 'decline']);
     Route::post('/vendor/bookings/{id}/complete', [BookingController::class, 'complete']);
     Route::get('/vendor/booked-dates', [BookingController::class, 'bookedDates']);
+
+    // Notifications (inbox / bell icon)
+    Route::get('/vendor/notifications', [NotificationController::class, 'index']);
+    Route::post('/vendor/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::post('/vendor/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 });

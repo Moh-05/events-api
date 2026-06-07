@@ -153,13 +153,32 @@ class BookingController extends Controller
 
 
 
-    // Vendor approves a booking — sets completed directly until scheduled auto-complete is built
+    // Vendor approves a paid booking → approved.
+    // Later (event day / vendor mark) it moves to completed via complete().
     public function approve(Request $request, $id)
     {
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
             ->where('vendor_id', $vendor->id)
             ->where('status', 'pending')
+            ->firstOrFail();
+
+        $booking->update(['status' => 'approved']);
+        $booking->refresh();
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking->load(['vendor', 'vendor_product']),
+        ]);
+    }
+
+    // Vendor marks an approved booking as completed (e.g. on the event day)
+    public function complete(Request $request, $id)
+    {
+        $vendor  = $request->user();
+        $booking = Booking::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->where('status', 'approved')
             ->firstOrFail();
 
         $booking->update(['status' => 'completed']);

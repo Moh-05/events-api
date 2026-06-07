@@ -59,6 +59,27 @@ A marketplace for event services where:
 
 ---
 
+## About the Developer (Mohamad) — for tailoring help / future Claude skills
+
+This section captures how Mohamad works, so Claude (and future custom skills) can
+assist him better. It is about **Mohamad**, the repo owner — not Amer.
+
+- **Who:** Mohamad (Moh), repo owner (`Moh-05/events-api`), Laravel backend dev.
+  Haflati is his graduation project (Damascus University, Faculty of Informatics Eng.).
+- **Language:** Talks to Claude in **simple English** (switched from Arabic because the
+  Claude Code chat panel has no RTL support and mixing scripts looked messy).
+- **Teammate Amer:** Amer sometimes uses Mohamad's laptop. **Amer always talks in Arabic.**
+  So: an Arabic message = Amer; an English message = Mohamad. Treat them as different people.
+- **How he likes to work:**
+  - Wants to understand the **why** before accepting a change (asks "do we actually need this?").
+  - Prefers step-by-step guidance and concrete Postman routes when testing.
+  - Likes clean JSON error responses over raw framework exceptions.
+  - Still learning Laravel — explain concepts simply, avoid heavy jargon dumps.
+- **Note:** This list will grow as we work, and Mohamad will use it to build tailored
+  Claude skills later.
+
+---
+
 ## Git Workflow
 
 - `main` branch → connected to Railway auto-deploy
@@ -126,23 +147,39 @@ On Railway, either:
 
 ## Payment Model — حفلتي (UPDATED & FINALIZED)
 
-### Key Decision: booking → vendor approves → user pays
+### Key Decision (UPDATED 2026-06-05 by Mohamad): PAY-FIRST
+
+The flow was flipped from the earlier "approve-first" plan to **pay-first**.
+This is what the code on the `dev` branch actually does now.
 
 ```
-FLOW:
-1. Customer creates booking     → status: pending
-2. Vendor approves              → status: awaiting_payment
-3. Customer pays via ShamCash   → status: approved
-4. Service is delivered         → status: completed
+FLOW (pay-first — current implementation):
+1. Customer creates booking      → status: awaiting_payment   (hidden from vendor)
+2. Customer pays via ShamCash    → status: pending            (now visible to vendor)
+3. Vendor approves               → status: approved
+4. Event day / vendor marks done → status: completed
 OR
-2b. Vendor declines             → status: declined
+3b. Vendor declines              → status: declined
 ```
 
-**WHY this order (not pay-first):**
+**IMPORTANT — status meanings changed from the old plan. Read carefully:**
 
-- ShamCash API has NO refund endpoint
-- If vendor declines after payment → manual refund nightmare
-- Industry standard for appointment-based services
+- `awaiting_payment` = brand-new UNPAID booking, hidden from the vendor
+- `pending` = PAID booking, now visible to the vendor, waiting for approval
+
+**WHY pay-first is OK for now (TEMPORARY — refund API arriving ~2026-06-12):**
+ShamCash currently exposes only a VERIFY endpoint (read-only) — there is no
+endpoint to send money out, so a paid booking that the vendor declines/cancels
+would need a MANUAL refund today. We are waiting on a ShamCash API (expected
+within ~1 week, around 2026-06-12) that lets us PAY / refund programmatically.
+Until then we keep this pay-first flow as-is, and `cancel()` only allows
+`awaiting_payment` (unpaid) bookings. Once the refund API lands, vendor
+decline/cancel will trigger an AUTOMATIC refund to the user (no manual work),
+and cancelling a paid booking can be enabled.
+
+**Testing note:** review is allowed when a booking is `approved` OR `completed`
+for now, so we don't have to wait for the event day. The real rule will be
+`completed` only.
 
 ### Payment Amounts
 
@@ -170,19 +207,19 @@ Vendor receives: 85% of amount paid
 3. User transfers the amount
 4. User returns to app and enters Transaction ID
 5. Laravel calls ShamCash API to verify
-6. If verified → booking status → approved
+6. If verified → booking status → pending (paid, now visible to vendor)
 ```
 
 ---
 
-## Booking Status Flow (UPDATED)
+## Booking Status Flow (UPDATED 2026-06-05 — PAY-FIRST)
 
 ```
-pending           → awaiting_payment (vendor approves)
-pending           → declined (vendor rejects)
-pending           → cancelled (user cancels)
-awaiting_payment  → approved (user pays & ShamCash verified)
-approved          → completed (vendor marks done)
+awaiting_payment  → pending    (user pays & ShamCash verified)
+awaiting_payment  → cancelled  (user cancels an unpaid booking)
+pending           → approved   (vendor approves)
+pending           → declined   (vendor declines)
+approved          → completed  (event day / vendor marks done)
 ```
 
 ---
@@ -229,6 +266,50 @@ approved          → completed (vendor marks done)
 - Firebase FCM HTTP v1 API
 - send(), notifyUser(), notifyVendor()
 - notifyAdmins() — commented out until Admin table is built
+
+---
+
+## UPDATES — 2026-06-06 (Mohamad session)
+
+### Booking flow finalized (pay-first)
+- `store()` creates a booking as `awaiting_payment` (hidden from vendor).
+- `PaymentController::verify()` moves it to `pending` after ShamCash verifies.
+- `approve()` → sets `approved` (was previously jumping straight to completed).
+- `complete()` ADDED → moves `approved` → `completed` (vendor marks done / event day).
+  This also fixed the `/vendor/bookings/{id}/complete` route, which had no method before.
+
+### Reviews
+- Review allowed when booking is `approved` OR `completed` (for now). Real rule later = `completed` only.
+- Clean JSON errors instead of framework exceptions:
+  - `404` Booking not found (not the caller's booking)
+  - `422` "You can't review a booking with status '<status>'..." 
+  - `409` already reviewed (unchanged)
+
+### FCM device token (needed for real push later)
+- `fcm_token` added to `$fillable` on User and Vendor models (column already existed).
+- `updateFcmToken()` added to UserProfileController and VendorProfileController.
+- Routes: `POST /fcm-token` (user) and `POST /vendor/fcm-token` (vendor).
+- The Flutter app calls these on login to save the device token.
+
+### Notification INBOX (bell icon history) — NEW
+- New `notifications` table: `notifiable_type` ('user'|'vendor'), `notifiable_id`,
+  `title`, `body`, `data` (json, nullable), `read_at` (nullable), timestamps.
+- New `Notification` model.
+- `NotificationService` now ALWAYS saves the notification to the DB (`saveToInbox`)
+  in addition to sending the FCM push. So every notify is stored + pushed.
+- New `NotificationController`:
+  - `index()` → list (newest first) + `unread_count`
+  - `markAsRead($id)` → set `read_at`
+  - `markAllAsRead()` → set `read_at` for all unread
+- Routes (both guards):
+  - User:   `GET /notifications`, `POST /notifications/read-all`, `POST /notifications/{id}/read`
+  - Vendor: `GET /vendor/notifications`, `POST /vendor/notifications/read-all`, `POST /vendor/notifications/{id}/read`
+- `unread_count` = number of rows with `read_at = null`; the app uses it for the bell badge.
+
+### Still deferred (not done yet)
+- Notifications are only fired in `PaymentController::verify()` so far.
+- Booking-event notifications (approve / decline / cancel) are NOT wired yet — to add next.
+- `debug_notifications` field in the payment response is for testing; remove before production.
 
 ---
 
@@ -400,14 +481,14 @@ Schema::create('bookings', function (Blueprint $table) {
 });
 ```
 
-**CRITICAL NOTE on status flow:**
+**CRITICAL NOTE on status flow (UPDATED 2026-06-05 — PAY-FIRST):**
 
 ```
-pending           → awaiting_payment (vendor approves)
-pending           → declined (vendor rejects)
-pending           → cancelled (user cancels)
-awaiting_payment  → approved (payment verified)
-approved          → completed (vendor marks done)
+awaiting_payment  → pending    (user pays & ShamCash verified)
+awaiting_payment  → cancelled  (user cancels an unpaid booking)
+pending           → approved   (vendor approves)
+pending           → declined   (vendor declines)
+approved          → completed  (event day / vendor marks done)
 ```
 
 ---

@@ -64,4 +64,13 @@ class UserProfileController extends Controller
             'message' => 'Profile image removed'
         ]);
     }
+
+    // Save / update the device FCM token (the app sends it on login)
+    public function updateFcmToken(Request $request)
+    {
+        $request->validate(['fcm_token' => 'required|string']);
+        $request->user()->update(['fcm_token' => $request->fcm_token]);
+
+        return response()->json(['status' => 'success']);
+    }
 }

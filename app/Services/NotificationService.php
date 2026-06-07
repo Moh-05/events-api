@@ -8,6 +8,7 @@ use Google\Auth\Credentials\ServiceAccountCredentials;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Admin;
+use App\Models\Notification;
 
 class NotificationService
 {
@@ -79,30 +80,48 @@ class NotificationService
         return ['sent' => true];
     }
 
-    public function notifyUser(User $user, string $title, string $body): array
+    public function notifyUser(User $user, string $title, string $body, array $data = []): array
     {
+        // Always save to the inbox first (so the bell icon shows history)
+        $this->saveToInbox('user', $user->id, $title, $body, $data);
+
         if (!$user->fcm_token) {
             // no device token yet — expected during testing before Flutter sends it
             return ['sent' => false, 'reason' => 'no_device_token', 'title' => $title, 'body' => $body];
         }
 
-        $result          = $this->send($user->fcm_token, $title, $body);
+        $result          = $this->send($user->fcm_token, $title, $body, $data);
         $result['title'] = $title;
         $result['body']  = $body;
         return $result;
     }
 
-    public function notifyVendor(Vendor $vendor, string $title, string $body): array
+    public function notifyVendor(Vendor $vendor, string $title, string $body, array $data = []): array
     {
+        // Always save to the inbox first (so the bell icon shows history)
+        $this->saveToInbox('vendor', $vendor->id, $title, $body, $data);
+
         if (!$vendor->fcm_token) {
             // no device token yet — expected during testing before Flutter sends it
             return ['sent' => false, 'reason' => 'no_device_token', 'title' => $title, 'body' => $body];
         }
 
-        $result          = $this->send($vendor->fcm_token, $title, $body);
+        $result          = $this->send($vendor->fcm_token, $title, $body, $data);
         $result['title'] = $title;
         $result['body']  = $body;
         return $result;
+    }
+
+    // Store the notification in the DB so it can be listed later (bell icon)
+    private function saveToInbox(string $type, int $id, string $title, string $body, array $data = []): void
+    {
+        Notification::create([
+            'notifiable_type' => $type,
+            'notifiable_id'   => $id,
+            'title'           => $title,
+            'body'            => $body,
+            'data'            => $data ?: null,
+        ]);
     }
 
     //for Admin based on role
