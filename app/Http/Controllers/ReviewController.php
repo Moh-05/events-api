@@ -67,8 +67,8 @@ class ReviewController extends Controller
         ]);
     }
 
-    // Get all reviews for a vendor
-    public function vendorReviews($vendorId)
+    // Get all reviews for a vendor (public endpoint — used on the vendor's public profile page)
+    public function vendorReviews(int $vendorId)
     {
         $reviews = Review::where('vendor_id', $vendorId)
             ->with('user:id,first_name,last_name')
@@ -78,6 +78,23 @@ class ReviewController extends Controller
         return response()->json([
             'status'  => 'success',
             'reviews' => $reviews,
+        ]);
+    }
+
+    // Vendor sees their own reviews (private — auth:vendors)
+    public function myReviews(Request $request)
+    {
+        $vendor  = $request->user();
+        $reviews = Review::where('vendor_id', $vendor->id)
+            ->with('user:id,first_name,last_name')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status'        => 'success',
+            'total_reviews' => $reviews->count(),
+            'rating_avg'    => $vendor->rating_avg,
+            'reviews'       => $reviews,
         ]);
     }
 }

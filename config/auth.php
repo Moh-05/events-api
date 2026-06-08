@@ -43,9 +43,13 @@ return [
             'provider' => 'users',
         ],
         'vendors' => [
-    'driver'   => 'sanctum',
-    'provider' => 'vendors',
-],
+            'driver'   => 'sanctum',
+            'provider' => 'vendors',
+        ],
+        'admins' => [
+            'driver'   => 'sanctum',
+            'provider' => 'admins',
+        ],
     ],
 
     /*
@@ -71,9 +75,13 @@ return [
             'model' => env('AUTH_MODEL', User::class),
         ],
         'vendors' => [
-    'driver' => 'eloquent',
-    'model'  => App\Models\Vendor::class,
-],
+            'driver' => 'eloquent',
+            'model'  => App\Models\Vendor::class,
+        ],
+        'admins' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\Admin::class,
+        ],
 
         // 'users' => [
         //     'driver' => 'database',

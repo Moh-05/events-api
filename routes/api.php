@@ -9,6 +9,8 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\AdminController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -84,13 +86,49 @@ Route::middleware('auth:vendors')->group(function () {
 
     // Bookings (Vendor)
     Route::get('/vendor/bookings', [BookingController::class, 'index']);
+    Route::get('/vendor/bookings/recent-requests', [BookingController::class, 'recentRequests']);
+    Route::get('/vendor/bookings/upcoming-events', [BookingController::class, 'upcomingEvents']);
     Route::post('/vendor/bookings/{id}/approve', [BookingController::class, 'approve']);
     Route::post('/vendor/bookings/{id}/decline', [BookingController::class, 'decline']);
     Route::post('/vendor/bookings/{id}/complete', [BookingController::class, 'complete']);
     Route::get('/vendor/booked-dates', [BookingController::class, 'bookedDates']);
 
+    // Reviews (Vendor) — الفيندور يشوف تقييماته الخاصة مع المعدل
+    Route::get('/vendor/reviews', [ReviewController::class, 'myReviews']);
+
+    // Stats (Vendor) — إحصائيات: عدد الحجوزات، الأرباح، معدل التقييم
+    Route::get('/vendor/stats', [BookingController::class, 'stats']);
+
     // Notifications (inbox / bell icon)
     Route::get('/vendor/notifications', [NotificationController::class, 'index']);
     Route::post('/vendor/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::post('/vendor/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+});
+
+// ─────────────────────────────────────────────
+// Admin Routes
+// ─────────────────────────────────────────────
+
+// Public — no auth
+Route::post('/admin/login', [AdminAuthController::class, 'login']);
+
+// All admins (super_admin + support)
+Route::middleware('auth:admins')->group(function () {
+
+    Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+
+    // KYC — both roles
+    Route::get('/admin/vendors/pending', [AdminController::class, 'pendingVendors']);
+    Route::post('/admin/vendors/{id}/approve', [AdminController::class, 'approveVendor']);
+    Route::post('/admin/vendors/{id}/reject', [AdminController::class, 'rejectVendor']);
+
+    // Super admin only
+    Route::middleware('role:super_admin')->group(function () {
+        Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
+        Route::get('/admin/vendors', [AdminController::class, 'vendors']);
+        Route::post('/admin/vendors/{id}/toggle', [AdminController::class, 'toggleVendor']);
+        Route::get('/admin/users', [AdminController::class, 'users']);
+        Route::get('/admin/bookings', [AdminController::class, 'bookings']);
+        Route::get('/admin/payments', [AdminController::class, 'payments']);
+    });
 });

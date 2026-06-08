@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Models\VendorProduct;
 use Illuminate\Http\Request;
 
@@ -75,7 +76,7 @@ class BookingController extends Controller
 
 
     // Customer updates a pending booking
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id)
     {
         $request->validate([
             'notes'            => 'sometimes|nullable|string',
@@ -133,7 +134,7 @@ class BookingController extends Controller
     }
 
     // Customer cancels a booking
-    public function cancel(Request $request, $id)
+    public function cancel(Request $request, int $id)
     {
         $user    = $request->user();
         // Only an unpaid draft can be cancelled freely. Once paid (pending) a
@@ -155,7 +156,7 @@ class BookingController extends Controller
 
     // Vendor approves a paid booking → approved.
     // Later (event day / vendor mark) it moves to completed via complete().
-    public function approve(Request $request, $id)
+    public function approve(Request $request, int $id)
     {
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
@@ -173,7 +174,7 @@ class BookingController extends Controller
     }
 
     // Vendor marks an approved booking as completed (e.g. on the event day)
-    public function complete(Request $request, $id)
+    public function complete(Request $request, int $id)
     {
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
@@ -191,7 +192,7 @@ class BookingController extends Controller
     }
 
     // Vendor declines a booking
-    public function decline(Request $request, $id)
+    public function decline(Request $request, int $id)
     {
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
@@ -230,6 +231,78 @@ class BookingController extends Controller
         ]);
     }
 
+
+    // Recent booking requests — latest pending bookings waiting for vendor action
+    public function recentRequests(Request $request)
+    {
+        $vendor   = $request->user();
+        $bookings = Booking::where('vendor_id', $vendor->id)
+            ->where('status', 'pending')
+            ->with(['user:id,first_name,last_name', 'vendor_product:id,name,price'])
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return response()->json([
+            'status'   => 'success',
+            'bookings' => $bookings,
+        ]);
+    }
+
+    // Upcoming events — approved bookings with a future event_date (appointment vendors only)
+    public function upcomingEvents(Request $request)
+    {
+        $vendor = $request->user();
+
+        if ($vendor->booking_style !== 'appointment') {
+            return response()->json([
+                'status'   => 'success',
+                'bookings' => [],
+                'note'     => 'Only appointment vendors have upcoming events',
+            ]);
+        }
+
+        $bookings = Booking::where('vendor_id', $vendor->id)
+            ->where('status', 'approved')
+            ->where('event_date', '>=', now())
+            ->with(['user:id,first_name,last_name', 'vendor_product:id,name'])
+            ->orderBy('event_date', 'asc')
+            ->get();
+
+        return response()->json([
+            'status'   => 'success',
+            'bookings' => $bookings,
+        ]);
+    }
+
+    // Vendor stats — total bookings by status, total earnings, rating
+    public function stats(Request $request)
+    {
+        $vendor = $request->user();
+
+        $bookings = Booking::where('vendor_id', $vendor->id);
+
+        $totalEarnings = Payment::whereHas('booking', fn($q) => $q->where('vendor_id', $vendor->id))
+            ->where('status', 'verified')
+            ->sum('vendor_payout');
+
+        return response()->json([
+            'status' => 'success',
+            'stats'  => [
+                'bookings' => [
+                    'total'     => (clone $bookings)->count(),
+                    'pending'   => (clone $bookings)->where('status', 'pending')->count(),
+                    'approved'  => (clone $bookings)->where('status', 'approved')->count(),
+                    'completed' => (clone $bookings)->where('status', 'completed')->count(),
+                    'declined'  => (clone $bookings)->where('status', 'declined')->count(),
+                    'cancelled' => (clone $bookings)->where('status', 'cancelled')->count(),
+                ],
+                'earnings'       => (float) $totalEarnings,
+                'rating_avg'     => (float) $vendor->rating_avg,
+                'total_reviews'  => \App\Models\Review::where('vendor_id', $vendor->id)->count(),
+            ],
+        ]);
+    }
 
     //الايام المحجوزه للمواعيد
     // Vendor gets their booked dates
