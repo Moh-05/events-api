@@ -13,7 +13,6 @@ class Vendor extends Authenticatable
     protected $fillable = [
         'first_name',
         'last_name',
-        'name',
         'phone',
         'city',
         'birth_date',
@@ -28,6 +27,7 @@ class Vendor extends Authenticatable
         'rating_avg',
         'is_approved',
         'is_active',
+        'fcm_token',
     ];
 
     protected $hidden = [
@@ -54,5 +54,9 @@ class Vendor extends Authenticatable
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
     }
 }

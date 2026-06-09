@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Storage;
 
 class VendorProfileController extends Controller
 {
-    // Get profile
     public function show(Request $request)
     {
         return response()->json([
@@ -73,7 +72,6 @@ class VendorProfileController extends Controller
         ]);
     }
 
-    // Delete profile image
     public function deleteImage(Request $request)
     {
         $vendor = $request->user();
@@ -87,5 +85,14 @@ class VendorProfileController extends Controller
             'status'  => 'success',
             'message' => 'Profile image removed'
         ]);
+    }
+
+    // Save / update the device FCM token (the app sends it on login)
+    public function updateFcmToken(Request $request)
+    {
+        $request->validate(['fcm_token' => 'required|string']);
+        $request->user()->update(['fcm_token' => $request->fcm_token]);
+
+        return response()->json(['status' => 'success']);
     }
 }

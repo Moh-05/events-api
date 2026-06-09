@@ -58,6 +58,7 @@ class VendorProductController extends Controller
             'name'                => 'sometimes|nullable|string|max:255',
             'description'         => 'sometimes|nullable|string',
             'price'               => 'sometimes|nullable|numeric|min:0',
+            'stock'               => 'sometimes|nullable|integer|min:0',
             'meta'                => 'sometimes|array',
             'images'              => 'required|array',
             'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
@@ -71,6 +72,7 @@ class VendorProductController extends Controller
             'name'        => $request->name ?? null,
             'description' => $request->description ?? null,
             'price'       => $request->price ?? null,
+            'stock'       => $request->stock ?? null,
             'meta'        => $request->meta ?? [],
         ]);
 
@@ -116,6 +118,7 @@ class VendorProductController extends Controller
             'name'                => 'sometimes|nullable|string|max:255',
             'description'         => 'sometimes|nullable|string',
             'price'               => 'sometimes|nullable|numeric|min:0',
+            'stock'               => 'sometimes|nullable|integer|min:0',
             'meta'                => 'sometimes|array',
             'images'              => 'sometimes|array',
             'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
@@ -134,6 +137,7 @@ class VendorProductController extends Controller
             'name',
             'description',
             'price',
+            'stock',
             'meta',
         ]));
 
@@ -169,10 +173,52 @@ class VendorProductController extends Controller
         ]);
     }
 
-    // Delete product and remove all associated images from storage
-    public function destroy($id)
+    // Best sellers — top products by number of bookings/orders (order vendors dashboard)
+    public function bestSellers(Request $request)
     {
-        $vendor = request()->user();
+        $vendor = $request->user();
+
+        // Count bookings per product, only paid/active ones count as a sale
+        $products = VendorProduct::where('vendor_id', $vendor->id)
+            ->withCount(['bookings' => function ($q) {
+                $q->whereIn('status', ['pending', 'approved', 'completed']);
+            }])
+            ->with('images')
+            ->orderByDesc('bookings_count')
+            ->take(5)
+            ->get();
+
+        return response()->json([
+            'status'   => 'success',
+            'products' => $products,
+        ]);
+    }
+
+    // Low-stock alerts — products at or below the threshold (order vendors inventory)
+    public function lowStock(Request $request)
+    {
+        $vendor    = $request->user();
+        $threshold = (int) $request->query('threshold', 5);
+
+        $products = VendorProduct::where('vendor_id', $vendor->id)
+            ->whereNotNull('stock') // only products that track stock
+            ->where('stock', '<=', $threshold)
+            ->with('images')
+            ->orderBy('stock', 'asc')
+            ->get();
+
+        return response()->json([
+            'status'    => 'success',
+            'threshold' => $threshold,
+            'count'     => $products->count(),
+            'products'  => $products,
+        ]);
+    }
+
+    // Delete product and remove all associated images from storage
+    public function destroy(Request $request, $id)
+    {
+        $vendor = $request->user();
 
         $product = VendorProduct::where('id', $id)
             ->where('vendor_id', $vendor->id)

@@ -21,6 +21,7 @@ class User extends Authenticatable
         'latitude',
         'longitude',
         'address',
+        'fcm_token',
     ];
 
     protected $hidden = [
@@ -34,5 +35,15 @@ class User extends Authenticatable
             'latitude'   => 'decimal:8',
             'longitude'  => 'decimal:8',
         ];
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
     }
 }
