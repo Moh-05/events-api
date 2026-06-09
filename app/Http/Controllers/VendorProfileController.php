@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Storage;
 
 class VendorProfileController extends Controller
 {
-    // Get profile
     public function show(Request $request)
     {
         return response()->json([
@@ -73,7 +72,6 @@ class VendorProfileController extends Controller
         ]);
     }
 
-    // Delete profile image
     public function deleteImage(Request $request)
     {
         $vendor = $request->user();

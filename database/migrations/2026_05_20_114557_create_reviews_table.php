@@ -17,7 +17,7 @@ return new class extends Migration
             $table->text('comment')->nullable();
             $table->timestamps();
 
-            // زبون ما يقدر يقيّم نفس الحجز مرتين
+            // one review per booking
             $table->unique('booking_id');
         });
     }

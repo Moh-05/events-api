@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Storage;
 
 class UserProfileController extends Controller
 {
-    // Get profile
     public function show(Request $request)
     {
         return response()->json([
@@ -16,7 +15,6 @@ class UserProfileController extends Controller
         ]);
     }
 
-    // Update profile
     public function update(Request $request)
     {
         $request->validate([
@@ -49,7 +47,6 @@ class UserProfileController extends Controller
         ]);
     }
 
-    // Delete profile image
     public function deleteImage(Request $request)
     {
         $user = $request->user();

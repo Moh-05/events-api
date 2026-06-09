@@ -208,7 +208,6 @@ class BookingController extends Controller
         ]);
     }
 
-    // Get all bookings (user or vendor)
     public function index(Request $request)
     {
         $user = $request->user();
@@ -275,7 +274,6 @@ class BookingController extends Controller
         ]);
     }
 
-    // Vendor stats — total bookings by status, total earnings, rating
     public function stats(Request $request)
     {
         $vendor = $request->user();
@@ -304,8 +302,75 @@ class BookingController extends Controller
         ]);
     }
 
-    //الايام المحجوزه للمواعيد
-    // Vendor gets their booked dates
+    public function show(Request $request, int $id)
+    {
+        $vendor  = $request->user();
+        $booking = Booking::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->with(['user:id,first_name,last_name,phone,profile_image', 'vendor_product.images', 'payment'])
+            ->firstOrFail();
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking,
+        ]);
+    }
+
+    // Recent orders — latest orders for order vendors (cake_shop, store).
+    // An order is just a booking with booking_style='order'. We skip drafts (awaiting_payment).
+    public function recentOrders(Request $request)
+    {
+        $vendor   = $request->user();
+        $bookings = Booking::where('vendor_id', $vendor->id)
+            ->where('booking_style', 'order')
+            ->where('status', '!=', 'awaiting_payment')
+            ->with(['user:id,first_name,last_name', 'vendor_product:id,name,price'])
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'orders' => $bookings,
+        ]);
+    }
+
+    // Earnings/revenue with month-over-month growth %
+    public function earnings(Request $request)
+    {
+        $vendor = $request->user();
+
+        $startThisMonth = now()->startOfMonth();
+        $startLastMonth = now()->subMonth()->startOfMonth();
+
+        // Sum vendor_payout from verified payments for this vendor's bookings
+        $base = Payment::whereHas('booking', fn($q) => $q->where('vendor_id', $vendor->id))
+            ->where('status', 'verified');
+
+        $thisMonth = (float) (clone $base)
+            ->where('created_at', '>=', $startThisMonth)
+            ->sum('vendor_payout');
+
+        $lastMonth = (float) (clone $base)
+            ->whereBetween('created_at', [$startLastMonth, $startThisMonth])
+            ->sum('vendor_payout');
+
+        // Growth % vs last month. If last month was 0, treat any income as 100%.
+        $growth = $lastMonth > 0
+            ? round((($thisMonth - $lastMonth) / $lastMonth) * 100, 1)
+            : ($thisMonth > 0 ? 100.0 : 0.0);
+
+        return response()->json([
+            'status'   => 'success',
+            'earnings' => [
+                'this_month' => $thisMonth,
+                'last_month' => $lastMonth,
+                'growth'     => $growth, // percent, can be negative
+            ],
+        ]);
+    }
+
+    // Booked dates for appointment vendors (used to block the calendar)
     public function bookedDates(Request $request)
     {
         $vendor = $request->user();

@@ -24,7 +24,6 @@ class PaymentController extends Controller
             ->where('status', 'awaiting_payment')
             ->firstOrFail();
 
-        // تأكد إن الحجز ما اتدفع قبل
         if (Payment::where('booking_id', $booking->id)
             ->where('status', 'verified')
             ->exists()
@@ -35,7 +34,7 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        // تأكد إن الـ transaction_id ما استخدم قبل
+        // prevent reuse of the same transaction
         if (Payment::where('transaction_id', $request->transaction_id)->exists()) {
             return response()->json([
                 'status'  => 'error',
@@ -43,14 +42,12 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        // احسب المبلغ المطلوب
         $product       = $booking->vendor_product;
         $vendor        = $booking->vendor;
         $expectedAmount = $vendor->booking_style === 'appointment'
             ? round($product->price * ($product->deposit_percent / 100), 2)
             : $product->price;
 
-        // تحقق من ShamCash
         $shamCash = new ShamCashService();
         $result   = $shamCash->verifyTransaction(
             $request->transaction_id,
@@ -70,7 +67,6 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        // سجل الـ payment
         $commission   = round($expectedAmount * 0.15, 2);
         $vendorPayout = round($expectedAmount * 0.85, 2);
 

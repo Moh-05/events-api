@@ -80,6 +80,8 @@ Route::middleware('auth:vendors')->group(function () {
     // Products
     Route::get('/vendor/products', [VendorProductController::class, 'getVendorProducts']);
     Route::post('/vendor/products', [VendorProductController::class, 'store']);
+    Route::get('/vendor/products/best-sellers', [VendorProductController::class, 'bestSellers']); // top products by orders
+    Route::get('/vendor/products/low-stock', [VendorProductController::class, 'lowStock']);       // inventory alerts
     Route::get('/vendor/products/{id}', [VendorProductController::class, 'show']);
     Route::post('/vendor/products/{id}', [VendorProductController::class, 'update']);
     Route::delete('/vendor/products/{id}', [VendorProductController::class, 'destroy']);
@@ -87,17 +89,21 @@ Route::middleware('auth:vendors')->group(function () {
     // Bookings (Vendor)
     Route::get('/vendor/bookings', [BookingController::class, 'index']);
     Route::get('/vendor/bookings/recent-requests', [BookingController::class, 'recentRequests']);
+    Route::get('/vendor/bookings/recent-orders', [BookingController::class, 'recentOrders']);     // order vendors
     Route::get('/vendor/bookings/upcoming-events', [BookingController::class, 'upcomingEvents']);
+    Route::get('/vendor/bookings/{id}', [BookingController::class, 'show']);                       // full booking/order detail
     Route::post('/vendor/bookings/{id}/approve', [BookingController::class, 'approve']);
     Route::post('/vendor/bookings/{id}/decline', [BookingController::class, 'decline']);
     Route::post('/vendor/bookings/{id}/complete', [BookingController::class, 'complete']);
     Route::get('/vendor/booked-dates', [BookingController::class, 'bookedDates']);
 
-    // Reviews (Vendor) — الفيندور يشوف تقييماته الخاصة مع المعدل
+    // Reviews (Vendor)
     Route::get('/vendor/reviews', [ReviewController::class, 'myReviews']);
+    Route::get('/vendor/reviews/summary', [ReviewController::class, 'summary']); // star breakdown, positive %, trend
 
-    // Stats (Vendor) — إحصائيات: عدد الحجوزات، الأرباح، معدل التقييم
+    // Stats (Vendor)
     Route::get('/vendor/stats', [BookingController::class, 'stats']);
+    Route::get('/vendor/earnings', [BookingController::class, 'earnings']); // month-over-month growth
 
     // Notifications (inbox / bell icon)
     Route::get('/vendor/notifications', [NotificationController::class, 'index']);

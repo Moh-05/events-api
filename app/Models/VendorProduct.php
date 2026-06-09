@@ -13,12 +13,16 @@ class VendorProduct extends Model
         'price',
         'meta',
         'is_available',
+        'stock',
     ];
 
+    // deposit_percent is intentionally NOT fillable — the deposit is a fixed
+    // platform rule (20%), set by the DB default, not editable by vendors.
     protected $casts = [
         'meta' => 'array',
         'is_available' => 'boolean',
         'price' => 'decimal:2',
+        'stock' => 'integer',
     ];
 
     public function vendor()
@@ -34,5 +38,10 @@ class VendorProduct extends Model
     public function primaryImage()
     {
         return $this->hasOne(VendorProductImage::class)->where('is_primary', true);
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'vendor_product_id');
     }
 }

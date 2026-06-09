@@ -313,6 +313,40 @@ approved          → completed  (event day / vendor marks done)
 
 ---
 
+## UPDATES — 2026-06-06 (later: Amer's admin + vendor dashboard endpoints)
+
+### Admin system — now BUILT by Amer (was "TO BE BUILT")
+- New `auth:admins` Sanctum guard in `config/auth.php`; `role` middleware alias registered in `bootstrap/app.php`.
+- Files: `AdminAuthController` (login/logout), `AdminController`, `EnsureAdminRole` middleware, `Admin` model, `admins` migration.
+- Roles: `super_admin` and `support`.
+- Admin routes: `POST /admin/login`, `POST /admin/logout`, KYC (`/admin/vendors/pending`, `/admin/vendors/{id}/approve`, `/admin/vendors/{id}/reject`), and super_admin-only: dashboard, vendors list, vendor toggle, users, bookings, payments.
+- REVIEW + open decisions for this admin system are written up in `docs/admin-review.html`. Key pending decision: let `support` SEE the dashboard read-only but DENY bans/payments (see that file for the full permission matrix). Known HIGH bug: `rejectVendor` sets `is_active=false`, letting support effectively ban vendors.
+
+### Vendor dashboard endpoints (Amer + this session)
+The Vendor app has two dashboard styles (service providers vs store/order vendors). These endpoints back them (all under `auth:vendors`):
+- `GET /vendor/bookings/recent-requests` — latest pending requests (Amer)
+- `GET /vendor/bookings/upcoming-events` — approved future events (Amer)
+- `GET /vendor/bookings/recent-orders` — latest orders for order vendors
+- `GET /vendor/bookings/{id}` — full booking/order detail (user + product + payment)
+- `GET /vendor/stats` — booking counts by status, earnings, rating (Amer)
+- `GET /vendor/earnings` — this month vs last month payout + growth %
+- `GET /vendor/reviews` — vendor's own reviews + average (Amer, `ReviewController::myReviews`)
+- `GET /vendor/reviews/summary` — star breakdown %, positive %, trend vs last month
+- `GET /vendor/products/best-sellers` — top products by number of orders
+- `GET /vendor/products/low-stock` — inventory alerts (`?threshold=N`, default 5)
+
+### Schema / model changes
+- Added nullable `stock` (integer) to `vendor_products` (edited the original migration → needs `migrate:fresh`). Wired into `VendorProduct` `$fillable`/casts and into product store/update.
+- Added `VendorProduct::bookings()` hasMany (was the one missing inverse relation).
+
+### Decisions / fixes
+- `deposit_percent` stays a FIXED platform rule (20%). It is deliberately NOT in `VendorProduct` `$fillable` — vendors cannot change it; it comes from the DB default. (A code review flagged it as a "bug"; that was a false positive given this rule.)
+- Removed the dead `'name'` from `Vendor` `$fillable` (the `vendors` table has no `name` column).
+- Comment cleanup pass: removed AI-style / Arabic comments across controllers/services/migrations, kept the real "why" comments.
+- Full code/ERD review (relationship naming, missing inverses, many-to-many) is in `docs/erd-review.html`.
+
+---
+
 ## Next Steps To Build (IN ORDER)
 
 ### IMMEDIATE (Current Session)
@@ -516,7 +550,7 @@ Schema::create('payments', function (Blueprint $table) {
 
 ---
 
-## Table: admins (TO BE BUILT)
+## Table: admins (BUILT 2026-06-06 by Amer — see actual migration for the final columns)
 
 ```php
 Schema::create('admins', function (Blueprint $table) {
@@ -850,7 +884,7 @@ class Payment extends Model
 
 ---
 
-## Model: Admin (TO BE BUILT)
+## Model: Admin (BUILT 2026-06-06 by Amer — see app/Models/Admin.php for the final version)
 
 ```php
 <?php

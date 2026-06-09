@@ -12,24 +12,36 @@ use App\Models\Notification;
 
 class NotificationService
 {
-    protected string $credentialsPath;
+    protected ?array $credentials = null;
 
     public function __construct()
     {
-        $this->credentialsPath = base_path(env('FIREBASE_CREDENTIALS'));
+        // On Railway the file is gitignored, so the JSON is passed as an env
+        // variable (FIREBASE_CREDENTIALS_JSON). Locally we read it from the
+        // file path (FIREBASE_CREDENTIALS). Support both.
+        $json = env('FIREBASE_CREDENTIALS_JSON');
+
+        if ($json) {
+            $this->credentials = json_decode($json, true);
+        } else {
+            $path = base_path(env('FIREBASE_CREDENTIALS'));
+            if (file_exists($path)) {
+                $this->credentials = json_decode(file_get_contents($path), true);
+            }
+        }
     }
 
     private function getAccessToken(): ?string
     {
-        if (!file_exists($this->credentialsPath)) {
-            Log::error("Firebase credentials file not found at: {$this->credentialsPath}");
+        if (!$this->credentials) {
+            Log::error("Firebase credentials not configured (set FIREBASE_CREDENTIALS_JSON on Railway or FIREBASE_CREDENTIALS locally).");
             return null;
         }
 
         $scopes = ['https://www.googleapis.com/auth/cloud-platform'];
 
         try {
-            $creds = new ServiceAccountCredentials($scopes, $this->credentialsPath);
+            $creds = new ServiceAccountCredentials($scopes, $this->credentials);
             $authToken = $creds->fetchAuthToken();
             return $authToken['access_token'] ?? null;
         } catch (\Exception $e) {
@@ -46,8 +58,7 @@ class NotificationService
             return [];
         }
 
-        $config    = json_decode(file_get_contents($this->credentialsPath), true);
-        $projectId = $config['project_id'] ?? null;
+        $projectId = $this->credentials['project_id'] ?? null;
 
         if (!$projectId) {
             Log::error("Firebase Project ID could not be extracted.");
@@ -124,7 +135,6 @@ class NotificationService
         ]);
     }
 
-    //for Admin based on role
     /*
     public function notifyAdmins(string $role, string $title, string $body): void
     {

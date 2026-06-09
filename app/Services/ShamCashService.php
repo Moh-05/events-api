@@ -16,7 +16,6 @@ class ShamCashService
         $this->accountId = env('SHAMCASH_ACCOUNT_ID');
     }
 
-    // التحقق من transaction معين
     public function verifyTransaction(
         string $transactionId,
         float  $expectedAmount,
@@ -31,7 +30,7 @@ class ShamCashService
             'transaction_ids' => $transactionId,
         ]);
 
-        // فشل الاتصال بالـ API
+        // API call failed
         if (!$response->successful()) {
             return [
                 'verified' => false,
@@ -42,7 +41,6 @@ class ShamCashService
         $data         = $response->json();
         $transactions = $data['data']['transactions'] ?? [];
 
-        // ما لاقى الـ transaction
         if (empty($transactions)) {
             return [
                 'verified' => false,
@@ -52,7 +50,6 @@ class ShamCashService
 
         $tx = $transactions[0];
 
-        // تحقق من المبلغ
         if ((float) $tx['amount'] !== (float) $expectedAmount) {
             return [
                 'verified' => false,
@@ -62,7 +59,6 @@ class ShamCashService
             ];
         }
 
-        // تحقق من العملة
         if ($tx['currency']['code'] !== strtoupper($currency)) {
             return [
                 'verified' => false,
@@ -70,7 +66,7 @@ class ShamCashService
             ];
         }
 
-        // تحقق إن التحويل مش قديم أكثر من 60 دقيقة
+        // reject transactions older than 60 minutes
         $occurredAt = \Carbon\Carbon::parse($tx['occurred_at']);
         if ($occurredAt->diffInMinutes(now()) > 60) {
             return [
@@ -87,4 +83,3 @@ class ShamCashService
         ];
     }
 }
-// i love u

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haflati — ERD &amp; Code Structure Review</title>
+<style>
+:root{--bg:#15131f;--bg2:#1e1b2e;--card:#262236;--gold:#C9A84C;--text:#E8E4F0;--dim:#9890B0;--green:#4CAF7D;--red:#E05050;--amber:#FCD34D;--blue:#6BA8E0;--border:rgba(201,168,76,.2)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.7;padding:40px 20px}
+.wrap{max-width:1040px;margin:0 auto}
+h1{color:var(--gold);font-size:30px;margin-bottom:6px}
+.sub{color:var(--dim);margin-bottom:30px;font-size:14px}
+h2{color:var(--gold);font-size:21px;margin:36px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+h3{color:var(--text);font-size:16px;margin:18px 0 8px}
+p{color:var(--dim);margin-bottom:12px}
+strong{color:var(--text)}
+code{background:#0f0d18;color:var(--gold);padding:2px 6px;border-radius:4px;font-family:'Consolas',monospace;font-size:13px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin:18px 0}
+.ent{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.ent h4{background:#2e2942;color:var(--gold);padding:8px 12px;font-size:14px;font-family:monospace}
+.ent ul{list-style:none;margin:0;padding:8px 12px}
+.ent li{color:var(--dim);font-size:12.5px;font-family:monospace;margin-bottom:3px}
+.pk{color:var(--gold)}.fk{color:var(--blue)}.uq{color:var(--green)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+th{background:#2e2942;color:var(--gold);font-size:13px}
+ul.bul{margin:8px 0 12px 22px}ul.bul li{color:var(--dim);margin-bottom:6px}
+.tag{font-family:monospace;font-size:11px;padding:2px 7px;border-radius:4px}
+.t-1m{background:rgba(107,168,224,.15);color:var(--blue)}
+.t-11{background:rgba(76,175,125,.15);color:var(--green)}
+.t-poly{background:rgba(201,168,76,.15);color:var(--gold)}
+.sev{font-family:monospace;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px}
+.s-high{background:rgba(224,80,80,.2);color:#ff8a8a}.s-med{background:rgba(252,211,77,.2);color:var(--amber)}.s-low{background:rgba(152,144,176,.2);color:var(--dim)}
+.good{color:var(--green)}.bad{color:var(--red)}
+.map{background:#0f0d18;border:1px solid var(--border);border-radius:8px;padding:18px;font-family:monospace;font-size:13px;color:var(--dim);white-space:pre;overflow-x:auto;line-height:1.8}
+.foot{margin-top:40px;color:#5a5470;font-size:12px;text-align:center}
+.legend{font-size:12px;color:var(--dim);margin:6px 0 18px}
+.legend span{margin-right:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Database (ERD) &amp; Code Structure — Review</h1>
+  <div class="sub">Haflati · Laravel 12 API · verified against the actual code · 2026-06-06</div>
+
+  <div class="card">
+    <h3>The one-paragraph answer</h3>
+    <p>Your data model is <strong>healthy</strong> — clean layering, correct foreign keys, good unique constraints, and three properly-separated auth guards. The things that "felt" confusing are mostly <strong>naming</strong>, not broken relationships. The single real relationship gap (a missing inverse on <code>VendorProduct</code>) was already filled this session. Below: the current ERD, a cleaned future version, and a plain-language explanation of every relationship doubt you had.</p>
+  </div>
+
+  <h2>1. Current ERD</h2>
+  <div class="legend">
+    <span><span class="pk">PK</span> = primary key</span>
+    <span><span class="fk">FK</span> = foreign key</span>
+    <span><span class="uq">UQ</span> = unique</span>
+  </div>
+  <div class="grid">
+    <div class="ent"><h4>users</h4><ul>
+      <li class="pk">id PK</li><li>first_name, last_name</li><li class="uq">phone UQ</li><li>city, birth_date</li><li>lat, lng, address</li><li>profile_image</li><li>fcm_token</li></ul></div>
+    <div class="ent"><h4>vendors</h4><ul>
+      <li class="pk">id PK</li><li>first_name, last_name</li><li class="uq">phone UQ</li><li>vendor_type (enum)</li><li>booking_style (enum)</li><li>business_name, bio</li><li>rating_avg</li><li>is_approved, is_active</li><li>fcm_token</li></ul></div>
+    <div class="ent"><h4>vendor_products</h4><ul>
+      <li class="pk">id PK</li><li class="fk">vendor_id FK</li><li>name, description</li><li>price, deposit_percent</li><li>meta (json)</li><li>is_available</li><li>stock (new)</li></ul></div>
+    <div class="ent"><h4>vendor_product_images</h4><ul>
+      <li class="pk">id PK</li><li class="fk">vendor_product_id FK</li><li>image_path</li><li>is_primary</li></ul></div>
+    <div class="ent"><h4>bookings</h4><ul>
+      <li class="pk">id PK</li><li class="fk">user_id FK</li><li class="fk">vendor_id FK</li><li class="fk">vendor_product_id FK</li><li>booking_style</li><li>status (enum)</li><li>event_* / delivery_*</li><li>price_agreed, notes</li></ul></div>
+    <div class="ent"><h4>payments</h4><ul>
+      <li class="pk">id PK</li><li class="fk">booking_id FK</li><li>amount_paid</li><li>commission, vendor_payout</li><li class="uq">transaction_id UQ</li><li>sender_name, status</li></ul></div>
+    <div class="ent"><h4>reviews</h4><ul>
+      <li class="pk">id PK</li><li class="fk uq">booking_id FK · UQ</li><li class="fk">user_id FK</li><li class="fk">vendor_id FK</li><li>rating, comment</li></ul></div>
+    <div class="ent"><h4>admins</h4><ul>
+      <li class="pk">id PK</li><li class="uq">email UQ</li><li>password</li><li>role (enum)</li><li>fcm_token</li></ul></div>
+    <div class="ent"><h4>notifications</h4><ul>
+      <li class="pk">id PK</li><li>notifiable_type</li><li>notifiable_id</li><li>title, body</li><li>data (json)</li><li>read_at</li></ul></div>
+  </div>
+
+  <h3>Relationship map</h3>
+  <div class="map">users ──&lt; bookings &gt;── vendors          (a booking belongs to 1 user + 1 vendor)
+vendors ──&lt; vendor_products ──&lt; vendor_product_images
+vendor_products ──&lt; bookings                (which product was booked)
+bookings ──1 payments                       (one payment per booking)
+bookings ──1 reviews                        (one review per booking · UQ)
+users ──&lt; reviews &gt;── vendors               (who reviewed whom)
+notifications ──&gt; (user OR vendor)          (polymorphic by notifiable_type/id)
+admins                                       (standalone auth model)</div>
+
+  <table>
+    <tr><th>Relationship</th><th>Type</th><th>Foreign key</th></tr>
+    <tr><td>User → Booking</td><td><span class="tag t-1m">1 — many</span></td><td>bookings.user_id</td></tr>
+    <tr><td>Vendor → VendorProduct</td><td><span class="tag t-1m">1 — many</span></td><td>vendor_products.vendor_id</td></tr>
+    <tr><td>Vendor → Booking</td><td><span class="tag t-1m">1 — many</span></td><td>bookings.vendor_id</td></tr>
+    <tr><td>VendorProduct → VendorProductImage</td><td><span class="tag t-1m">1 — many</span></td><td>vendor_product_images.vendor_product_id</td></tr>
+    <tr><td>VendorProduct → Booking</td><td><span class="tag t-1m">1 — many</span></td><td>bookings.vendor_product_id</td></tr>
+    <tr><td>Booking → Payment</td><td><span class="tag t-11">1 — 1</span></td><td>payments.booking_id</td></tr>
+    <tr><td>Booking → Review</td><td><span class="tag t-11">1 — 1</span></td><td>reviews.booking_id (UQ)</td></tr>
+    <tr><td>User / Vendor → Review</td><td><span class="tag t-1m">1 — many</span></td><td>reviews.user_id / vendor_id</td></tr>
+    <tr><td>Notification → User or Vendor</td><td><span class="tag t-poly">polymorphic</span></td><td>notifiable_type + notifiable_id</td></tr>
+  </table>
+
+  <h2>2. Relationships explained simply (the doubts you had)</h2>
+
+  <h3>"Why so many <code>belongsTo</code> but no <code>hasMany</code>?"</h3>
+  <p>Every relationship has <strong>two sides</strong>, and the foreign key always lives on the "many/child" side. <code>belongsTo</code> is the child looking up at its parent; <code>hasMany</code> is the parent looking down at its children. You can define just one side and queries still work — but defining both makes the code readable (<code>$vendor-&gt;products</code> AND <code>$product-&gt;vendor</code>). So "many belongsTo" isn't wrong; it just means some parent-side <code>hasMany</code> methods weren't written yet.</p>
+
+  <h3>"<code>product</code> vs <code>vendor_product</code> — which is right?"</h3>
+  <p>Verified in code: <code>Booking</code> defines the relation as <code>vendor_product()</code> (<code>Booking.php:46</code>) and uses that exact name <strong>consistently in 11 places</strong>, so nothing is broken. The confusion is only that <code>VendorProductImage</code> calls the same model <code>product()</code> (<code>VendorProductImage.php:19</code>). Two words, one model. <strong>Fix: pick one word</strong> (recommend <code>product()</code> everywhere) so you never second-guess it again.</p>
+
+  <h3>"Isn't User↔Vendor a many-to-many? Where's the pivot?"</h3>
+  <p>Yes, conceptually a user deals with many vendors and a vendor with many users. But it is correctly modelled as a <strong>rich join table</strong> — the <code>bookings</code> table — because the link carries data (status, date, price, payment, review). A plain <code>belongsToMany</code> pivot can't hold all that. <strong>Keep <code>Booking</code> as a real model</strong>; do NOT convert to a pivot. (Optionally add a read-only <code>hasManyThrough</code> later for convenience, e.g. "all users who booked this vendor".)</p>
+
+  <h2>3. Findings (verified in code)</h2>
+  <table>
+    <tr><th>Sev</th><th>Finding</th></tr>
+    <tr><td><span class="sev s-high">HIGH</span></td><td><strong><code>VendorProduct::$fillable</code> is missing <code>deposit_percent</code></strong> (<code>VendorProduct.php</code>). The column exists and pricing reads it, but a vendor can't actually set it — it silently falls back to the DB default of 20. Add it to <code>$fillable</code>.</td></tr>
+    <tr><td><span class="sev s-med">MED</span></td><td><strong>Dead <code>fillable</code>:</strong> <code>Vendor::$fillable</code> lists <code>'name'</code> (<code>Vendor.php:16</code>) but the table has no <code>name</code> column. Harmless now (you stopped sending it) but remove it.</td></tr>
+    <tr><td><span class="sev s-med">MED</span></td><td><strong><code>VendorProduct::bookings()</code> inverse was missing</strong> — the one genuine broken pair. <span class="good">Added this session</span> (needed for best-sellers). Good.</td></tr>
+    <tr><td><span class="sev s-med">MED</span></td><td><strong>No Form Requests.</strong> Booking validation is duplicated between <code>store()</code> and <code>update()</code>. Extract to a <code>StoreBookingRequest</code> to stop repeating yourself.</td></tr>
+    <tr><td><span class="sev s-low">LOW</span></td><td><strong>Status values are raw strings</strong> scattered everywhere. Move to constants or a PHP enum so a typo can't create an invalid status.</td></tr>
+    <tr><td><span class="sev s-low">LOW</span></td><td><strong>Notification has no Eloquent relations</strong> — it uses manual <code>notifiable_type/id</code> queries. Add <code>User::notifications()</code> / <code>Vendor::notifications()</code> (morphMany) for cleaner code.</td></tr>
+    <tr><td><span class="sev s-low">LOW</span></td><td>Date-conflict check ignores <code>awaiting_payment</code>, so two users could hold unpaid drafts on the same date. Intentional for now (no expiry yet) — revisit with an expiry timer.</td></tr>
+  </table>
+  <p><strong class="good">What's already good:</strong> clean Model / Controller / Service layering, three separated auth guards with role middleware, sensible FK cascades (<code>nullOnDelete</code> on <code>bookings.vendor_product_id</code> keeps paid history if a product is deleted), good casts, consistent JSON response shape, and unique constraints on <code>reviews.booking_id</code> and <code>payments.transaction_id</code>.</p>
+
+  <h2>4. Future / cleaned ERD</h2>
+  <ul class="bul">
+    <li><strong>Naming:</strong> rename <code>Booking::vendor_product()</code> → <code>product()</code> (update the 11 call sites) so the model name is one word everywhere.</li>
+    <li><strong>Inverse relations:</strong> keep the new <code>VendorProduct::bookings()</code>; add <code>morphMany</code> notification relations on User &amp; Vendor.</li>
+    <li><strong>Status enums:</strong> introduce <code>BookingStatus</code> / <code>PaymentStatus</code> enums.</li>
+    <li><strong>New tables for planned features:</strong> <code>complaints</code> (user/vendor ↔ booking, handled by support admin), <code>audit_logs</code> (admin actions), and later <code>refunds</code> (once the ShamCash pay API arrives ~2026-06-12).</li>
+    <li><strong>Form Requests:</strong> move validation out of controllers.</li>
+  </ul>
+
+  <div class="foot">Generated for Mohamad · review is read-only, no code was changed · Haflati 2026</div>
+</div>
+</body>
+</html>
