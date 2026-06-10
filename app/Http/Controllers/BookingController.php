@@ -93,9 +93,11 @@ class BookingController extends Controller
         ]);
 
         $user    = $request->user();
+        // Only an unpaid draft can be edited. Once the booking is paid (pending)
+        // the details are locked, so changes wait for a cancel/refund instead.
         $booking = Booking::where('id', $id)
             ->where('user_id', $user->id)
-            ->where('status', 'pending')
+            ->where('status', 'awaiting_payment')
             ->firstOrFail();
 
         // Check date conflict if date changed (appointment only)
