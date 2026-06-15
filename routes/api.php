@@ -11,6 +11,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -70,7 +71,6 @@ Route::middleware('auth:vendors')->group(function () {
 
     // Profile
     Route::get('/vendor/profile', [VendorProfileController::class, 'show']);
-    Route::post('/vendor/profile/type', [VendorProfileController::class, 'setType']);
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
 
@@ -109,6 +109,10 @@ Route::middleware('auth:vendors')->group(function () {
     Route::get('/vendor/notifications', [NotificationController::class, 'index']);
     Route::post('/vendor/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::post('/vendor/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
+    // Wallet
+    Route::get('/vendor/wallet', [WalletController::class, 'wallet']);
+    Route::post('/vendor/withdraw', [WalletController::class, 'withdraw']);
 });
 
 // ─────────────────────────────────────────────

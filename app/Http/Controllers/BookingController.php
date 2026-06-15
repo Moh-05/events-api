@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\VendorProduct;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -139,18 +140,53 @@ class BookingController extends Controller
     public function cancel(Request $request, int $id)
     {
         $user    = $request->user();
-        // Only an unpaid draft can be cancelled freely. Once paid (pending) a
-        // refund is required, so cancelling a paid booking waits for the pay API.
         $booking = Booking::where('id', $id)
             ->where('user_id', $user->id)
-            ->whereIn('status', ['awaiting_payment'])
+            ->whereIn('status', ['awaiting_payment', 'pending', 'approved'])
             ->firstOrFail();
+
+        $refundPercent = 0;
+        $refundAmount  = 0.0;
+
+        if ($booking->status === 'approved') {
+            // Find the credit row — its created_at IS the approval moment (3-day clock start)
+            $credit = WalletTransaction::where('booking_id', $booking->id)
+                ->where('type', 'credit')
+                ->first();
+
+            if ($credit) {
+                $hoursSinceApproval = $credit->created_at->diffInHours(now());
+
+                if ($hoursSinceApproval <= 24) {
+                    $refundPercent = 100;
+                    $refundAmount  = (float) $credit->amount;
+                } elseif ($hoursSinceApproval <= 72) {
+                    $refundPercent = 50;
+                    $refundAmount  = round((float) $credit->amount * 0.5, 2);
+                }
+                // > 72h (3 days): 0% — money already cleared, no refund row
+
+                if ($refundAmount > 0) {
+                    WalletTransaction::create([
+                        'vendor_id'  => $booking->vendor_id,
+                        'booking_id' => $booking->id,
+                        'type'       => 'refund',
+                        'amount'     => -$refundAmount,
+                    ]);
+                }
+            }
+        }
 
         $booking->update(['status' => 'cancelled']);
 
         return response()->json([
-            'status'  => 'success',
-            'message' => 'Booking cancelled successfully',
+            'status'         => 'success',
+            'message'        => 'Booking cancelled successfully',
+            'refund_percent' => $refundPercent,
+            'refund_amount'  => $refundAmount,
+            'note'           => $refundAmount > 0
+                ? 'Refund will be processed once ShamCash refund API is available.'
+                : null,
         ]);
     }
 
@@ -168,6 +204,17 @@ class BookingController extends Controller
 
         $booking->update(['status' => 'approved']);
         $booking->refresh();
+
+        // Credit the vendor's wallet — 3-day hold starts now (created_at = this moment)
+        // Vendor never receives money unless they explicitly approve
+        if ($booking->payment) {
+            WalletTransaction::create([
+                'vendor_id'  => $vendor->id,
+                'booking_id' => $booking->id,
+                'type'       => 'credit',
+                'amount'     => $booking->payment->vendor_payout,
+            ]);
+        }
 
         return response()->json([
             'status'  => 'success',

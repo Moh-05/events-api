@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haflati — Vendor App API Reference</title>
+<style>
+:root {
+  --bg:        #0f0f1a;
+  --surface:   #16213e;
+  --surface2:  #1a1a2e;
+  --gold:      #C9A84C;
+  --gold-dim:  #8a6f33;
+  --text:      #e8e8f0;
+  --text-dim:  #8888a8;
+  --border:    #252545;
+  --get:       #27ae60;
+  --post:      #2980b9;
+  --del:       #c0392b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,Arial,sans-serif;line-height:1.65;
+}
+
+/* ── HEADER ── */
+.hdr{
+  background:linear-gradient(135deg,#0d0d1a 0%,#1a1a2e 100%);
+  border-bottom:2px solid var(--gold);
+  padding:2.75rem 2rem;text-align:center;
+}
+.hdr .eyebrow{
+  color:var(--text-dim);font-size:.78rem;letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:.5rem;
+}
+.hdr h1{color:var(--gold);font-size:2rem;font-weight:700;letter-spacing:.5px;}
+.hdr .sub{color:var(--text-dim);font-size:.9rem;margin-top:.35rem;direction:ltr;}
+
+/* ── CONTAINER ── */
+.wrap{max-width:1100px;margin:0 auto;padding:2rem 1.5rem;}
+
+/* ── INTRO BOX ── */
+.intro{
+  background:var(--surface);border:1px solid var(--border);
+  border-right:4px solid var(--gold);border-radius:8px;
+  padding:1.5rem;margin-bottom:2rem;direction:ltr;
+}
+.intro h3{color:var(--gold);font-size:.82rem;text-transform:uppercase;
+  letter-spacing:1.5px;margin-bottom:.85rem;}
+.intro .row{display:flex;gap:.5rem;align-items:baseline;margin-bottom:.45rem;}
+.intro .lbl{color:var(--text-dim);font-size:.82rem;min-width:140px;flex-shrink:0;}
+.intro code,.card-path code,.job-ar code,td code{
+  background:#0a0a14;color:var(--gold);
+  padding:.1rem .4rem;border-radius:3px;
+  font-family:'Consolas',monospace;font-size:.82rem;
+}
+.intro .divider{border:none;border-top:1px solid var(--border);margin:.9rem 0;}
+.intro .note{color:var(--text-dim);font-size:.82rem;line-height:1.7;}
+.intro .note span{color:#7ecbcb;}
+
+/* ── TOC ── */
+.toc{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:1.5rem;margin-bottom:2.5rem;
+}
+.toc h3{color:var(--gold);font-size:.95rem;margin-bottom:1rem;text-align:right;}
+.toc-grid{display:grid;grid-template-columns:1fr 1fr;gap:.35rem;}
+.toc a{
+  color:var(--text-dim);text-decoration:none;font-size:.88rem;
+  padding:.3rem .55rem;border-radius:4px;transition:all .2s;
+  display:block;direction:rtl;
+}
+.toc a:hover{color:var(--gold);background:var(--surface2);}
+.toc a .ct{color:var(--gold-dim);font-size:.78rem;margin-right:.4rem;
+  direction:ltr;display:inline-block;}
+
+/* ── SECTION ── */
+.sec{margin-bottom:3rem;}
+.sec-title{
+  display:flex;align-items:center;gap:.75rem;
+  margin-bottom:1.5rem;padding-bottom:.75rem;
+  border-bottom:1px solid var(--border);direction:rtl;
+}
+.sec-title h2{color:var(--gold);font-size:1.25rem;}
+.sec-title .en{color:var(--text-dim);font-size:.88rem;}
+
+/* ── CARD ── */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;margin-bottom:1.25rem;overflow:hidden;
+}
+.card-hdr{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.7rem 1.25rem;background:var(--surface2);direction:ltr;
+}
+.badge{
+  font-family:'Consolas',monospace;font-size:.74rem;font-weight:700;
+  padding:.18rem .5rem;border-radius:3px;letter-spacing:.5px;flex-shrink:0;
+}
+.g {background:#0d2b1a;color:#4caf73;border:1px solid #27ae60;}
+.p {background:#0d1b2a;color:#5ba3d0;border:1px solid #2980b9;}
+.d {background:#2b0d0d;color:#e07070;border:1px solid #c0392b;}
+
+.card-path{color:var(--text);font-family:'Consolas',monospace;font-size:.88rem;flex:1;}
+.card-path .param{color:var(--gold);}
+.atag{
+  font-size:.74rem;padding:.12rem .45rem;border-radius:10px;flex-shrink:0;
+}
+.locked{background:#1f1a06;color:#c9a84c;border:1px solid #5a4810;}
+.pub   {background:#061a1a;color:#5cbcbc;border:1px solid #1a6060;}
+
+.card-body{padding:1rem 1.25rem;}
+.job{
+  background:#090912;border-right:3px solid var(--gold);
+  padding:.6rem .85rem;border-radius:0 5px 5px 0;
+  margin-bottom:.85rem;color:var(--text);font-size:.9rem;
+  direction:rtl;text-align:right;line-height:1.7;
+}
+.no-body{
+  color:var(--text-dim);font-style:italic;
+  font-size:.84rem;text-align:center;padding:.6rem;
+}
+
+/* ── TABLE ── */
+table{width:100%;border-collapse:collapse;font-size:.83rem;direction:ltr;}
+th{
+  background:#090912;color:var(--text-dim);
+  padding:.45rem .7rem;text-align:left;font-size:.75rem;
+  text-transform:uppercase;letter-spacing:.5px;font-weight:600;
+}
+td{padding:.45rem .7rem;border-top:1px solid var(--border);vertical-align:top;}
+tr:hover td{background:#0d0d1f;}
+.req{background:#200d0d;color:#e07070;border:1px solid #5a2020;
+  font-size:.7rem;padding:.08rem .38rem;border-radius:9px;}
+.opt{background:#0d200d;color:#70a870;border:1px solid #205020;
+  font-size:.7rem;padding:.08rem .38rem;border-radius:9px;}
+.qry{background:#1a1a06;color:#b8a040;border:1px solid #5a5010;
+  font-size:.7rem;padding:.08rem .38rem;border-radius:9px;}
+.ar{color:var(--text-dim);font-size:.84rem;direction:rtl;text-align:right;}
+
+/* ── FOOTER ── */
+footer{
+  text-align:center;padding:2rem;
+  color:var(--text-dim);font-size:.8rem;
+  border-top:1px solid var(--border);direction:rtl;
+}
+footer .gold{color:var(--gold);}
+
+/* ── PRINT ── */
+@media print{
+  body{background:#fff;color:#111;}
+  .hdr{background:#f0f0f0;border-bottom:2px solid #8a6f33;}
+  .hdr h1,.sec-title h2{color:#8a6f33;}
+  .card,.toc,.intro{border:1px solid #ccc;background:#fff;}
+  .card-hdr,.intro,.toc{background:#f8f8f8;}
+  .g{background:#e0ffe0;color:#006600;}
+  .p{background:#e0e0ff;color:#000066;}
+  .d{background:#ffe0e0;color:#660000;}
+  table,th,td{border-color:#ddd;}
+  .job{background:#fffde7;border-right-color:#8a6f33;}
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="eyebrow">حفلتي · Haflati Platform</div>
+  <h1>Vendor App API Reference</h1>
+  <div class="sub">دليل نقاط الـ API الخاصة بتطبيق الـ Vendor — Flutter Team Reference · v2.0 · June 2026</div>
+</header>
+
+<div class="wrap">
+
+  <!-- ── INTRO ── -->
+  <div class="intro">
+    <h3>Base Configuration</h3>
+    <div class="row">
+      <span class="lbl">Base URL</span>
+      <code>https://events-api-production-138b.up.railway.app/api</code>
+    </div>
+    <div class="row">
+      <span class="lbl">Auth Header</span>
+      <code>Authorization: Bearer {token}</code>
+    </div>
+    <div class="row">
+      <span class="lbl">Accept Header</span>
+      <code>Accept: application/json</code>
+    </div>
+    <div class="row">
+      <span class="lbl">File Uploads</span>
+      <code>Content-Type: multipart/form-data</code> — required when sending images
+    </div>
+    <hr class="divider">
+    <div class="note">
+      <span>🔒 Token required</span> — Bearer token returned by <code>verify-otp</code> or <code>complete-registration</code>. Store it on device after login.<br>
+      <span>🌐 Public</span> — No auth header needed for these endpoints.<br>
+      Note: currently in testing mode, <code>otp</code> is returned in the <code>send-otp</code> response for easier testing. Remove before production.
+    </div>
+  </div>
+
+  <!-- ── TOC ── -->
+  <div class="toc">
+    <h3>فهرس المحتوى — Table of Contents</h3>
+    <div class="toc-grid">
+      <a href="#auth"><span class="ct">(3)</span> المصادقة · Auth</a>
+      <a href="#profile"><span class="ct">(5)</span> الملف الشخصي · Profile</a>
+      <a href="#products"><span class="ct">(7)</span> المنتجات · Products</a>
+      <a href="#bookings"><span class="ct">(9)</span> الحجوزات · Bookings</a>
+      <a href="#reviews"><span class="ct">(2)</span> التقييمات · Reviews</a>
+      <a href="#stats"><span class="ct">(2)</span> الإحصائيات · Stats</a>
+      <a href="#notifications"><span class="ct">(3)</span> الإشعارات · Notifications</a>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 1: AUTH                           -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="auth">
+    <div class="sec-title">
+      <h2>المصادقة</h2>
+      <span class="en">Auth</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/send-otp</span>
+        <span class="atag pub">🌐 Public</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرسل رمز OTP عبر WhatsApp إلى رقم الهاتف — أول خطوة في تسجيل الدخول أو إنشاء حساب جديد.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>phone</code></td><td>string</td><td><span class="req">required</span></td><td class="ar">رقم الهاتف بالصيغة الدولية (مثال: <code>+963911...</code>)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/verify-otp</span>
+        <span class="atag pub">🌐 Public</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يتحقق من رمز OTP — إذا كان الـ vendor مسجّلاً سابقاً يُعيد <code>token</code> مباشرةً (حالة <code>login</code>)، وإن كان جديداً يُعيد <code>registration_token</code> مؤقتاً لإتمام التسجيل (حالة <code>new_vendor</code>).</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>phone</code></td><td>string</td><td><span class="req">required</span></td><td class="ar">نفس الرقم المُستخدم في send-otp</td></tr>
+          <tr><td><code>otp</code></td><td>integer</td><td><span class="req">required</span></td><td class="ar">الرمز المكوّن من 6 أرقام المُرسَل عبر WhatsApp</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/complete-registration</span>
+        <span class="atag pub">🌐 Public</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُكمل تسجيل vendor جديد — يُستدعى فقط عند <code>status: new_vendor</code>. يُنشئ الحساب ويُعيد الـ Bearer token مباشرةً.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>registration_token</code></td><td>string (64)</td><td><span class="req">required</span></td><td class="ar">التوكن المؤقت من verify-otp (صالح 15 دقيقة)</td></tr>
+          <tr><td><code>first_name</code></td><td>string</td><td><span class="req">required</span></td><td class="ar">الاسم الأول</td></tr>
+          <tr><td><code>last_name</code></td><td>string</td><td><span class="req">required</span></td><td class="ar">الاسم الأخير</td></tr>
+          <tr><td><code>city</code></td><td>string</td><td><span class="req">required</span></td><td class="ar">المدينة</td></tr>
+          <tr><td><code>birth_date</code></td><td>date</td><td><span class="req">required</span></td><td class="ar">تاريخ الميلاد (YYYY-MM-DD)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 2: PROFILE                        -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="profile">
+    <div class="sec-title">
+      <h2>الملف الشخصي</h2>
+      <span class="en">Profile</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/profile</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع بيانات الـ vendor الحالي كاملةً — الاسم، نوع الخدمة، المدينة، الموقع الجغرافي، حالة الموافقة، متوسط التقييم.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/profile/type</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُحدد نوع نشاط الـ vendor — يجب استدعاؤها مرة واحدة قبل إنشاء المنتجات أو استقبال الحجوزات. تُعيّن <code>booking_style</code> تلقائياً: المحلات والمتاجر = <code>order</code>، القاعات والمصورين والـ DJ = <code>appointment</code>.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>vendor_type</code></td><td>enum</td><td><span class="req">required</span></td><td class="ar"><code>wedding_venue</code> · <code>photographer</code> · <code>dj</code> · <code>cake_shop</code> · <code>store</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/profile</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُحدّث بيانات الملف الشخصي — جميع الحقول اختيارية، يمكن إرسال أي حقل بمفرده. إذا أُرسلت صورة يجب استخدام <code>multipart/form-data</code>.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>business_name</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">اسم النشاط التجاري</td></tr>
+          <tr><td><code>bio</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">نبذة تعريفية (max 1000 حرف)</td></tr>
+          <tr><td><code>birth_date</code></td><td>date</td><td><span class="opt">optional</span></td><td class="ar">تاريخ الميلاد (YYYY-MM-DD)</td></tr>
+          <tr><td><code>latitude</code></td><td>decimal</td><td><span class="opt">optional</span></td><td class="ar">خط العرض (-90 to 90)</td></tr>
+          <tr><td><code>longitude</code></td><td>decimal</td><td><span class="opt">optional</span></td><td class="ar">خط الطول (-180 to 180)</td></tr>
+          <tr><td><code>address</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">العنوان بالنص (max 255 حرف)</td></tr>
+          <tr><td><code>profile_image</code></td><td>file</td><td><span class="opt">optional</span></td><td class="ar">صورة الملف الشخصي — jpg/jpeg/png · max 2 MB</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge d">DELETE</span>
+        <span class="card-path">/vendor/profile/image</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يحذف صورة الملف الشخصي من الخادم ويُفرّغ الحقل في قاعدة البيانات.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/fcm-token</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يحفظ FCM device token للـ vendor — يُستدعى عند كل تسجيل دخول لضمان وصول الإشعارات للجهاز الحالي. الـ FCM token يختلف تماماً عن Sanctum token.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>fcm_token</code></td><td>string</td><td><span class="req">required</span></td><td class="ar">توكن الجهاز من Firebase SDK (يختلف لكل جهاز)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 3: PRODUCTS                       -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="products">
+    <div class="sec-title">
+      <h2>المنتجات والخدمات</h2>
+      <span class="en">Products</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/products</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع جميع منتجات/خدمات الـ vendor الحالي المتاحة (<code>is_available = true</code>) مع صورها.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/products</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُنشئ منتجاً/خدمة جديدة — الصور إجبارية (<code>images[]</code>)، بقية الحقول اختيارية. يجب إرسال الطلب بـ <code>multipart/form-data</code>.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>images[]</code></td><td>file[]</td><td><span class="req">required</span></td><td class="ar">صور المنتج — jpg/jpeg/png · max 2 MB لكل صورة</td></tr>
+          <tr><td><code>name</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">اسم المنتج أو الخدمة</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">وصف تفصيلي</td></tr>
+          <tr><td><code>price</code></td><td>decimal</td><td><span class="opt">optional</span></td><td class="ar">السعر الكامل بالليرة السورية</td></tr>
+          <tr><td><code>stock</code></td><td>integer</td><td><span class="opt">optional</span></td><td class="ar">الكمية المتوفرة (للمحلات التي تتتبع المخزون فقط)</td></tr>
+          <tr><td><code>meta</code></td><td>object</td><td><span class="opt">optional</span></td><td class="ar">بيانات JSON مرنة خاصة بالنوع (مواصفات، ألوان...)</td></tr>
+          <tr><td><code>primary_image_index</code></td><td>integer</td><td><span class="opt">optional</span></td><td class="ar">رقم الصورة الرئيسية في المصفوفة (0-based، default: 0)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/products/best-sellers</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع أفضل 5 منتجات بحسب عدد الطلبات والحجوزات المدفوعة — مخصص لبطاقة "الأكثر طلباً" في لوحة تحكم المحلات.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/products/low-stock</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع المنتجات التي وصل مخزونها لحد التنبيه أو أقل — لتنبيهات المخزون في لوحة تحكم المحلات. يتجاهل المنتجات التي لا تتتبع مخزوناً.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>threshold</code></td><td>integer</td><td><span class="qry">query param</span></td><td class="ar">حد التنبيه (default: 5) — مثال: <code>?threshold=10</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/products/<span class="param">{id}</span></span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع تفاصيل منتج واحد مع صوره الكاملة — الـ vendor يرى منتجاته الخاصة فقط.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/products/<span class="param">{id}</span></span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُحدّث بيانات منتج ويُدير صوره — يُستخدم POST بدلاً من PATCH/PUT لأن PHP على Railway لا يقرأ <code>multipart/form-data</code> مع PUT/PATCH. جميع الحقول اختيارية.</div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Status</th><th>شرح</th></tr>
+          <tr><td><code>name</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">اسم جديد للمنتج</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td><span class="opt">optional</span></td><td class="ar">وصف جديد</td></tr>
+          <tr><td><code>price</code></td><td>decimal</td><td><span class="opt">optional</span></td><td class="ar">سعر جديد</td></tr>
+          <tr><td><code>stock</code></td><td>integer</td><td><span class="opt">optional</span></td><td class="ar">كمية جديدة في المخزون</td></tr>
+          <tr><td><code>meta</code></td><td>object</td><td><span class="opt">optional</span></td><td class="ar">بيانات JSON جديدة</td></tr>
+          <tr><td><code>images[]</code></td><td>file[]</td><td><span class="opt">optional</span></td><td class="ar">صور جديدة لإضافتها</td></tr>
+          <tr><td><code>primary_image_index</code></td><td>integer</td><td><span class="opt">optional</span></td><td class="ar">رقم الصورة الرئيسية من بين الصور الجديدة المرسلة</td></tr>
+          <tr><td><code>delete_image_ids[]</code></td><td>integer[]</td><td><span class="opt">optional</span></td><td class="ar">IDs الصور القديمة المراد حذفها</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge d">DELETE</span>
+        <span class="card-path">/vendor/products/<span class="param">{id}</span></span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يحذف المنتج وجميع صوره من الخادم وقاعدة البيانات بشكل نهائي.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 4: BOOKINGS                       -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="bookings">
+    <div class="sec-title">
+      <h2>الحجوزات والطلبات</h2>
+      <span class="en">Bookings</span>
+    </div>
+
+    <div style="background:#090912;border:1px solid #252545;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;direction:ltr;font-size:.82rem;color:#9090a8;">
+      <strong style="color:#C9A84C;">Booking Status Flow (Pay-First):</strong><br>
+      <code>awaiting_payment</code> → <em style="color:#5ba3d0;">[customer pays]</em> → <code>pending</code> → <em style="color:#5ba3d0;">[vendor approves]</em> → <code>approved</code> → <em style="color:#5ba3d0;">[event/delivery done]</em> → <code>completed</code><br>
+      <code>awaiting_payment</code> → <code>cancelled</code> (customer cancels before paying) &nbsp;|&nbsp; <code>pending</code> → <code>declined</code> (vendor declines)
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/bookings</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع جميع حجوزات الـ vendor مرتبةً من الأحدث — يُستخدم لعرض القائمة الكاملة في لوحة التحكم.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/bookings/recent-requests</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع أحدث 10 حجوزات بحالة <code>pending</code> تنتظر قرار القبول أو الرفض — مخصص لبطاقة "الطلبات الجديدة" في الـ dashboard. (<code>pending</code> = دُفع ومنتظر موافقة الـ vendor)</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/bookings/recent-orders</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع أحدث 10 طلبات للمحلات (<code>cake_shop</code>, <code>store</code>) — يستثني الطلبات غير المدفوعة. لـ <code>appointment</code> vendors يُعيد قائمة فارغة.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/bookings/upcoming-events</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع الحجوزات المقبولة (<code>approved</code>) ذات تاريخ مستقبلي مرتبةً تصاعدياً — مخصص لـ vendors من نوع <code>appointment</code> (قاعات، مصورين، DJ).</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/bookings/<span class="param">{id}</span></span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع تفاصيل حجز واحد كاملةً — يشمل بيانات المستخدم، صور المنتج، ومعلومات الدفعة.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/bookings/<span class="param">{id}</span>/approve</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يقبل الـ vendor الحجز — يُغيّر حالته من <code>pending</code> إلى <code>approved</code>. يعمل فقط على الحجوزات المدفوعة (حالة <code>pending</code>).</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/bookings/<span class="param">{id}</span>/decline</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يرفض الـ vendor الحجز — يُغيّر حالته من <code>pending</code> إلى <code>declined</code>.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/bookings/<span class="param">{id}</span>/complete</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُغلق الحجز كمُكتمل — يُستدعى يوم الفعالية أو بعد تسليم الطلب. يُغيّر الحالة من <code>approved</code> إلى <code>completed</code> فقط.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/booked-dates</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع قائمة التواريخ المحجوزة — يُستخدم لتظليل الأيام غير المتاحة في التقويم (<code>appointment</code> vendors فقط). يشمل الحجوزات بحالة <code>pending</code> أو <code>approved</code>.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 5: REVIEWS                        -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="reviews">
+    <div class="sec-title">
+      <h2>التقييمات</h2>
+      <span class="en">Reviews</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/reviews</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع جميع تقييمات الـ vendor الحالي مع بيانات المستخدم ومتوسط التقييم العام.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/reviews/summary</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع ملخصاً تفصيلياً للتقييمات — توزيع النجوم من 1 إلى 5، نسبة التقييمات الإيجابية، مقارنة مع الشهر الماضي.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 6: STATS                          -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="stats">
+    <div class="sec-title">
+      <h2>الإحصائيات والأرباح</h2>
+      <span class="en">Stats &amp; Earnings</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/stats</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع إحصائيات شاملة — عدد الحجوزات مُصنَّفةً حسب الحالة (pending / approved / completed / declined / cancelled)، إجمالي الأرباح، متوسط التقييم، عدد التقييمات.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/earnings</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع أرباح الشهر الحالي والشهر الماضي مع نسبة النمو — مثال: <code dir="ltr">{"this_month": 85000, "last_month": 70000, "growth": 21.4}</code>. النسبة يمكن أن تكون سالبة في حال تراجع الأرباح.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SECTION 7: NOTIFICATIONS                  -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="sec" id="notifications">
+    <div class="sec-title">
+      <h2>الإشعارات</h2>
+      <span class="en">Notifications</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge g">GET</span>
+        <span class="card-path">/vendor/notifications</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُرجع قائمة إشعارات الـ vendor مرتبةً من الأحدث — يشمل <code>unread_count</code> لعرض الرقم على أيقونة الجرس (badge).</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/notifications/<span class="param">{id}</span>/read</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُعلّم إشعاراً واحداً كمقروء (<code>read_at = now()</code>) — يُستدعى عند الضغط على إشعار محدد.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <span class="badge p">POST</span>
+        <span class="card-path">/vendor/notifications/read-all</span>
+        <span class="atag locked">🔒 Token</span>
+      </div>
+      <div class="card-body">
+        <div class="job">يُعلّم جميع الإشعارات غير المقروءة كمقروءة دفعةً واحدة — يُستخدم عند فتح شاشة الإشعارات لتصفير البادج.</div>
+        <div class="no-body">لا يحتاج body</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<footer>
+  <p>حفلتي · Haflati Platform &nbsp;·&nbsp; <span class="gold">Vendor API v2.0</span> &nbsp;·&nbsp; June 2026</p>
+  <p style="margin-top:.4rem;">للاستفسارات التقنية راجع <code>events_api_master_context.md</code> في المستودع</p>
+</footer>
+
+</body>
+</html>
