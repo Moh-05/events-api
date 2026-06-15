@@ -93,7 +93,7 @@ class AdminController extends Controller
 
     public function bookings(Request $request)
     {
-        $query = Booking::with(['user', 'vendor', 'vendor_product'])->latest();
+        $query = Booking::with(['user', 'vendor', 'product'])->latest();
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);

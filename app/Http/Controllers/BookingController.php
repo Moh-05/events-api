@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\VendorProduct;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -68,7 +69,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
@@ -131,27 +132,81 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
-    // Customer cancels a booking
+    // Customer cancels a booking.
+    // Refund depends on the status and (for approved bookings) how long ago the
+    // vendor approved. The real money back to the user waits on the ShamCash
+    // refund API — here we only adjust the vendor's wallet bookkeeping.
     public function cancel(Request $request, int $id)
     {
         $user    = $request->user();
-        // Only an unpaid draft can be cancelled freely. Once paid (pending) a
-        // refund is required, so cancelling a paid booking waits for the pay API.
         $booking = Booking::where('id', $id)
             ->where('user_id', $user->id)
-            ->whereIn('status', ['awaiting_payment'])
             ->firstOrFail();
 
-        $booking->update(['status' => 'cancelled']);
+        // Unpaid draft — nothing was paid, just drop it.
+        if ($booking->status === 'awaiting_payment') {
+            $booking->update(['status' => 'cancelled']);
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Booking cancelled',
+            ]);
+        }
 
+        // Paid but not yet approved — money is still held by the platform and
+        // was never credited to the vendor. Full refund to the user; the
+        // vendor's wallet is untouched.
+        if ($booking->status === 'pending') {
+            $booking->update(['status' => 'cancelled']);
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Booking cancelled — full refund due to the user',
+                'refund'  => ['percent' => 100, 'note' => 'real refund pending ShamCash API'],
+            ]);
+        }
+
+        // Approved — refund tier based on hours since approval (clock started
+        // when the credit was created).
+        if ($booking->status === 'approved') {
+            $credit = WalletTransaction::where('booking_id', $booking->id)
+                ->where('type', 'credit')
+                ->first();
+
+            $hours = $credit
+                ? (now()->timestamp - $credit->created_at->timestamp) / 3600
+                : PHP_INT_MAX;
+
+            $percent = $hours <= 24 ? 100 : ($hours <= 72 ? 50 : 0);
+
+            // Debit the vendor's wallet by the refunded share of their payout.
+            // It nets against the original credit (same booking_id), so it
+            // clears on the same 3-day schedule as that credit.
+            if ($credit && $percent > 0) {
+                WalletTransaction::create([
+                    'vendor_id'  => $booking->vendor_id,
+                    'booking_id' => $booking->id,
+                    'type'       => 'refund',
+                    'amount'     => -1 * round($credit->amount * $percent / 100, 2),
+                ]);
+            }
+
+            $booking->update(['status' => 'cancelled']);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => "Booking cancelled — {$percent}% refund due to the user",
+                'refund'  => ['percent' => $percent, 'note' => 'real refund pending ShamCash API'],
+            ]);
+        }
+
+        // completed / already cancelled / declined — cannot cancel.
         return response()->json([
-            'status'  => 'success',
-            'message' => 'Booking cancelled successfully',
-        ]);
+            'status'  => 'error',
+            'message' => "Cannot cancel a booking with status '{$booking->status}'",
+        ], 422);
     }
 
 
@@ -169,9 +224,25 @@ class BookingController extends Controller
         $booking->update(['status' => 'approved']);
         $booking->refresh();
 
+        // Credit the vendor's wallet with their payout. This row's created_at
+        // is the approval time — the money is held for 3 days (the refund
+        // window) before it becomes withdrawable.
+        $payout = (float) Payment::where('booking_id', $booking->id)
+            ->where('status', 'verified')
+            ->value('vendor_payout');
+
+        if ($payout > 0) {
+            WalletTransaction::create([
+                'vendor_id'  => $vendor->id,
+                'booking_id' => $booking->id,
+                'type'       => 'credit',
+                'amount'     => $payout,
+            ]);
+        }
+
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
@@ -189,7 +260,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
@@ -206,7 +277,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
@@ -216,12 +287,12 @@ class BookingController extends Controller
 
         if ($user instanceof \App\Models\Vendor) {
             $bookings = Booking::where('vendor_id', $user->id)
-                ->with(['vendor_product'])
+                ->with(['product'])
                 ->latest()
                 ->get();
         } else {
             $bookings = Booking::where('user_id', $user->id)
-                ->with(['vendor', 'vendor_product'])
+                ->with(['vendor', 'product'])
                 ->latest()
                 ->get();
         }
@@ -239,7 +310,7 @@ class BookingController extends Controller
         $vendor   = $request->user();
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('status', 'pending')
-            ->with(['user:id,first_name,last_name', 'vendor_product:id,name,price'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price'])
             ->latest()
             ->take(10)
             ->get();
@@ -266,7 +337,7 @@ class BookingController extends Controller
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('status', 'approved')
             ->where('event_date', '>=', now())
-            ->with(['user:id,first_name,last_name', 'vendor_product:id,name'])
+            ->with(['user:id,first_name,last_name', 'product:id,name'])
             ->orderBy('event_date', 'asc')
             ->get();
 
@@ -309,7 +380,7 @@ class BookingController extends Controller
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
             ->where('vendor_id', $vendor->id)
-            ->with(['user:id,first_name,last_name,phone,profile_image', 'vendor_product.images', 'payment'])
+            ->with(['user:id,first_name,last_name,phone,profile_image', 'product.images', 'payment'])
             ->firstOrFail();
 
         return response()->json([
@@ -326,7 +397,7 @@ class BookingController extends Controller
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('booking_style', 'order')
             ->where('status', '!=', 'awaiting_payment')
-            ->with(['user:id,first_name,last_name', 'vendor_product:id,name,price'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price'])
             ->latest()
             ->take(10)
             ->get();

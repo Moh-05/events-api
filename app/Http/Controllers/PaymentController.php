@@ -42,7 +42,7 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        $product       = $booking->vendor_product;
+        $product       = $booking->product;
         $vendor        = $booking->vendor;
         $expectedAmount = $vendor->booking_style === 'appointment'
             ? round($product->price * ($product->deposit_percent / 100), 2)
@@ -102,7 +102,7 @@ class PaymentController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Payment verified successfully',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
             'payment' => $payment,
             'debug_notifications' => [
                 'user'   => $notifyUser,

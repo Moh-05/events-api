@@ -59,4 +59,9 @@ class Vendor extends Authenticatable
     {
         return $this->hasMany(Review::class);
     }
+
+    public function walletTransactions()
+    {
+        return $this->hasMany(WalletTransaction::class);
+    }
 }
