@@ -71,7 +71,6 @@ Route::middleware('auth:vendors')->group(function () {
 
     // Profile
     Route::get('/vendor/profile', [VendorProfileController::class, 'show']);
-    Route::post('/vendor/profile/type', [VendorProfileController::class, 'setType']);
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
 
