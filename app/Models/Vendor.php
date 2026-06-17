@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -9,6 +10,14 @@ use Laravel\Sanctum\HasApiTokens;
 class Vendor extends Authenticatable
 {
     use HasApiTokens, Notifiable;
+
+    // Local scope: Vendor::active() returns only non-banned vendors.
+    // Used on public/customer-facing queries (browse, search). Admin queries
+    // omit it on purpose so admins can still see and manage banned vendors.
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
 
     protected $fillable = [
         'first_name',
@@ -27,6 +36,7 @@ class Vendor extends Authenticatable
         'rating_avg',
         'is_approved',
         'is_active',
+        'rejection_reason',
         'fcm_token',
     ];
 

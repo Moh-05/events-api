@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Vendor;
 use App\Models\VendorProduct;
 use Illuminate\Support\Facades\Storage;
 
@@ -38,6 +39,15 @@ class VendorProductController extends Controller
     // Search products by name within a specific vendor
     public function searchVendorProducts(Request $request, $vendorId)
     {
+        // A banned vendor's work is hidden from customers (data stays in the DB).
+        if (!Vendor::active()->whereKey($vendorId)->exists()) {
+            return response()->json([
+                'status'   => 'success',
+                'products' => [],
+                'note'     => 'Vendor unavailable',
+            ]);
+        }
+
         $query = VendorProduct::where('vendor_id', $vendorId)
             ->with('images');
 

@@ -22,6 +22,7 @@ class User extends Authenticatable
         'longitude',
         'address',
         'fcm_token',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -34,6 +35,7 @@ class User extends Authenticatable
             'birth_date' => 'date',
             'latitude'   => 'decimal:8',
             'longitude'  => 'decimal:8',
+            'is_active'  => 'boolean',
         ];
     }
 

@@ -7,11 +7,13 @@ use Illuminate\Http\Request;
 
 class EnsureAdminRole
 {
-    public function handle(Request $request, Closure $next, string $role): mixed
+    // Usage in routes: role:super_admin  OR  role:super_admin,support
+    // Accepts a comma-separated list and allows the admin if their role is any of them.
+    public function handle(Request $request, Closure $next, string ...$roles): mixed
     {
         $admin = $request->user();
 
-        if (!$admin || $admin->role !== $role) {
+        if (!$admin || !in_array($admin->role, $roles, true)) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Unauthorized — insufficient role',

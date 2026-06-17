@@ -31,6 +31,14 @@ class BookingController extends Controller
         $product = VendorProduct::with('vendor')->findOrFail($request->vendor_product_id);
         $vendor  = $product->vendor;
 
+        // A banned (suspended) vendor can't receive new bookings.
+        if (!$vendor || !$vendor->is_active) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'This vendor is currently unavailable',
+            ], 403);
+        }
+
         // Check if date is already booked (appointment only)
         if ($vendor->booking_style === 'appointment' && $request->event_date) {
             $conflict = Booking::where('vendor_id', $vendor->id)

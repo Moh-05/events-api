@@ -51,6 +51,14 @@ class VendorAuthController extends Controller
         $vendor = Vendor::where('phone', $request->phone)->first();
 
         if ($vendor) {
+            // Banned vendors can't log in. Data stays intact; unbanning restores access.
+            if (!$vendor->is_active) {
+                return response()->json([
+                    'status'  => 'suspended',
+                    'message' => 'Your account has been suspended. Please contact support.',
+                ], 403);
+            }
+
             return response()->json([
                 'status' => 'login',
                 'token'  => $vendor->createToken('auth_token')->plainTextToken,
