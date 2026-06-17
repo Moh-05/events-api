@@ -83,17 +83,22 @@ class VendorAuthController extends Controller
             'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
             'city'               => 'required|string|min:2|max:100',
             'birth_date'         => 'required|date|before:today|after:1900-01-01',
+            'vendor_type'        => 'required|in:wedding_venue,photographer,cake_shop,dj',
         ]);
 
         $phone = Cache::get('reg_token_' . $request->registration_token);
         if (!$phone) return response()->json(['message' => 'Expired'], 403);
 
+        $bookingStyle = $request->vendor_type === 'cake_shop' ? 'order' : 'appointment';
+
         $vendor = Vendor::create([
-            'phone'      => $phone,
-            'first_name' => $request->first_name,
-            'last_name'  => $request->last_name,
-            'city'       => $request->city,
-            'birth_date' => $request->birth_date,
+            'phone'         => $phone,
+            'first_name'    => $request->first_name,
+            'last_name'     => $request->last_name,
+            'city'          => $request->city,
+            'birth_date'    => $request->birth_date,
+            'vendor_type'   => $request->vendor_type,
+            'booking_style' => $bookingStyle,
         ]);
 
         Cache::forget('reg_token_' . $request->registration_token);
@@ -101,7 +106,7 @@ class VendorAuthController extends Controller
         return response()->json([
             'status' => 'success',
             'token'  => $vendor->createToken('auth_token')->plainTextToken,
-            'vendor' => $vendor
+            'vendor' => $vendor,
         ]);
     }
 }

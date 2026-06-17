@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haflati — Vendor App API Reference</title>
+<style>
+:root{
+  --bg:#14121d;--bg2:#1c1930;--card:#221f33;--card2:#2a2640;
+  --gold:#C9A84C;--gold2:#e6c876;--text:#ECE9F4;--dim:#9b93b4;--line:rgba(201,168,76,.18);
+  --get:#4CAF7D;--post:#4C8FAF;--del:#E0606A;--req:#E0a04c;--opt:#7d76a0;
+  --code:#0e0c16;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.65;padding:36px 18px}
+.wrap{max-width:1040px;margin:0 auto}
+h1{color:var(--gold);font-size:30px;margin-bottom:4px;letter-spacing:.3px}
+.sub{color:var(--dim);font-size:14px;margin-bottom:26px}
+h2{color:var(--gold2);font-size:21px;margin:40px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.ar{direction:rtl;text-align:right;font-family:'Segoe UI',Tahoma,'Arial',sans-serif}
+code,.mono{font-family:'Consolas','Courier New',monospace}
+code{background:var(--code);color:var(--gold2);padding:2px 7px;border-radius:5px;font-size:13px}
+
+/* intro */
+.intro{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:10px}
+.intro h3{color:var(--gold);font-size:15px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.kv{display:flex;flex-wrap:wrap;gap:8px 0;margin:10px 0}
+.kv .k{color:var(--dim);width:150px;font-size:13px}
+.kv .v{flex:1;min-width:200px}
+.note-ar{background:var(--bg2);border-right:3px solid var(--gold);border-radius:8px;padding:12px 16px;margin:10px 0}
+
+/* endpoint card */
+.ep{background:var(--card);border:1px solid var(--line);border-radius:11px;margin:14px 0;overflow:hidden}
+.ep-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--card2);flex-wrap:wrap}
+.m{font-weight:700;font-size:11px;padding:4px 10px;border-radius:6px;letter-spacing:.5px;font-family:monospace}
+.m-get{background:rgba(76,175,125,.16);color:var(--get)}
+.m-post{background:rgba(76,143,175,.16);color:var(--post)}
+.m-del{background:rgba(224,96,106,.16);color:var(--del)}
+.path{font-family:'Consolas',monospace;font-size:14.5px;color:var(--text);font-weight:600}
+.lock{margin-left:auto;font-size:11px;color:var(--dim);white-space:nowrap}
+.lock b{color:var(--gold2)}
+.ep-body{padding:16px 18px}
+.job{margin-bottom:12px}
+.lbl{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;font-weight:700}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+th,td{padding:8px 11px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+th{color:var(--gold);font-size:12px;background:rgba(201,168,76,.05)}
+td.field{font-family:'Consolas',monospace;color:var(--gold2);white-space:nowrap}
+td.type{font-family:'Consolas',monospace;color:var(--dim);font-size:12.5px}
+.tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:monospace}
+.t-req{background:rgba(224,160,76,.16);color:var(--req)}
+.t-opt{background:rgba(125,118,160,.16);color:var(--opt)}
+td.ar{direction:rtl;text-align:right}
+.none{color:var(--dim);font-style:italic;font-size:13.5px}
+.enum{color:var(--gold2);font-family:monospace;font-size:12.5px}
+.foot{margin-top:46px;color:#5a5470;font-size:12px;text-align:center;border-top:1px solid var(--line);padding-top:16px}
+.pill{display:inline-block;font-family:monospace;font-size:11.5px;padding:2px 9px;border-radius:5px;background:var(--bg2);color:var(--gold2);margin:2px 3px}
+.toc{columns:2;column-gap:30px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 24px;margin:14px 0 8px}
+.toc a{color:var(--text);text-decoration:none;font-size:14px;display:block;padding:3px 0}
+.toc a:hover{color:var(--gold2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Haflati — Vendor App API Reference</h1>
+  <div class="sub">حفلتي · مرجع الـ API لتطبيق الـ Vendor (Flutter) · Laravel 12 · Updated 2026-06-15</div>
+
+  <!-- ───────── INTRO ───────── -->
+  <div class="intro">
+    <h3>Base & Auth</h3>
+    <div class="kv"><div class="k">Base URL</div><div class="v"><code>https://events-api-production-138b.up.railway.app/api</code></div></div>
+    <div class="kv"><div class="k">Auth header</div><div class="v"><code>Authorization: Bearer {token}</code></div></div>
+    <div class="kv"><div class="k">Content-Type</div><div class="v"><code>application/json</code> — except image uploads → <code>multipart/form-data</code></div></div>
+    <div class="kv"><div class="k">Accept</div><div class="v"><code>application/json</code> (always send this header)</div></div>
+
+    <div class="note-ar ar">
+      كل الـ endpoints تحتاج الـ <code>Authorization: Bearer {token}</code> ما عدا تسجيل الدخول (send-otp / verify-otp / complete-registration).
+      الـ token بتاخذه من الـ login. للتجربة الحالية: الـ <code>otp</code> برجع جوّا الـ response مباشرة، فما بتحتاج WhatsApp.
+      أي طلب فيه رفع صور (المنتجات أو صورة البروفايل) لازم يكون <code>multipart/form-data</code>، والباقي <code>JSON</code>.
+    </div>
+  </div>
+
+  <!-- ───────── TOC ───────── -->
+  <div class="toc">
+    <a href="#auth">1 · Authentication</a>
+    <a href="#profile">2 · Profile</a>
+    <a href="#products">3 · Products / Services</a>
+    <a href="#bookings">4 · Bookings & Orders</a>
+    <a href="#reviews">5 · Reviews</a>
+    <a href="#stats">6 · Stats & Earnings</a>
+    <a href="#wallet">7 · Wallet</a>
+    <a href="#notifications">8 · Notifications</a>
+  </div>
+
+  <!-- ═══════════ 1 · AUTH ═══════════ -->
+  <h2 id="auth">1 · Authentication <span style="font-size:14px;color:var(--dim)">— تسجيل الدخول والتسجيل</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/send-otp</span><span class="lock">🌐 Public</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرسل رمز تحقق (OTP) لرقم الموبايل عبر WhatsApp. للتجربة الرمز برجع جوّا الـ response بحقل <code>otp</code>.</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">phone</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الموبايل، أرقام فقط مع إمكانية <code>+</code> (7–15 خانة).</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/verify-otp</span><span class="lock">🌐 Public</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يتحقق من الـ OTP. إذا الرقم موجود مسبقاً → بيرجّع <code>status: login</code> مع <code>token</code>. إذا جديد → بيرجّع <code>status: new_vendor</code> مع <code>registration_token</code> لإكمال التسجيل.</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">phone</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">نفس الرقم المُرسل له الـ OTP.</td></tr>
+        <tr><td class="field">otp</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">الرمز المكوّن من 6 أرقام.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/complete-registration</span><span class="lock">🌐 Public</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">ينشئ حساب الـ vendor الجديد ويرجّع الـ <code>token</code>. يُستدعى فقط لما يكون الرقم جديد (بعد <code>new_vendor</code>).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">registration_token</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">الـ token الراجع من verify-otp (صالح 15 دقيقة).</td></tr>
+        <tr><td class="field">first_name</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">حروف فقط، 2–50.</td></tr>
+        <tr><td class="field">last_name</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">حروف فقط، 2–50.</td></tr>
+        <tr><td class="field">city</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">المدينة، 2–100.</td></tr>
+        <tr><td class="field">birth_date</td><td class="type">date</td><td><span class="tag t-req">required</span></td><td class="ar">تاريخ ميلاد صالح (<code>YYYY-MM-DD</code>) قبل اليوم.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════ 2 · PROFILE ═══════════ -->
+  <h2 id="profile">2 · Profile <span style="font-size:14px;color:var(--dim)">— الملف الشخصي</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/profile</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع بيانات الـ vendor الحالي (المسجّل دخوله بالـ token).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/profile/type</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحدّد نوع الـ vendor (يُضبط مرة بعد التسجيل). النوع بيحدّد الـ booking_style تلقائياً (<code>cake_shop</code> = order، الباقي = appointment).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">واحد من: <span class="enum">wedding_venue · photographer · cake_shop · dj</span></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/profile</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحدّث بيانات البروفايل. كل الحقول اختيارية — أرسل فقط ما تريد تغييره. لرفع صورة بروفايل استخدم <code>multipart/form-data</code>.</div></div>
+      <div class="lbl">Body <span style="color:var(--dim);font-weight:400">(multipart/form-data if sending an image)</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">business_name</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">اسم النشاط، حتى 255.</td></tr>
+        <tr><td class="field">bio</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">نبذة، حتى 1000.</td></tr>
+        <tr><td class="field">birth_date</td><td class="type">date</td><td><span class="tag t-opt">optional</span></td><td class="ar">تاريخ الميلاد.</td></tr>
+        <tr><td class="field">latitude</td><td class="type">numeric</td><td><span class="tag t-opt">optional</span></td><td class="ar">خط العرض (−90 … 90).</td></tr>
+        <tr><td class="field">longitude</td><td class="type">numeric</td><td><span class="tag t-opt">optional</span></td><td class="ar">خط الطول (−180 … 180).</td></tr>
+        <tr><td class="field">address</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">العنوان، حتى 255.</td></tr>
+        <tr><td class="field">profile_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة jpg/jpeg/png، حد أقصى 2MB.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/image</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة البروفايل الحالية.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/fcm-token</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يخزّن الـ FCM token تبع جهاز الـ vendor لإرسال إشعارات Push. يرسله التطبيق بعد تسجيل الدخول.</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">fcm_token</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">الـ device token من Firebase.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════ 3 · PRODUCTS ═══════════ -->
+  <h2 id="products">3 · Products / Services <span style="font-size:14px;color:var(--dim)">— المنتجات / الخدمات</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/products</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع كل منتجات/خدمات الـ vendor المتاحة، مع صورها.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/products</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">ينشئ منتج/خدمة جديدة. الصور <b>مطلوبة</b>. الطلب لازم يكون <code>multipart/form-data</code>. ملاحظة: نسبة العربون (deposit) ثابتة 20% ولا تُرسل.</div></div>
+      <div class="lbl">Body <span style="color:var(--dim);font-weight:400">(multipart/form-data)</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">images[]</td><td class="type">file[]</td><td><span class="tag t-req">required</span></td><td class="ar">صورة واحدة على الأقل، jpg/jpeg/png، حد أقصى 2MB لكل صورة.</td></tr>
+        <tr><td class="field">name</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">اسم المنتج، حتى 255.</td></tr>
+        <tr><td class="field">description</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">الوصف.</td></tr>
+        <tr><td class="field">price</td><td class="type">numeric</td><td><span class="tag t-opt">optional</span></td><td class="ar">السعر (≥ 0).</td></tr>
+        <tr><td class="field">stock</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">الكمية (لمتاجر الطلبات مثل cake_shop).</td></tr>
+        <tr><td class="field">meta</td><td class="type">array</td><td><span class="tag t-opt">optional</span></td><td class="ar">بيانات إضافية حرّة (key/value).</td></tr>
+        <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">ترتيب الصورة الرئيسية (افتراضي 0).</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/products/best-sellers</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">أكثر 5 منتجات مبيعاً (حسب عدد الحجوزات المدفوعة/النشطة).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/products/low-stock</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">المنتجات التي وصلت أو نزلت عن حدّ المخزون (تنبيهات النفاد).</div></div>
+      <div class="lbl">Query params</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">threshold</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">الحد الأدنى (افتراضي 5). مثال: <code>?threshold=3</code></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/products/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع منتج واحد بالتفصيل (للـ vendor صاحب المنتج فقط).</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم المنتج في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/products/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحدّث المنتج: تعديل الحقول، إضافة صور جديدة، أو حذف صور موجودة. كل الحقول اختيارية. استخدم <code>multipart/form-data</code> عند إرسال صور.</div></div>
+      <div class="lbl">Path & Body <span style="color:var(--dim);font-weight:400">(multipart/form-data if images)</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم المنتج في الـ URL.</td></tr>
+        <tr><td class="field">name / description / price / stock / meta</td><td class="type">mixed</td><td><span class="tag t-opt">optional</span></td><td class="ar">نفس حقول الإنشاء — أرسل فقط ما تريد تعديله.</td></tr>
+        <tr><td class="field">images[]</td><td class="type">file[]</td><td><span class="tag t-opt">optional</span></td><td class="ar">صور جديدة تُضاف للمنتج.</td></tr>
+        <tr><td class="field">delete_image_ids[]</td><td class="type">integer[]</td><td><span class="tag t-opt">optional</span></td><td class="ar">أرقام الصور المراد حذفها.</td></tr>
+        <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">تحديد الصورة الرئيسية.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/products/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحذف المنتج وكل صوره.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم المنتج في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════ 4 · BOOKINGS ═══════════ -->
+  <h2 id="bookings">4 · Bookings & Orders <span style="font-size:14px;color:var(--dim)">— الحجوزات والطلبات</span></h2>
+
+  <div class="note-ar ar">
+    حالات الحجز (status):
+    <span class="pill">awaiting_payment</span> بانتظار الدفع (مخفي عن الـ vendor) ·
+    <span class="pill">pending</span> مدفوع وبانتظار موافقتك ·
+    <span class="pill">approved</span> تمت الموافقة ·
+    <span class="pill">completed</span> منتهٍ ·
+    <span class="pill">declined</span> مرفوض ·
+    <span class="pill">cancelled</span> ملغى
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings/recent-requests</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">آخر 10 طلبات حجز بحالة <code>pending</code> (بانتظار موافقتك)، مع اسم العميل والمنتج.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings/recent-orders</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">آخر 10 طلبات لمتاجر الطلبات (<code>booking_style = order</code>)، بدون المسوّدات غير المدفوعة.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings/upcoming-events</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">الفعاليات القادمة: الحجوزات <code>approved</code> التي تاريخها في المستقبل (لمزوّدي المواعيد فقط).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تفاصيل حجز/طلب كامل: العميل + المنتج وصوره + الدفعة.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/bookings/{id}/approve</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor (محجوز 3 أيام).</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
+      </table>
+      <div class="lbl" style="margin-top:8px">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/bookings/{id}/decline</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">رفض حجز <code>pending</code> (يصبح <code>declined</code>).</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
+      </table>
+      <div class="lbl" style="margin-top:8px">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/bookings/{id}/complete</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تعليم حجز <code>approved</code> كمنتهٍ (<code>completed</code>) — مثلاً يوم الفعالية.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
+      </table>
+      <div class="lbl" style="margin-top:8px">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/booked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">التواريخ المحجوزة (<code>pending</code> أو <code>approved</code>) لاستخدامها في تعطيل أيام الـ calendar.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 5 · REVIEWS ═══════════ -->
+  <h2 id="reviews">5 · Reviews <span style="font-size:14px;color:var(--dim)">— التقييمات</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/reviews</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تقييمات الـ vendor مع اسم صاحب كل تقييم، والعدد الكلي والمعدّل.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/reviews/summary</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">ملخّص التقييمات: المعدّل، التوزيع على النجوم (1–5) بالنسبة المئوية، نسبة الإيجابي، والاتجاه مقارنة بالشهر الماضي.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 6 · STATS ═══════════ -->
+  <h2 id="stats">6 · Stats & Earnings <span style="font-size:14px;color:var(--dim)">— الإحصائيات والأرباح</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/stats</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">إحصائيات لوحة التحكم: عدد الحجوزات حسب الحالة، إجمالي الأرباح، المعدّل، وعدد التقييمات.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/earnings</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">أرباح هذا الشهر مقابل الشهر الماضي مع نسبة النمو (growth %).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 7 · WALLET ═══════════ -->
+  <h2 id="wallet">7 · Wallet <span style="font-size:14px;color:var(--dim)">— المحفظة</span></h2>
+
+  <div class="note-ar ar">
+    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز 3 أيام</b> (فترة استرجاع العميل). بعد 3 أيام يصبح <b>متاحاً للسحب</b>.
+    <span class="pill">available_balance</span> القابل للسحب الآن ·
+    <span class="pill">pending_clearance</span> محجوز ضمن الـ 3 أيام ·
+    <span class="pill">total_earned</span> الأرباح المؤكدة (بعد خصم الاسترجاعات).
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/wallet</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع أرصدة المحفظة (available / pending / total earned) + سجل الحركات (transactions). كل حركة تحتوي الـ booking مع العميل والمنتج. المبلغ <code>amount</code> بإشارة (سالب = خروج).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/withdraw</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يسحب كامل الرصيد المتاح (<code>available_balance</code>) ويصفّره. (الدفع الفعلي للبنك سيُضاف لاحقاً عند توفّر ShamCash payout API.) يرجّع خطأ 422 إذا لا يوجد رصيد متاح.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 8 · NOTIFICATIONS ═══════════ -->
+  <h2 id="notifications">8 · Notifications <span style="font-size:14px;color:var(--dim)">— الإشعارات</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/notifications</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">قائمة إشعارات الـ vendor (الأحدث أولاً) + عدد غير المقروء <code>unread_count</code> (لأيقونة الجرس).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/notifications/{id}/read</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تعليم إشعار واحد كمقروء.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الإشعار في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/notifications/read-all</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تعليم كل الإشعارات غير المقروءة كمقروءة.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    Haflati · Vendor App API Reference · for the Flutter team · generated 2026-06-15<br>
+    Base: <span class="mono">https://events-api-production-138b.up.railway.app/api</span>
+  </div>
+
+</div>
+</body>
+</html>

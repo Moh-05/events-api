@@ -347,6 +347,44 @@ The Vendor app has two dashboard styles (service providers vs store/order vendor
 
 ---
 
+## UPDATES — 2026-06-10 (Mohamad session: live Railway deploy + relationship rename)
+
+### 1. Relationship renamed: `vendor_product()` → `product()`
+- The `Booking` relationship method is now **`product()`** (was `vendor_product()`). This matches `VendorProductImage::product()` — the naming inconsistency flagged in `docs/erd-review.html` is now fixed.
+- The **DB column stays `vendor_product_id`** and the FK is still explicit: `belongsTo(VendorProduct::class, 'vendor_product_id')`.
+- All call sites updated: `BookingController`, `PaymentController`, `AdminController`. Always eager-load with `$booking->load(['vendor', 'product'])`.
+- ⚠️ **API impact (tell Flutter):** the booking RESPONSE key changed from `"vendor_product"` to `"product"`. The booking INPUT is unchanged — clients still POST `vendor_product_id` when creating a booking.
+- This supersedes old BUG #6 and flips MUST-FOLLOW rule #1.
+
+### 2. Edit-booking rule: only before payment
+- `BookingController::update()` now allows editing a booking **only while `awaiting_payment`** (unpaid draft). Once paid (`pending`), the details are locked.
+- Reason: once money is in, changing date/duration would break the deposit and the vendor's calendar. Changes after payment wait for a cancel/refund instead.
+- `cancel()` is also `awaiting_payment`-only (unchanged).
+
+### 3. Firebase credentials: env JSON (Railway) or file (local)
+- `NotificationService` now reads credentials from **`FIREBASE_CREDENTIALS_JSON`** (a Railway variable holding the full service-account JSON) first, and falls back to the **`FIREBASE_CREDENTIALS`** file path (local).
+- Local `.env` keeps `FIREBASE_CREDENTIALS=storage/app/...json`. Railway uses `FIREBASE_CREDENTIALS_JSON` (paste the whole JSON, braces included). You do NOT need both in the same place.
+- Note: generating a new key in Firebase does NOT revoke old keys — to fully kill a leaked key, delete it in Google Cloud Console → IAM → Service Accounts → Keys.
+
+### 4. Deployed to Railway (staging for the Flutter team)
+- Live URL: `https://events-api-production-138b.up.railway.app`
+- Start command is now **permanently** `php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT` (NOT `migrate:fresh`). `migrate --force` only applies new migrations and never wipes data.
+- For one-off commands (`migrate:fresh`, `db:seed`, `tinker`) use the **Railway CLI**: `railway ssh php artisan ...`. It runs inside the container so it reaches `mysql.railway.internal`. Installed locally at `C:\xampp\php\railway.exe` (login with `railway login`, link with `railway link`).
+
+### 5. Full end-to-end flow verified on LIVE ✅
+- Flow: vendor signup → set type (photographer) → create service → user signup → booking → ShamCash payment (real 5 SYP deposit) → vendor approve → user review (5★) → vendor complete. All passed.
+- Test data: vendor business_name "Opus 4.8", user "Opus 4.7", product "Wedding Photography Package" priced 25 SYP (20% deposit = 5 SYP). ShamCash confirmed a real transaction.
+- 60-route sweep: every non-admin route responds correctly. Edit-booking verified after redeploy. Decline not re-tested (status guard confirmed; same code path as approve).
+- Admin routes: only login (401 bad creds) + auth guard (401 no token) verified — **no admin account exists yet** (no seeder). Create the first admin via `railway ssh php artisan tinker`.
+
+### 6. Known issues / reminders (NOT bugs — handle before real launch)
+- **WhatsApp (UltraMsg) subscription STOPPED** for non-payment → real OTP messages not sending. OTP is still returned in the API response for testing. Renew UltraMsg before launch.
+- **Images wiped on every Railway deploy** (ephemeral container disk). DB rows survive, but image files vanish → broken images until re-upload. Plan: move to **Cloudflare R2** (S3-compatible, ~10 GB always-free, no egress fees) or a Railway Volume before launch. Fine for testing — devs just re-upload.
+- **`price_agreed`** (bookings) is reserved/unused (always null). To be **removed later**, or used when a custom-quote/negotiation feature is built.
+- Testing-only leftovers to remove before real production: OTP in auth responses, `debug_notifications` in `PaymentController`, and set **`APP_DEBUG=false`** on Railway (it currently leaks stack traces on 404s).
+
+---
+
 ## Next Steps To Build (IN ORDER)
 
 ### IMMEDIATE (Current Session)
@@ -783,7 +821,7 @@ class VendorProductImage extends Model
 
 ---
 
-## Model: Booking (UPDATED — new statuses, vendor_product() method)
+## Model: Booking (UPDATED — new statuses, product() method — renamed from vendor_product() 2026-06-10)
 
 ```php
 <?php
@@ -830,8 +868,10 @@ class Booking extends Model
         return $this->belongsTo(Vendor::class);
     }
 
-    // CRITICAL: method is named 'vendor_product' — always load with this name
-    public function vendor_product()
+    // Relationship to the booked product. Renamed from vendor_product() to
+    // product() on 2026-06-10 (matches VendorProductImage::product()).
+    // The FK column stays vendor_product_id.
+    public function product()
     {
         return $this->belongsTo(VendorProduct::class, 'vendor_product_id');
     }
@@ -925,7 +965,7 @@ VendorProduct → hasMany  → VendorProductImage
 VendorProduct → hasOne   → VendorProductImage (primaryImage)
 Booking      → belongsTo → User (user_id)
 Booking      → belongsTo → Vendor
-Booking      → belongsTo → VendorProduct (via vendor_product_id) — method named 'vendor_product()'
+Booking      → belongsTo → VendorProduct (via vendor_product_id) — method named 'product()' (renamed from 'vendor_product()' 2026-06-10)
 Booking      → hasOne    → Payment
 Payment      → belongsTo → Booking
 VendorProductImage → belongsTo → VendorProduct
@@ -1482,14 +1522,14 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
     public function userBookings(Request $request)
     {
         $bookings = Booking::where('user_id', $request->user()->id)
-            ->with(['vendor', 'vendor_product'])
+            ->with(['vendor', 'product'])
             ->latest()
             ->get();
 
@@ -1538,7 +1578,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
         ]);
     }
 
@@ -1569,7 +1609,7 @@ class BookingController extends Controller
     public function vendorBookings(Request $request)
     {
         $bookings = Booking::where('vendor_id', $request->user()->id)
-            ->with(['user', 'vendor_product'])
+            ->with(['user', 'product'])
             ->latest()
             ->get();
 
@@ -1659,7 +1699,7 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        $product        = $booking->vendor_product;
+        $product        = $booking->product;
         $vendor         = $booking->vendor;
         $expectedAmount = $vendor->booking_style === 'appointment'
             ? round($product->price * ($product->deposit_percent / 100), 2)
@@ -1720,7 +1760,7 @@ class PaymentController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Payment verified successfully',
-            'booking' => $booking->load(['vendor', 'vendor_product']),
+            'booking' => $booking->load(['vendor', 'product']),
             'payment' => $payment,
         ]);
     }
@@ -1884,11 +1924,10 @@ Http::asForm()->post(
 **Problem:** `auth:vendors` group nested inside `auth:sanctum` group — vendor routes blocked.
 **Fix:** Keep two middleware groups completely separate at same level.
 
-### BUG #6: RelationNotFoundException — vendor_product vs product
+### BUG #6: RelationNotFoundException — vendor_product vs product (RESOLVED 2026-06-10)
 
-**Problem:** `$booking->load(['vendor', 'product'])` throws RelationNotFoundException.
-**Root Cause:** Relationship method in Booking model is named `vendor_product()` not `product()`.
-**Fix:** Always use `$booking->load(['vendor', 'vendor_product'])`.
+**Problem (historical):** `$booking->load(['vendor', 'product'])` threw RelationNotFoundException because the relationship method was named `vendor_product()`.
+**Resolution:** The method was renamed to `product()` on 2026-06-10 (to match `VendorProductImage::product()`), so the inconsistency is gone. **Now always use `$booking->load(['vendor', 'product'])`.** The FK column stays `vendor_product_id`.
 
 ### BUG #7: PUT/PATCH Fails on Railway with form-data
 
@@ -2253,13 +2292,13 @@ public function notifyAdmins(string $role, string $title, string $body): void
 
 ## MUST FOLLOW — Zero Exceptions
 
-1. **Relationship Loading:** ALWAYS `$booking->load(['vendor', 'vendor_product'])` NEVER `product`
+1. **Relationship Loading:** ALWAYS `$booking->load(['vendor', 'product'])` — the method was renamed from `vendor_product()` to `product()` on 2026-06-10. The DB column is still `vendor_product_id`.
 2. **After Updates:** ALWAYS call `$booking->refresh()` before returning JSON response
 3. **Form-data Updates:** ALWAYS use POST with `_method=PATCH` spoofing for file uploads
 4. **primary_image_index:** ALWAYS cast to `(int)` — `(int) ($request->primary_image_index ?? 0)`
 5. **Middleware Groups:** NEVER nest `auth:vendors` inside `auth:sanctum` — always separate
 6. **DB Names:** Local = `events_api`, Railway = `railway`
-7. **Booking Status:** New flow = pending → awaiting_payment → approved → completed
+7. **Booking Status:** Flow = awaiting_payment → pending (after pay) → approved → completed
 8. **Payment:** User can only pay when booking is `awaiting_payment` (not `pending`)
 9. **Date Conflicts:** Block `pending`, `awaiting_payment`, AND `approved` statuses
 10. **FCM Errors:** Log silently — never return as API error response

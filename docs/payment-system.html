@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حفلتي — نظام الدفع: ورقة تقنية</title>
+<style>
+:root{
+  --ink:#23202b;--ink2:#46424f;--dim:#7c7790;--bg:#faf8f4;--paper:#ffffff;
+  --gold:#9c7d2a;--gold-soft:#f3ead2;--line:#e7e1d4;--rule:#cdbf9c;
+  --green:#2f7d57;--red:#b5403f;--amber:#9a6b15;--blue:#2f5d8a;--code:#f4f1ea;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Tahoma,Arial,sans-serif;line-height:1.85;direction:rtl}
+.page{max-width:900px;margin:0 auto;background:var(--paper);box-shadow:0 1px 30px rgba(40,34,20,.07);padding:60px 64px}
+h1,h2{font-family:'Segoe UI',Tahoma,sans-serif;font-weight:700}
+code,.mono{font-family:'Consolas','Courier New',monospace;font-size:.88em;direction:ltr;unicode-bidi:embed}
+code{background:var(--code);color:#6b551a;padding:1px 6px;border-radius:4px}
+p{margin:9px 0;color:var(--ink2)}strong{color:var(--ink)}
+ul,ol{margin:8px 26px 8px 0}li{margin:6px 0;color:var(--ink2)}
+
+.cover{border-bottom:3px solid var(--gold);padding-bottom:24px;margin-bottom:8px}
+.eyebrow{letter-spacing:2px;color:var(--gold);font-size:12px;font-weight:700;margin-bottom:12px}
+.cover h1{font-size:34px;line-height:1.25;margin-bottom:10px}
+.cover .lede{font-size:15.5px;color:var(--ink2);max-width:680px}
+.meta{display:flex;flex-wrap:wrap;gap:10px 24px;margin-top:20px;font-size:13px;color:var(--dim)}
+.meta b{color:var(--ink)}
+
+h2{font-size:22px;margin:40px 0 4px;padding-top:8px}
+h2 .num{color:var(--gold);font-size:16px;margin-left:10px;font-weight:700}
+.rule{height:2px;background:linear-gradient(270deg,var(--rule),transparent);margin-bottom:14px}
+h3{font-size:16px;margin:20px 0 4px}
+
+.toc{background:var(--gold-soft);border:1px solid var(--line);border-radius:10px;padding:18px 24px;margin:24px 0}
+.toc h4{font-size:12px;letter-spacing:1px;color:var(--gold);margin-bottom:8px}
+.toc ol{columns:2;column-gap:34px;margin-right:18px}
+.toc a{color:var(--ink);text-decoration:none}.toc a:hover{color:var(--gold)}
+
+.box{border-radius:10px;padding:14px 20px;margin:16px 0;border:1px solid var(--line)}
+.box .h{font-weight:700;font-size:13px;margin-bottom:5px}
+.why{background:#f6f8f4;border-right:4px solid var(--green)}.why .h{color:var(--green)}
+.note{background:#f4f7fa;border-right:4px solid var(--blue)}.note .h{color:var(--blue)}
+.warn{background:#fbf6f0;border-right:4px solid var(--amber)}.warn .h{color:var(--amber)}
+
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{padding:9px 13px;text-align:right;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#f7f3ea;color:var(--gold);font-size:12.5px;border-bottom:2px solid var(--rule)}
+td.k{font-family:'Consolas',monospace;color:#6b551a;white-space:nowrap;direction:ltr}
+.tier td:first-child{font-weight:700;color:var(--ink)}
+
+.flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:20px 0;direction:ltr;justify-content:center}
+.flow .node{background:var(--paper);border:1.5px solid var(--rule);border-radius:9px;padding:9px 13px;text-align:center;min-width:120px}
+.flow .node b{display:block;font-family:'Consolas',monospace;color:var(--ink);font-size:12.5px}
+.flow .node span{color:var(--dim);font-size:11px}
+.flow .arr{color:var(--gold);font-weight:700;padding:0 9px;font-size:17px}
+.split{display:flex;gap:14px;margin:18px 0;flex-wrap:wrap;direction:ltr}
+.split .b{flex:1;min-width:170px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fcfbf7;text-align:center}
+.split .b .big{font-size:25px;font-weight:700}
+.split .pct-gold{color:var(--gold)}.split .pct-green{color:var(--green)}.split .pct-blue{color:var(--blue)}
+.split .b small{color:var(--dim);font-size:12px}
+
+.footer{margin-top:48px;border-top:2px solid var(--gold);padding-top:16px;color:var(--dim);font-size:12.5px;text-align:center}
+@media print{body{background:#fff}.page{box-shadow:none;padding:28px}}
+@media(max-width:680px){.page{padding:30px 20px}.toc ol{columns:1}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ░ COVER ░ -->
+  <div class="cover">
+    <div class="eyebrow">ورقة تقنية · TECHNICAL WHITE PAPER</div>
+    <h1>نظام الدفع في منصة حفلتي</h1>
+    <p class="lede">بنية دفع وتسوية قائمة على العربون والتحقق، مُصمَّمة للسوق السوري حيث لا تتوفّر بوابات الدفع التقليدية. توضّح هذه الورقة كيف تنتقل الأموال داخل المنصة، والمبرّر وراء كل قرار تصميمي، والضمانات التي تحمي العميل والـ vendor معاً.</p>
+    <div class="meta">
+      <div><b>المشروع</b> · حفلتي — سوق خدمات المناسبات</div>
+      <div><b>الـ Backend</b> · Laravel 12 REST API</div>
+      <div><b>البوابة</b> · ShamCash</div>
+      <div><b>الإصدار</b> · 1.0 · 2026-06-15</div>
+    </div>
+  </div>
+
+  <!-- ░ TOC ░ -->
+  <div class="toc">
+    <h4>المحتويات</h4>
+    <ol>
+      <li><a href="#s1">الملخّص التنفيذي</a></li>
+      <li><a href="#s2">السياق والقيود التصميمية</a></li>
+      <li><a href="#s3">نموذج العربون والعمولة</a></li>
+      <li><a href="#s4">التحقق من الدفع عبر ShamCash</a></li>
+      <li><a href="#s5">مسار الحجز ودورة الأموال</a></li>
+      <li><a href="#s6">محفظة الـ vendor وسياسة الاسترجاع</a></li>
+      <li><a href="#s7">القيود الحالية والخطة المستقبلية</a></li>
+    </ol>
+  </div>
+
+  <!-- ░ 1 ░ -->
+  <h2 id="s1"><span class="num">١</span>الملخّص التنفيذي</h2>
+  <div class="rule"></div>
+  <p>حفلتي منصة سوق ثنائية تربط العملاء بمزوّدي خدمات المناسبات (قاعات أفراح، مصوّرين، محلات حلويات، منسّقي موسيقى). يقوم نظام الدفع على ثلاثة مبادئ:</p>
+  <ul>
+    <li><strong>دفع عربون بدل السعر الكامل:</strong> يؤمّن العميل الحجز بدفع <strong>عربون ثابت 20%</strong> أونلاين، ويُسوّى الباقي مع الـ vendor مباشرة.</li>
+    <li><strong>التحقق بدل المعالجة:</strong> بما أنّ البوابة المحلية (ShamCash) توفّر واجهة <em>تحقق</em> لا واجهة سحب، تتحقق المنصة من تحويل يبدؤه العميل بدل سحب بطاقة.</li>
+    <li><strong>الحجز ثم الإفراج:</strong> تُضاف أرباح الـ vendor بعد موافقته على الحجز فقط، وتُحجز <strong>3 أيام</strong> يمكن خلالها استرجاع الإلغاء — حمايةً للعميل.</li>
+  </ul>
+  <p>تحتفظ المنصة بعمولة <strong>15%</strong> من كل عربون وتمرّر <strong>85%</strong> للـ vendor. والنتيجة نموذج تسوية متين تجاه قيود البنية المالية المحلية، ويبقى عادلاً وشفّافاً للطرفين.</p>
+
+  <!-- ░ 2 ░ -->
+  <h2 id="s2"><span class="num">٢</span>السياق والقيود التصميمية</h2>
+  <div class="rule"></div>
+  <p>لا يمكن مناقشة بنية الدفع بمعزل عن البيئة المالية التي تعمل فيها. ثلاثة قيود قادت كل قرار لاحق:</p>
+  <ol>
+    <li><strong>غياب بوابات البطاقات العالمية:</strong> خدمات Visa وMastercard وPayPal وStripe غير متاحة عملياً في سوريا، فكان الحلّ المحلي إلزامياً.</li>
+    <li><strong>ShamCash للتحقق فقط (حالياً):</strong> توفّر البوابة المختارة، <strong>ShamCash</strong> (محفظة رقمية سورية)، واجهة <em>للتحقق</em> من حدوث المعاملة، لكنها <em>لا توفّر بعد</em> واجهة <em>دفع</em> أو <em>استرجاع</em> برمجية؛ أي لا يمكن للمنصة تحريك الأموال آلياً بعد.</li>
+    <li><strong>الثقة تُهندَس لا تُفترض:</strong> بغياب وسيط ضامن (escrow)، على المنصة نفسها أن تضمن العدالة: أن يُدفع للـ vendor مقابل الحجوزات المنفّذة، وأن يُحمى العميل من الحجوزات المتعثّرة.</li>
+  </ol>
+  <div class="box why">
+    <div class="h">المبرّر التصميمي</div>
+    <p style="margin:0">قادت هذه القيود إلى تصميم <strong>التسوية المؤجّلة</strong>: يسجّل النظام الأموال ويحاسبها كدفتر داخلي دقيق، بينما تتم الحركة <em>الفعلية</em> للأموال (تحويل العميل دخولاً، والاسترجاع والدفع خروجاً مستقبلاً) عبر ShamCash. ومع نضوج واجهة ShamCash تُؤتمت الخطوات اليدوية دون أي تغيير في منطق المحاسبة.</p>
+  </div>
+
+  <!-- ░ 3 ░ -->
+  <h2 id="s3"><span class="num">٣</span>نموذج العربون والعمولة</h2>
+  <div class="rule"></div>
+  <p>لا يدفع العميل السعر الكامل أونلاين، بل يدفع <strong>عربوناً</strong> يحجز الموعد، ويُرتَّب الباقي مع الـ vendor. ونسبة العربون <strong>قاعدة ثابتة في المنصة (20%)</strong> غير قابلة للتعديل من الـ vendor (مفروضة على مستوى قاعدة البيانات).</p>
+  <table>
+    <tr><th>نوع الـ vendor</th><th>booking style</th><th>المبلغ المدفوع أونلاين</th></tr>
+    <tr><td>مصوّر، قاعة، DJ</td><td class="k">appointment</td><td><strong>عربون 20%</strong> من السعر</td></tr>
+    <tr><td>محل حلويات ومتاجر الطلبات</td><td class="k">order</td><td><strong>السعر الكامل</strong> (منتج يُصنع حسب الطلب)</td></tr>
+  </table>
+  <p>تُقسَّم كل دفعة مؤكَّدة بين المنصة والـ vendor:</p>
+  <div class="split">
+    <div class="b"><div class="big pct-gold">100%</div><strong>المبلغ المدفوع</strong><br><small>العربون أو السعر الكامل</small></div>
+    <div class="b"><div class="big pct-blue">15%</div><strong>عمولة المنصة</strong><br><small>إيراد حفلتي</small></div>
+    <div class="b"><div class="big pct-green">85%</div><strong>حصة الـ vendor</strong><br><small>تُضاف لمحفظته</small></div>
+  </div>
+  <p>مثال: مصوّر بسعر <code>25,000 SYP</code> يتطلّب عربوناً <code>5,000 SYP</code>؛ تحتفظ المنصة بـ <code>750 SYP</code> ويحصل الـ vendor على <code>4,250 SYP</code>. وتُحسب هذه الأرقام الثلاثة وتُخزَّن في كل سجل دفعة، فيصبح التقسيم قابلاً للتدقيق.</p>
+
+  <!-- ░ 4 ░ -->
+  <h2 id="s4"><span class="num">٤</span>التحقق من الدفع عبر ShamCash</h2>
+  <div class="rule"></div>
+  <p>بدل سحب بطاقة مخزَّنة، يقوم المسار على <strong>التحقق</strong>: يحوّل العميل العربون إلى حساب المنصة من محفظته، فيحصل على <strong>رقم معاملة (transaction ID)</strong>، ثم يرسله للـ API الذي يستدعي ShamCash <strong>للتحقق</strong> قبل الوثوق به.</p>
+  <p>والتحقق صارم؛ لا تُقبل المعاملة إلا إذا اجتازت <strong>كل</strong> الفحوص التالية (في <code>ShamCashService::verifyTransaction</code>):</p>
+  <table>
+    <tr><th>الفحص</th><th>القاعدة</th><th>سبب الفشل</th></tr>
+    <tr><td>الوجود</td><td>أن يكون رقم المعاملة موجوداً في ShamCash</td><td class="k">NOT_FOUND</td></tr>
+    <tr><td>المبلغ</td><td>أن يساوي العربون المتوقَّع بالضبط</td><td class="k">AMOUNT_MISMATCH</td></tr>
+    <tr><td>العملة</td><td>أن تكون <code>SYP</code></td><td class="k">CURRENCY_MISMATCH</td></tr>
+    <tr><td>الحداثة</td><td>أن تكون قد حدثت خلال آخر <strong>60 دقيقة</strong></td><td class="k">TRANSACTION_EXPIRED</td></tr>
+  </table>
+  <div class="box note">
+    <div class="h">لماذا نافذة 60 دقيقة؟</div>
+    <p style="margin:0">تقييد عمر المعاملة يضيّق فرصة إعادة الاستخدام، ويجعل كل محاولة دفع قريبة زمنياً من حجزها. ومع منع الاستخدام المتكرر، يضمن أنّ التحويل حديث وحقيقي ويُستهلك مرة واحدة فقط.</p>
+  </div>
+
+  <!-- ░ 5 ░ -->
+  <h2 id="s5"><span class="num">٥</span>مسار الحجز ودورة الأموال</h2>
+  <div class="rule"></div>
+  <p>يمرّ الحجز عبر آلة حالات محدَّدة، وبترتيب <strong>الدفع أولاً</strong>: يدفع العميل <em>قبل</em> أن يرى الـ vendor الطلب.</p>
+  <div class="flow">
+    <div class="node"><b>awaiting_payment</b><span>مسوّدة · مخفي</span></div>
+    <div class="arr">→</div>
+    <div class="node"><b>pending</b><span>مدفوع · بانتظار الـ vendor</span></div>
+    <div class="arr">→</div>
+    <div class="node"><b>approved</b><span>تمت الموافقة</span></div>
+    <div class="arr">→</div>
+    <div class="node"><b>completed</b><span>تم التنفيذ</span></div>
+  </div>
+  <p style="text-align:center;color:var(--dim);font-size:13px">فرعياً: قد يرفض الـ vendor حجزاً <code>pending</code> ليصبح <code>declined</code>، وقد يلغي العميل أي حجز مدفوع ليصبح <code>cancelled</code>.</p>
+  <div class="box why">
+    <div class="h">لماذا الدفع أولاً بدل الموافقة أولاً؟</div>
+    <p style="margin:0">في نموذج <em>الموافقة أولاً</em>، يوافق الـ vendor ثم يدفع العميل؛ لكن لو تراجع الـ vendor <em>بعد</em> الدفع، لاستحقّت المنصة استرجاعاً لا تستطيع تنفيذه آلياً (لا توجد واجهة استرجاع في ShamCash). أمّا <strong>الدفع أولاً</strong> فيتجنّب إنشاء التزامات يعجز النظام عن الوفاء بها: يُتحقّق من المال مقدّماً، وتأتي قرارات الـ vendor مقابل دفعة مؤكَّدة. ويُؤجَّل استرجاع العميل عند رفض الـ vendor حتى توفّر واجهة الاسترجاع، فيصبح آلياً.</p>
+  </div>
+  <p>وتتلخّص دورة الأموال في: يدفع العميل ← تحتجز <strong>المنصة</strong> المبلغ ← يوافق الـ vendor فتُضاف حصته <strong>85%</strong> لمحفظته (محجوزة 3 أيام) ← بعد 3 أيام تصبح <strong>قابلة للسحب</strong>.</p>
+
+  <!-- ░ 6 ░ -->
+  <h2 id="s6"><span class="num">٦</span>محفظة الـ vendor وسياسة الاسترجاع</h2>
+  <div class="rule"></div>
+  <p>المحفظة مبنيّة كـ <strong>دفتر حركات (ledger)</strong>: كل حركة (إضافة <code>credit</code> عند الموافقة، استرجاع <code>refund</code> عند الإلغاء، سحب <code>withdrawal</code>) هي صف ثابت لا يُعدَّل. وتُشتقّ الأرصدة من الدفتر ولا تُخزَّن كرقم قابل للتعديل، فيمكن إعادة حسابها وتدقيقها دائماً.</p>
+
+  <h3>الأرصدة الثلاثة</h3>
+  <table>
+    <tr><th>الرصيد</th><th>المعنى</th></tr>
+    <tr><td class="k">available_balance</td><td>الأرباح التي تجاوزت الحجز (3 أيام) بعد خصم السحوبات — قابلة للسحب الآن.</td></tr>
+    <tr><td class="k">pending_clearance</td><td>أرباح موافَق عليها حديثاً ولا تزال ضمن نافذة الـ 3 أيام — محجوزة.</td></tr>
+    <tr><td class="k">total_earned</td><td>الأموال التي <em>تجاوزت</em> النافذة فقط تُحتسب أرباحاً؛ ويُستثنى المُسترجَع والمعلّق.</td></tr>
+  </table>
+
+  <h3>سياسة الاسترجاع عند إلغاء العميل</h3>
+  <p>يعتمد ما يستردّه العميل — وبالتالي ما يُخصم من محفظة الـ vendor — على المدّة المنقضية منذ <strong>الموافقة</strong>:</p>
+  <table class="tier">
+    <tr><th>المدّة منذ الموافقة</th><th>استرجاع العميل</th><th>يحتفظ الـ vendor</th></tr>
+    <tr><td>خلال 24 ساعة</td><td style="color:var(--red)">100% (كامل)</td><td>0%</td></tr>
+    <tr><td>بين يوم و3 أيام</td><td style="color:var(--amber)">50% (نصف)</td><td>50%</td></tr>
+    <tr><td>بعد 3 أيام</td><td style="color:var(--green)">0% (لا شيء)</td><td>100%</td></tr>
+  </table>
+  <p>وإذا ألغى العميل <em>قبل</em> موافقة الـ vendor (الحجز لا يزال <code>pending</code>)، فالمال لم يُضَف لمحفظة الـ vendor أصلاً، فتبقى محفظته دون تغيير ويُسترجَع العميل كاملاً.</p>
+
+  <div class="box why">
+    <div class="h">لماذا حجز 3 أيام مرتبط بالسحب؟</div>
+    <p style="margin:0">تتشارك نافذة الاسترجاع وقفل السحب الحدّ نفسه (3 أيام) عمداً. لا يحقّ للـ vendor سحب مالٍ لم تُغلق نافذة استرجاعه بعد. وهذا يمنع خللاً محاسبياً: لو سحب الـ vendor أموالاً قد يستردّها العميل لاحقاً، لأصبح رصيد المحفظة سالباً. فتأجيل السحب حتى يصبح المال غير قابل للاسترجاع يبقي كل الأرصدة موجبة ومتّسقة.</p>
+  </div>
+
+  <h3>نموذج البيانات (الدفتر)</h3>
+  <p>يقوم النظام على جدولين: <code>payments</code> يسجّل الأموال الداخلة المؤكَّدة، و<code>wallet_transactions</code> هو دفتر تسوية الـ vendor.</p>
+  <table>
+    <tr><th>عمود في wallet_transactions</th><th>الغرض</th></tr>
+    <tr><td class="k">vendor_id</td><td>صاحب المحفظة</td></tr>
+    <tr><td class="k">booking_id</td><td>الحجز المصدر (فارغ للسحوبات)</td></tr>
+    <tr><td class="k">type</td><td><code>credit</code> · <code>refund</code> · <code>withdrawal</code></td></tr>
+    <tr><td class="k">amount</td><td>بإشارة: credit موجب، refund وwithdrawal سالب</td></tr>
+    <tr><td class="k">created_at</td><td>بالنسبة لـ credit هو <em>وقت الموافقة</em>، ومنه تُقاس الـ 3 أيام</td></tr>
+  </table>
+  <div class="box note">
+    <div class="h">ملاحظة على تصميم الدفتر</div>
+    <p style="margin:0">تخزين المال كدفتر إضافي (append-only) بإشارات، بدل رصيد واحد قابل للتعديل، يتبع مبدأ القيد المزدوج في المحاسبة: لا يُمحى التاريخ، وكل رقم يُفسَّر من صفوفه المصدر، والنظام قابل للتدقيق من طرفه إلى طرفه — وهي خصائص جوهرية لمنصة تتعامل مع أموال الآخرين.</p>
+  </div>
+
+  <!-- ░ 7 ░ -->
+  <h2 id="s7"><span class="num">٧</span>القيود الحالية والخطة المستقبلية</h2>
+  <div class="rule"></div>
+  <div class="box warn">
+    <div class="h">القيد الحالي</div>
+    <p style="margin:0">توفّر ShamCash اليوم واجهة <strong>تحقق</strong> فقط؛ فتستطيع المنصة تأكيد تحويل داخل، لكنها لا تستطيع بعد <em>إرسال</em> المال برمجياً. ولذلك يُمثَّل تدفقان خارجيان في الدفتر دون تنفيذ فعلي بعد: <strong>استرجاع العميل</strong> (عند الإلغاء) و<strong>دفع الـ vendor</strong> (عند السحب).</p>
+  </div>
+  <p>والبنية مهيّأة لذلك؛ فعند إطلاق ShamCash واجهة الدفع/الاسترجاع:</p>
+  <ul>
+    <li>سيُطلق مسار <code>cancel</code> استرجاعاً حقيقياً للعميل بالمبلغ المحسوب — ومنطق الدفتر جاهز.</li>
+    <li>سيُرسل مسار <code>withdraw</code> تحويلاً حقيقياً للـ vendor — وحساب الرصيد المتاح جاهز.</li>
+  </ul>
+  <p>ولا يحتاج أي منطق محاسبي إلى تغيير؛ تُضاف فقط استدعاءة التحويل الخارجي. وهذه هي الفائدة الجوهرية من تصميم <strong>التسوية المؤجّلة</strong>.</p>
+
+  <div class="footer">
+    حفلتي — ورقة تقنية لنظام الدفع · الإصدار 1.0 · 2026-06-15<br>
+    أُعدّت لفريق التطوير وللمراجعة الأكاديمية.
+  </div>
+
+</div>
+</body>
+</html>

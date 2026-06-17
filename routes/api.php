@@ -12,6 +12,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminManagementController;
+use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -71,7 +72,6 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
 
     // Profile
     Route::get('/vendor/profile', [VendorProfileController::class, 'show']);
-    Route::post('/vendor/profile/type', [VendorProfileController::class, 'setType']);
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
 
@@ -105,6 +105,10 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     // Stats (Vendor)
     Route::get('/vendor/stats', [BookingController::class, 'stats']);
     Route::get('/vendor/earnings', [BookingController::class, 'earnings']); // month-over-month growth
+
+    // Wallet (Vendor)
+    Route::get('/vendor/wallet', [WalletController::class, 'show']);       // balances + transactions
+    Route::post('/vendor/withdraw', [WalletController::class, 'withdraw']); // withdraw all available
 
     // Notifications (inbox / bell icon)
     Route::get('/vendor/notifications', [NotificationController::class, 'index']);

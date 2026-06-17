@@ -15,31 +15,6 @@ class VendorProfileController extends Controller
         ]);
     }
 
-    // Setup vendor type (first step after register)
-    public function setType(Request $request)
-    {
-        $request->validate([
-            'vendor_type' => 'required|in:wedding_venue,photographer,cake_shop,dj',
-        ]);
-
-        $vendor = $request->user();
-
-        $bookingStyle = in_array($request->vendor_type, ['cake_shop'])
-            ? 'order'
-            : 'appointment';
-
-        $vendor->update([
-            'vendor_type'   => $request->vendor_type,
-            'booking_style' => $bookingStyle,
-        ]);
-
-        return response()->json([
-            'status'        => 'success',
-            'vendor_type'   => $vendor->vendor_type,
-            'booking_style' => $vendor->booking_style,
-        ]);
-    }
-
     // Complete profile setup
     public function update(Request $request)
     {
@@ -51,10 +26,15 @@ class VendorProfileController extends Controller
             'longitude'     => 'sometimes|numeric|between:-180,180',
             'address'       => 'sometimes|string|max:255',
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
+            'vendor_type'   => 'sometimes|in:wedding_venue,photographer,cake_shop,dj',
         ]);
 
         $vendor = $request->user();
-        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address']);
+        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type']);
+
+        if ($request->filled('vendor_type')) {
+            $data['booking_style'] = $request->vendor_type === 'cake_shop' ? 'order' : 'appointment';
+        }
 
         if ($request->hasFile('profile_image')) {
             if ($vendor->profile_image) {
