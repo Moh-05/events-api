@@ -14,14 +14,20 @@ class Admin extends Authenticatable
         'email',
         'password',
         'role',
-        'fcm_token',
+        'last_login_at',
     ];
 
     protected $hidden = ['password', 'remember_token'];
 
     protected $casts = [
-        'password' => 'hashed',
+        'password'      => 'hashed',
+        'last_login_at' => 'datetime',
     ];
+
+    public function auditLogs()
+    {
+        return $this->hasMany(AdminAuditLog::class);
+    }
 
     public function isSuperAdmin(): bool
     {

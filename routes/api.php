@@ -11,6 +11,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminManagementController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PortfolioController;
 use Illuminate\Support\Facades\Route;
@@ -37,7 +38,7 @@ Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendor
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum
 // ─────────────────────────────────────────────
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Profile
     Route::get('/profile', [UserProfileController::class, 'show']);
@@ -69,7 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // ─────────────────────────────────────────────
 // Vendor Protected Routes — auth:vendors
 // ─────────────────────────────────────────────
-Route::middleware('auth:vendors')->group(function () {
+Route::middleware(['auth:vendors', 'active'])->group(function () {
 
     // Profile
     Route::get('/vendor/profile', [VendorProfileController::class, 'show']);
@@ -128,26 +129,38 @@ Route::middleware('auth:vendors')->group(function () {
 // Admin Routes
 // ─────────────────────────────────────────────
 
-// Public — no auth
-Route::post('/admin/login', [AdminAuthController::class, 'login']);
+// Public — no auth. Throttled to 5 attempts/min per IP against brute force.
+Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('throttle:5,1');
 
-// All admins (super_admin + support)
 Route::middleware('auth:admins')->group(function () {
 
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 
-    // KYC — both roles
-    Route::get('/admin/vendors/pending', [AdminController::class, 'pendingVendors']);
-    Route::post('/admin/vendors/{id}/approve', [AdminController::class, 'approveVendor']);
-    Route::post('/admin/vendors/{id}/reject', [AdminController::class, 'rejectVendor']);
-
-    // Super admin only
-    Route::middleware('role:super_admin')->group(function () {
+    // ── View + KYC — super_admin AND support (read-only + approve/reject KYC) ──
+    Route::middleware('role:super_admin,support')->group(function () {
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
+
         Route::get('/admin/vendors', [AdminController::class, 'vendors']);
-        Route::post('/admin/vendors/{id}/toggle', [AdminController::class, 'toggleVendor']);
+        Route::get('/admin/vendors/pending', [AdminController::class, 'pendingVendors']);
+        Route::get('/admin/vendors/{id}', [AdminController::class, 'vendorDetail']);
+        Route::post('/admin/vendors/{id}/approve', [AdminController::class, 'approveVendor']);
+        Route::post('/admin/vendors/{id}/reject', [AdminController::class, 'rejectVendor']);
+
         Route::get('/admin/users', [AdminController::class, 'users']);
         Route::get('/admin/bookings', [AdminController::class, 'bookings']);
+    });
+
+    // ── Sensitive actions — super_admin ONLY (ban, money, audit, manage admins) ──
+    Route::middleware('role:super_admin')->group(function () {
+        Route::post('/admin/vendors/{id}/toggle', [AdminController::class, 'toggleVendor']); // ban/unban vendor
+        Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleUser']);     // ban/unban user
+
         Route::get('/admin/payments', [AdminController::class, 'payments']);
+        Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
+
+        // Manage admin accounts (hire/remove support)
+        Route::get('/admin/admins', [AdminManagementController::class, 'index']);
+        Route::post('/admin/admins', [AdminManagementController::class, 'store']);
+        Route::delete('/admin/admins/{id}', [AdminManagementController::class, 'destroy']);
     });
 });

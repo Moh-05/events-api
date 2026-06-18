@@ -15,7 +15,9 @@ class AdminAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $admin = Admin::where('email', $request->email)->first();
+        // Normalize email so "Admin@Haflati.com " and "admin@haflati.com" match.
+        $email = strtolower(trim($request->email));
+        $admin = Admin::where('email', $email)->first();
 
         if (!$admin || !Hash::check($request->password, $admin->password)) {
             return response()->json([
@@ -23,6 +25,9 @@ class AdminAuthController extends Controller
                 'message' => 'Invalid credentials',
             ], 401);
         }
+
+        // Track the last successful login.
+        $admin->update(['last_login_at' => now()]);
 
         return response()->json([
             'status' => 'success',

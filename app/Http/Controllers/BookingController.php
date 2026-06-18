@@ -33,6 +33,14 @@ class BookingController extends Controller
         $product = VendorProduct::with('vendor')->findOrFail($request->vendor_product_id);
         $vendor  = $product->vendor;
 
+        // A banned (suspended) vendor can't receive new bookings.
+        if (!$vendor || !$vendor->is_active) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'This vendor is currently unavailable',
+            ], 403);
+        }
+
         // Can't book an unavailable product. A product auto-hides
         // (is_available = false) the moment its stock hits 0, so this also
         // blocks booking a sold-out product.
