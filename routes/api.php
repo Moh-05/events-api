@@ -12,6 +12,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\PortfolioController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -31,6 +32,7 @@ Route::post('/vendor/complete-registration', [VendorAuthController::class, 'comp
 // Public browse
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);
+Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendorPortfolio']);
 
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum
@@ -85,6 +87,13 @@ Route::middleware('auth:vendors')->group(function () {
     Route::get('/vendor/products/{id}', [VendorProductController::class, 'show']);
     Route::post('/vendor/products/{id}', [VendorProductController::class, 'update']);
     Route::delete('/vendor/products/{id}', [VendorProductController::class, 'destroy']);
+
+    // Portfolio (Vendor)
+    Route::get('/vendor/portfolio', [PortfolioController::class, 'index']);
+    Route::post('/vendor/portfolio', [PortfolioController::class, 'store']);
+    Route::get('/vendor/portfolio/{id}', [PortfolioController::class, 'show']);      // detail: primary + other images
+    Route::post('/vendor/portfolio/{id}', [PortfolioController::class, 'update']);   // POST (form-data) to add/replace images
+    Route::delete('/vendor/portfolio/{id}', [PortfolioController::class, 'destroy']);
 
     // Bookings (Vendor)
     Route::get('/vendor/bookings', [BookingController::class, 'index']);
