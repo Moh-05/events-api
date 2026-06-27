@@ -83,13 +83,16 @@ class VendorAuthController extends Controller
             'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
             'city'               => 'required|string|min:2|max:100',
             'birth_date'         => 'required|date|before:today|after:1900-01-01',
-            'vendor_type'        => 'required|in:wedding_venue,photographer,cake_shop,dj',
+            'vendor_type'        => 'required|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
+            'vendor_style'       => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
         ]);
 
         $phone = Cache::get('reg_token_' . $request->registration_token);
         if (!$phone) return response()->json(['message' => 'Expired'], 403);
 
-        $bookingStyle = $request->vendor_type === 'cake_shop' ? 'order' : 'appointment';
+        // Seller categories are order-based; every other (service) category is appointment-based.
+        $sellerTypes  = ['flowers', 'gifts', 'dresses', 'accessories', 'candles', 'cakes'];
+        $bookingStyle = in_array($request->vendor_type, $sellerTypes) ? 'order' : 'appointment';
 
         $vendor = Vendor::create([
             'phone'         => $phone,
@@ -99,6 +102,7 @@ class VendorAuthController extends Controller
             'birth_date'    => $request->birth_date,
             'vendor_type'   => $request->vendor_type,
             'booking_style' => $bookingStyle,
+            'vendor_style'  => $request->vendor_style,
         ]);
 
         Cache::forget('reg_token_' . $request->registration_token);

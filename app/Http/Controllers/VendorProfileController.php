@@ -26,14 +26,17 @@ class VendorProfileController extends Controller
             'longitude'     => 'sometimes|numeric|between:-180,180',
             'address'       => 'sometimes|string|max:255',
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
-            'vendor_type'   => 'sometimes|in:wedding_venue,photographer,cake_shop,dj',
+            'vendor_type'   => 'sometimes|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
+            'vendor_style'  => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
         ]);
 
         $vendor = $request->user();
-        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type']);
+        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style']);
 
         if ($request->filled('vendor_type')) {
-            $data['booking_style'] = $request->vendor_type === 'cake_shop' ? 'order' : 'appointment';
+            // Seller categories are order-based; every other (service) category is appointment-based.
+            $sellerTypes = ['flowers', 'gifts', 'dresses', 'accessories', 'candles', 'cakes'];
+            $data['booking_style'] = in_array($request->vendor_type, $sellerTypes) ? 'order' : 'appointment';
         }
 
         if ($request->hasFile('profile_image')) {

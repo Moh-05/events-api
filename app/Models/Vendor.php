@@ -28,6 +28,7 @@ class Vendor extends Authenticatable
         'business_name',
         'vendor_type',
         'booking_style',
+        'vendor_style',
         'profile_image',
         'latitude',
         'longitude',

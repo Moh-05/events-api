@@ -17,15 +17,27 @@ return new class extends Migration
             $table->date('birth_date')->nullable();
             $table->string('business_name')->nullable();
             $table->enum('vendor_type', [
-                'wedding_venue',
+                // Service categories (appointment-based)
                 'photographer',
-                'cake_shop',
+                'makeupArtist',
                 'dj',
-                'store',
+                'weddingHall',
+                // Seller categories (order-based)
+                'flowers',
+                'gifts',
+                'dresses',
+                'accessories',
+                'candles',
+                'cakes',
             ])->nullable();
             $table->enum('booking_style', [
                 'appointment',
                 'order'
+            ])->nullable();
+            // Helper for Flutter only (vendor_type drives the workflow).
+            $table->enum('vendor_style', [
+                'service_provider',
+                'seller',
             ])->nullable();
             $table->string('profile_image')->nullable();
             $table->decimal('latitude', 10, 8)->nullable();
