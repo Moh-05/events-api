@@ -34,8 +34,13 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        // prevent reuse of the same transaction
-        if (Payment::where('transaction_id', $request->transaction_id)->exists()) {
+        // TEST bypass: transaction_id "0000" skips ShamCash verification and can
+        // be reused across bookings, so we can test the full pay flow without a
+        // real transfer. Remove before production.
+        $isTest = $request->transaction_id === '0000';
+
+        // prevent reuse of the same transaction (the test id is exempt)
+        if (!$isTest && Payment::where('transaction_id', $request->transaction_id)->exists()) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'This transaction has already been used',
@@ -48,11 +53,15 @@ class PaymentController extends Controller
             ? round($product->price * ($product->deposit_percent / 100), 2)
             : $product->price;
 
-        $shamCash = new ShamCashService();
-        $result   = $shamCash->verifyTransaction(
-            $request->transaction_id,
-            $expectedAmount
-        );
+        if ($isTest) {
+            $result = ['verified' => true, 'sender_name' => 'TEST'];
+        } else {
+            $shamCash = new ShamCashService();
+            $result   = $shamCash->verifyTransaction(
+                $request->transaction_id,
+                $expectedAmount
+            );
+        }
 
         if (!$result['verified']) {
             return response()->json([
@@ -76,7 +85,7 @@ class PaymentController extends Controller
             'commission'     => $commission,
             'vendor_payout'  => $vendorPayout,
             'currency'       => 'SYP',
-            'transaction_id' => $request->transaction_id,
+            'transaction_id' => $isTest ? '0000-' . $booking->id : $request->transaction_id,
             'sender_name'    => $result['sender_name'],
             'status'         => 'verified',
         ]);
