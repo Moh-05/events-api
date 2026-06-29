@@ -385,6 +385,55 @@ The Vendor app has two dashboard styles (service providers vs store/order vendor
 
 ---
 
+## UPDATES — 2026-06-27 (Moh + Amer: wallet, portfolio, stock, categories, ban, notifications)
+
+### 1. Vendor wallet system (NEW)
+- Table `wallet_transactions`: `vendor_id`, `booking_id` (nullable), `type` (`credit|refund|withdrawal`), `amount` (signed decimal 10,2), timestamps. Model `WalletTransaction`; `Vendor::walletTransactions()`.
+- `WalletController`:
+  - `GET /vendor/wallet` (`show`) → `wallet` {`available_balance`, `pending_clearance`, `total_earned`, `currency`, `pending_note`} + `transactions` (each with `booking.user` + `booking.product`).
+  - `POST /vendor/withdraw` → sweeps the full available balance to 0 (records a `withdrawal` row). Real bank payout deferred until ShamCash payout API exists. 422 if nothing available.
+- Logic: on vendor **approve**, a `credit` of `vendor_payout` is added; **held 3 days** (`HOLD_DAYS`, the refund window) before it clears into `available`. Balances derived per-booking (group by `booking_id`, net credit+refund; cleared once the credit is >3 days old). Withdrawals reduce `available` immediately but never reduce `total_earned`.
+
+### 2. Stock handling (NEW)
+- Stock is taken at vendor **`approve()`** (NOT at booking) and returned when an **approved** booking is cancelled.
+- `store()` blocks the booking if the product `is_available = false` (a product auto-hides when stock hits 0).
+- `approve()` uses an **atomic conditional decrement** (`where('stock','>',0)->decrement`) → can never oversell; returns **409 "out of stock"** if none left; sets `is_available=false` when stock reaches 0.
+- `cancel()` of an approved booking restores +1 and re-enables `is_available`. `decline()` and draft/pending cancels do NOT touch stock (it was never decremented). Refund tiers on approved-cancel: ≤24h=100%, ≤72h=50%, >72h=0% (negative `refund` row).
+- Products with `stock = null` (appointment services) are untracked — all stock logic skips them. `approve()` and `cancel()` wrap stock + wallet + status in a DB transaction.
+
+### 3. Vendor categories + `vendor_style` (CHANGED)
+- `vendor_type` enum replaced with the new category list:
+  - **Service** (`booking_style = appointment`): `photographer`, `makeupArtist`, `dj`, `weddingHall`
+  - **Seller** (`booking_style = order`): `flowers`, `gifts`, `dresses`, `accessories`, `candles`, `cakes`
+- `booking_style` auto-derives from `vendor_type` (seller list → order, else appointment) in both complete-registration and profile update. (Replaces the old `cake_shop` check.)
+- NEW column **`vendor_style`** enum (`service_provider | seller`, nullable) — a **helper field for Flutter only, no backend logic**. Set wherever `vendor_type` is set (optional at registration, settable in profile); returned inside the `vendor` object on login/signup.
+- **Registration flow changed:** `vendor_type` is now **required in `complete-registration`**; the old separate `POST /vendor/profile/type` (`setType`) endpoint was **REMOVED**.
+
+### 4. Portfolio — "معرض الأعمال" (NEW)
+- Like products but **no price**. Tables: `portfolio_items` (`vendor_id`, `title`, `description`) + `portfolio_item_images` (`portfolio_item_id`, `image_path`, `is_primary`). Models `PortfolioItem` / `PortfolioItemImage`; `Vendor::portfolioItems()`. Images → `storage/app/public/portfolio_images`.
+- `PortfolioController` routes: `GET /vendor/portfolio` (own), `POST /vendor/portfolio` (create — `images[]` required, `primary_image_index`), `GET /vendor/portfolio/{id}` (detail), `POST /vendor/portfolio/{id}` (update — add `images[]` / `delete_image_ids[]`), `DELETE /vendor/portfolio/{id}`, and public `GET /vendors/{vendorId}/portfolio`.
+
+### 5. Notifications wired into booking events (CHANGED)
+- Previously only `PaymentController::verify` fired. Now also: **approve → user**, **decline → user**, **complete → user**, **cancel (pending/approved) → vendor**, **new review → vendor**.
+- Each saves to the inbox + sends FCM (if device token) with `data: { booking_id }`. Notification titles are **plain text, no emojis**.
+
+### 6. Admin role split + ban enforcement (Amer, NEW)
+- New columns `users.is_active` and `vendors.rejection_reason`; new `admin_audit_logs` table; `AdminManagementController`; `EnsureActive` middleware (alias `active`) applied to the user and vendor route groups.
+- Banned vendor: vendor login returns `status: suspended` (403); `BookingController::store` blocks booking a suspended vendor (403). `Vendor::scopeActive()` for public queries.
+- Admin routes: `role:super_admin,support` for view + KYC; super_admin-only for management actions. `admin/login` throttled 5/min. First admin via `AdminSeeder` → `admin@haflati.com` / `0000` (change after first login).
+
+### 7. Testing helpers — REMOVE before production
+- **Payment bypass:** `transaction_id = "0000"` skips ShamCash verification and is reusable across bookings (stored internally as `0000-{bookingId}`).
+- OTP still returned in auth responses; **UltraMsg subscription stopped** (trial not extended) → OTPs are not actually sent via WhatsApp during testing.
+- **Images not persistent** — wiped on every Railway deploy. Acceptable while testing; move to Cloudflare R2 before launch.
+
+### Deferred by decision (fine for testing)
+Persistent images (R2) · UltraMsg renewal · removing OTP/`0000`/`debug_notifications` · `APP_DEBUG=false` · ShamCash payout+refund API · reviews completed-only rule · pagination · Arabic translation · chat · favorites (Amer's task).
+
+> **Docs:** `docs/vendor-api.html` is the up-to-date Vendor App API reference for the Flutter team (new categories, `vendor_style`, Portfolio section).
+
+---
+
 ## Next Steps To Build (IN ORDER)
 
 ### IMMEDIATE (Current Session)
