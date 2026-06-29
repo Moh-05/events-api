@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Review;
 use App\Models\Booking;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
@@ -59,6 +60,13 @@ class ReviewController extends Controller
         $vendor     = $booking->vendor;
         $avg        = Review::where('vendor_id', $vendor->id)->avg('rating');
         $vendor->update(['rating_avg' => round($avg, 2)]);
+
+        (new NotificationService())->notifyVendor(
+            $vendor,
+            'New Review',
+            "You received a {$request->rating}-star review.",
+            ['booking_id' => $booking->id]
+        );
 
         return response()->json([
             'status' => 'success',

@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\VendorProduct;
 use App\Models\WalletTransaction;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -180,6 +181,14 @@ class BookingController extends Controller
         // vendor's wallet is untouched.
         if ($booking->status === 'pending') {
             $booking->update(['status' => 'cancelled']);
+
+            (new NotificationService())->notifyVendor(
+                $booking->vendor,
+                'Booking Cancelled',
+                "The customer cancelled booking #{$booking->id}.",
+                ['booking_id' => $booking->id]
+            );
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Booking cancelled — full refund due to the user',
@@ -219,6 +228,13 @@ class BookingController extends Controller
                 // The approved booking had its stock decremented — give the unit back.
                 $this->restoreStock($booking);
             });
+
+            (new NotificationService())->notifyVendor(
+                $booking->vendor,
+                'Booking Cancelled',
+                "The customer cancelled booking #{$booking->id}.",
+                ['booking_id' => $booking->id]
+            );
 
             return response()->json([
                 'status'  => 'success',
@@ -287,6 +303,13 @@ class BookingController extends Controller
 
         $booking->refresh();
 
+        (new NotificationService())->notifyUser(
+            $booking->user,
+            'Booking Approved',
+            "Your booking #{$booking->id} has been approved by the vendor.",
+            ['booking_id' => $booking->id]
+        );
+
         return response()->json([
             'status'  => 'success',
             'booking' => $booking->load(['vendor', 'product']),
@@ -304,6 +327,13 @@ class BookingController extends Controller
 
         $booking->update(['status' => 'completed']);
         $booking->refresh();
+
+        (new NotificationService())->notifyUser(
+            $booking->user,
+            'Service Completed',
+            "Your booking #{$booking->id} is complete. Don't forget to leave a review!",
+            ['booking_id' => $booking->id]
+        );
 
         return response()->json([
             'status'  => 'success',
@@ -323,6 +353,13 @@ class BookingController extends Controller
         // No stock change: a pending booking never decremented stock (stock is
         // only taken at approve), so there is nothing to restore here.
         $booking->update(['status' => 'declined']);
+
+        (new NotificationService())->notifyUser(
+            $booking->user,
+            'Booking Declined',
+            "Your booking #{$booking->id} was declined. Your payment will be refunded.",
+            ['booking_id' => $booking->id]
+        );
 
         return response()->json([
             'status'  => 'success',

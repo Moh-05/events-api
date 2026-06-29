@@ -98,13 +98,13 @@ class PaymentController extends Controller
 
         $notifyUser   = $notification->notifyUser(
             $user,
-            'Payment Received ✅',
+            'Payment Received',
             'Your payment was confirmed. Your booking is now waiting for vendor approval.'
         );
 
         $notifyVendor = $notification->notifyVendor(
             $vendor,
-            'New Paid Booking 🔔',
+            'New Paid Booking',
             'You have a new paid booking #' . $booking->id . '. Please accept or decline.'
         );
 
