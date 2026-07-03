@@ -425,12 +425,32 @@ The Vendor app has two dashboard styles (service providers vs store/order vendor
 ### 7. Testing helpers — REMOVE before production
 - **Payment bypass:** `transaction_id = "0000"` skips ShamCash verification and is reusable across bookings (stored internally as `0000-{bookingId}`).
 - OTP still returned in auth responses; **UltraMsg subscription stopped** (trial not extended) → OTPs are not actually sent via WhatsApp during testing.
-- **Images not persistent** — wiped on every Railway deploy. Acceptable while testing; move to Cloudflare R2 before launch.
+- ~~Images not persistent~~ — SOLVED 2026-07-03: moved to Supabase Storage (see UPDATES — 2026-07-03).
 
 ### Deferred by decision (fine for testing)
-Persistent images (R2) · UltraMsg renewal · removing OTP/`0000`/`debug_notifications` · `APP_DEBUG=false` · ShamCash payout+refund API · reviews completed-only rule · pagination · Arabic translation · chat · favorites (Amer's task).
+UltraMsg renewal · removing OTP/`0000`/`debug_notifications` · `APP_DEBUG=false` · ShamCash payout+refund API · reviews completed-only rule · pagination · Arabic translation · chat · favorites (Amer's task).
 
 > **Docs:** `docs/vendor-api.html` is the up-to-date Vendor App API reference for the Flutter team (new categories, `vendor_style`, Portfolio section).
+
+---
+
+## UPDATES — 2026-07-03 (Supabase images + booking items / cart)
+
+### 1. Supabase Storage — images now survive deploys
+- Railway's container disk is wiped on every deploy, so locally-stored uploads kept disappearing. All image uploads/deletes moved from the local `public` disk to a new S3-compatible **`supabase` disk** (`config/filesystems.php`), backed by Supabase Storage (free tier, bucket `Haflati`, public reads).
+- Package: `league/flysystem-aws-s3-v3`. Env vars (local `.env` + Railway): `SUPABASE_S3_ENDPOINT`, `SUPABASE_S3_REGION`, `SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY`, `SUPABASE_S3_BUCKET`, `SUPABASE_PUBLIC_URL`.
+- New computed URL fields in every JSON response (Flutter uses these directly): `image_url` on `VendorProductImage` + `PortfolioItemImage`, `profile_image_url` on `User` + `Vendor`. DB still stores only the short path.
+- Supabase free tier pauses after ~7 idle days (resume in dashboard). **Rotate the S3 secret key before launch.**
+
+### 2. Booking items — cart-style orders (`booking_items` table)
+- An order can now hold **multiple different products from the same vendor, each with its own quantity** (e.g. 1× Red Rose + 2× White Rose). New table `booking_items`: `booking_id`, `vendor_product_id`, `quantity`, `unit_price` (**price snapshot at booking time** — later vendor price changes don't alter what an existing order owes). Model `BookingItem`; `Booking::items()` hasMany.
+- `POST /bookings` accepts either the old shape (`vendor_product_id` + optional `quantity`) or `items: [{vendor_product_id, quantity}, ...]`. Duplicate product ids are merged. Appointments unchanged: single package, quantity forced to 1 (`items`/qty>1 → 422). All items must be same vendor (422). Per-item availability + stock guards at booking (409 "Only N of 'X' left in stock").
+- `bookings.vendor_product_id` still points to the first item (kept so existing vendor endpoints don't break).
+- **Payment:** order total = sum of `unit_price × quantity` over items; appointment stays deposit% of package. Commission 15/85 applies to the total.
+- **Stock:** approve decrements **every item by its quantity** atomically (`WHERE stock >= qty`), all-or-nothing in one transaction — if any item can't be covered the whole approval fails 409 and rolls back. Cancel of an approved booking restores every item's quantity. Sold-out auto-hide/un-hide unchanged.
+- `PATCH`-style `POST /bookings/{id}` on an unpaid order draft can replace the items list (same guards, new snapshots).
+- Bookings now return `items` (with product) everywhere: user store/update/index, vendor index/show/recentOrders, payment response, approve/decline/complete.
+- Full flow verified locally: multi-item book → `0000` pay (exact total) → approve (stock −per item) → cancel (stock restored, wallet netted); guards: overbook, mixed vendors, appointment+qty, plain appointment regression.
 
 ---
 

@@ -43,6 +43,11 @@ class Booking extends Model
         return $this->belongsTo(Vendor::class);
     }
 
+    public function items()
+    {
+        return $this->hasMany(BookingItem::class);
+    }
+
     public function product()
     {
         return $this->belongsTo(VendorProduct::class, 'vendor_product_id');
