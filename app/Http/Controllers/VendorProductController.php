@@ -89,7 +89,7 @@ class VendorProductController extends Controller
         if ($request->hasFile('images')) {
             $primaryIndex = (int) ($request->primary_image_index ?? 0);
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('product_images', 'public');
+                $path = $image->store('product_images', 'supabase');
 
                 $product->images()->create([
                     'image_path' => $path,
@@ -158,7 +158,7 @@ class VendorProductController extends Controller
                 ->get();
 
             foreach ($imagesToDelete as $image) {
-                Storage::disk('public')->delete($image->image_path);
+                Storage::disk('supabase')->delete($image->image_path);
                 $image->delete();
             }
         }
@@ -168,7 +168,7 @@ class VendorProductController extends Controller
             $primaryIndex = $request->primary_image_index ?? null;
 
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('product_images', 'public');
+                $path = $image->store('product_images', 'supabase');
 
                 $product->images()->create([
                     'image_path' => $path,
@@ -235,7 +235,7 @@ class VendorProductController extends Controller
             ->firstOrFail();
 
         foreach ($product->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            Storage::disk('supabase')->delete($image->image_path);
         }
 
         $product->delete();

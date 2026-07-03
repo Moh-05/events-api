@@ -72,7 +72,7 @@ class PortfolioController extends Controller
         if ($request->hasFile('images')) {
             $primaryIndex = (int) ($request->primary_image_index ?? 0);
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('portfolio_images', 'public');
+                $path = $image->store('portfolio_images', 'supabase');
 
                 $item->images()->create([
                     'image_path' => $path,
@@ -115,7 +115,7 @@ class PortfolioController extends Controller
                 ->get();
 
             foreach ($imagesToDelete as $image) {
-                Storage::disk('public')->delete($image->image_path);
+                Storage::disk('supabase')->delete($image->image_path);
                 $image->delete();
             }
         }
@@ -125,7 +125,7 @@ class PortfolioController extends Controller
             $primaryIndex = $request->primary_image_index ?? null;
 
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('portfolio_images', 'public');
+                $path = $image->store('portfolio_images', 'supabase');
 
                 $item->images()->create([
                     'image_path' => $path,
@@ -150,7 +150,7 @@ class PortfolioController extends Controller
             ->firstOrFail();
 
         foreach ($item->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            Storage::disk('supabase')->delete($image->image_path);
         }
 
         $item->delete();

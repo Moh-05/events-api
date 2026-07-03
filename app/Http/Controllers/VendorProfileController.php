@@ -41,10 +41,10 @@ class VendorProfileController extends Controller
 
         if ($request->hasFile('profile_image')) {
             if ($vendor->profile_image) {
-                Storage::disk('public')->delete($vendor->profile_image);
+                Storage::disk('supabase')->delete($vendor->profile_image);
             }
             $data['profile_image'] = $request->file('profile_image')
-                ->store('vendor_images', 'public');
+                ->store('vendor_images', 'supabase');
         }
 
         $vendor->update($data);
@@ -60,7 +60,7 @@ class VendorProfileController extends Controller
         $vendor = $request->user();
 
         if ($vendor->profile_image) {
-            Storage::disk('public')->delete($vendor->profile_image);
+            Storage::disk('supabase')->delete($vendor->profile_image);
             $vendor->update(['profile_image' => null]);
         }
 

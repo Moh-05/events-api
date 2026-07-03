@@ -33,10 +33,10 @@ class UserProfileController extends Controller
 
         if ($request->hasFile('profile_image')) {
             if ($user->profile_image) {
-                Storage::disk('public')->delete($user->profile_image);
+                Storage::disk('supabase')->delete($user->profile_image);
             }
             $data['profile_image'] = $request->file('profile_image')
-                ->store('profile_images', 'public');
+                ->store('profile_images', 'supabase');
         }
 
         $user->update($data);
@@ -52,7 +52,7 @@ class UserProfileController extends Controller
         $user = $request->user();
 
         if ($user->profile_image) {
-            Storage::disk('public')->delete($user->profile_image);
+            Storage::disk('supabase')->delete($user->profile_image);
             $user->update(['profile_image' => null]);
         }
 
