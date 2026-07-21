@@ -260,8 +260,8 @@ class BookingController extends Controller
 
             $booking->update(['status' => 'approved']);
 
-            // Credit the vendor's payout. This row's created_at is the approval
-            // time — money is held 3 days (refund window) before it's withdrawable.
+            // Credit the vendor's payout. The money stays in escrow (pending)
+            // until the booking is completed — see WalletController::balances().
             $payout = (float) Payment::where('booking_id', $booking->id)
                 ->where('status', 'verified')
                 ->value('vendor_payout');
@@ -301,6 +301,20 @@ class BookingController extends Controller
             ->where('vendor_id', $vendor->id)
             ->where('status', 'approved')
             ->firstOrFail();
+
+        // Can't mark complete before the service actually happened — otherwise a
+        // vendor could complete early to cash out an escrowed booking. Bookings
+        // also auto-complete one day after this date (bookings:auto-complete).
+        $serviceDate = $booking->booking_style === 'order'
+            ? $booking->delivery_date
+            : $booking->event_date;
+
+        if ($serviceDate && now()->lt($serviceDate)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'You can only mark this completed on or after the event/delivery date',
+            ], 422);
+        }
 
         $booking->update(['status' => 'completed']);
         $booking->refresh();
