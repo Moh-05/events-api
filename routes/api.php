@@ -140,22 +140,52 @@ Route::middleware('auth:admins')->group(function () {
     Route::middleware('role:super_admin,support')->group(function () {
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
 
-        Route::get('/admin/vendors', [AdminController::class, 'vendors']);
+        Route::get('/admin/vendors', [AdminController::class, 'vendors']);                    // ?search= ?is_active=
         Route::get('/admin/vendors/pending', [AdminController::class, 'pendingVendors']);
         Route::get('/admin/vendors/{id}', [AdminController::class, 'vendorDetail']);
         Route::post('/admin/vendors/{id}/approve', [AdminController::class, 'approveVendor']);
         Route::post('/admin/vendors/{id}/reject', [AdminController::class, 'rejectVendor']);
 
-        Route::get('/admin/users', [AdminController::class, 'users']);
-        Route::get('/admin/bookings', [AdminController::class, 'bookings']);
+        Route::get('/admin/users', [AdminController::class, 'users']);                        // ?search=
+        Route::get('/admin/users/{id}', [AdminController::class, 'userDetail']);              // user + their bookings
+
+        Route::get('/admin/bookings', [AdminController::class, 'bookings']);                  // ?status= ?vendor_id= ?user_id=
+        Route::get('/admin/bookings/{id}', [AdminController::class, 'bookingDetail']);
+
+        Route::get('/admin/reviews', [AdminController::class, 'reviews']);                    // ?vendor_id=
     });
 
-    // ── Sensitive actions — super_admin ONLY (ban, money, audit, manage admins) ──
+    // ── Sensitive actions — super_admin ONLY (ban, money, disputes, audit, admins) ──
     Route::middleware('role:super_admin')->group(function () {
-        Route::post('/admin/vendors/{id}/toggle', [AdminController::class, 'toggleVendor']); // ban/unban vendor
-        Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleUser']);     // ban/unban user
+        // Vendor account state
+        Route::post('/admin/vendors/{id}/ban', [AdminController::class, 'banVendor']);           // immediate: cancel + refund all
+        Route::post('/admin/vendors/{id}/ban-gradual', [AdminController::class, 'banVendorGradual']); // winding-down
+        Route::post('/admin/vendors/{id}/unban', [AdminController::class, 'unbanVendor']);
 
+        // User account state
+        Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleUser']);         // ban/unban user
+
+        // Dispute resolution — cancel + refund a single booking
+        Route::post('/admin/bookings/{id}/cancel', [AdminController::class, 'cancelBooking']);
+
+        // Content moderation — remove abusive review / product / portfolio item
+        Route::delete('/admin/reviews/{id}', [AdminController::class, 'deleteReview']);
+        Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct']);
+        Route::delete('/admin/portfolio/{id}', [AdminController::class, 'deletePortfolioItem']);
+
+        // Money oversight
+        Route::get('/admin/vendors/{id}/wallet', [AdminController::class, 'vendorWallet']); // a vendor's earnings/ledger
         Route::get('/admin/payments', [AdminController::class, 'payments']);
+        Route::get('/admin/stats/financial', [AdminController::class, 'financials']); // income/profit report
+
+        // Refunds owed to customers (pay out manually, then mark paid)
+        Route::get('/admin/refunds-due', [AdminController::class, 'refundsDue']);
+        Route::post('/admin/refunds/{id}/mark-paid', [AdminController::class, 'markRefundPaid']);
+
+        // Vendor withdrawal payouts
+        Route::get('/admin/withdrawals', [AdminController::class, 'withdrawals']);          // ?unpaid=1
+        Route::post('/admin/withdrawals/{id}/mark-paid', [AdminController::class, 'markWithdrawalPaid']);
+
         Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
 
         // Manage admin accounts (hire/remove support)

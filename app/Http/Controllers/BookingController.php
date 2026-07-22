@@ -179,7 +179,13 @@ class BookingController extends Controller
         // was never credited to the vendor. Full refund to the user; the
         // vendor's wallet is untouched.
         if ($booking->status === 'pending') {
-            $booking->update(['status' => 'cancelled']);
+            $paid = (float) Payment::where('booking_id', $booking->id)
+                ->where('status', 'verified')->value('amount_paid');
+
+            $booking->update([
+                'status'        => 'cancelled',
+                'refund_amount' => $paid > 0 ? round($paid, 2) : null, // 100% owed to the user
+            ]);
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Booking cancelled — full refund due to the user',
@@ -200,11 +206,16 @@ class BookingController extends Controller
 
             $percent = $hours <= 24 ? 100 : ($hours <= 72 ? 50 : 0);
 
+            // What the customer gets back = that % of what they paid.
+            $paid         = (float) Payment::where('booking_id', $booking->id)
+                ->where('status', 'verified')->value('amount_paid');
+            $refundAmount = round($paid * $percent / 100, 2);
+
             // Debit the vendor's wallet by the refunded share of their payout.
             // It nets against the original credit (same booking_id), so it
             // clears on the same 3-day schedule as that credit.
             // Refund row + status change + stock restore happen together.
-            DB::transaction(function () use ($booking, $credit, $percent) {
+            DB::transaction(function () use ($booking, $credit, $percent, $refundAmount) {
                 if ($credit && $percent > 0) {
                     WalletTransaction::create([
                         'vendor_id'  => $booking->vendor_id,
@@ -214,7 +225,10 @@ class BookingController extends Controller
                     ]);
                 }
 
-                $booking->update(['status' => 'cancelled']);
+                $booking->update([
+                    'status'        => 'cancelled',
+                    'refund_amount' => $refundAmount > 0 ? $refundAmount : null,
+                ]);
 
                 // The approved booking had its stock decremented — give the unit back.
                 $this->restoreStock($booking);

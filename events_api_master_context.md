@@ -385,6 +385,84 @@ The Vendor app has two dashboard styles (service providers vs store/order vendor
 
 ---
 
+## UPDATES — 2026-06-29 (Amer + Claude session: escrow fix + auto-complete)
+
+> ⚠️ **Mohamad — this touches the wallet you built.** The change is intentional; please read before merging.
+
+### 1. Vendor earnings now clear on COMPLETION, not 3 days after approval (ESCROW FIX)
+- **Problem it fixes:** the old rule cleared a booking's payout **3 days after approval**. But an appointment (e.g. a wedding hall) can be booked months ahead, so the vendor could **withdraw money for a service that hadn't happened yet**. If the booking was then cancelled or the vendor banned before the event, the money was already gone — the platform couldn't refund the customer.
+- **New rule:** a booking's earnings stay in **escrow (`pending_clearance`)** while the booking is still `pending`/`approved`, and only become **withdrawable (`available`)** once the booking is **`completed`** (service delivered) or **`cancelled`** (final). This keeps the money refundable right up until the service actually happens.
+- **Where:** `WalletController::balances()` — the clearing test is now `in_array($booking->status, ['completed','cancelled'])` instead of the `created_at + 3 days` time check. `HOLD_DAYS` const removed. `withdraw()` now eager-loads `booking:id,status`. `pending_note` text updated.
+- **No API shape change** — same `available_balance` / `pending_clearance` / `total_earned` keys; only *when* money moves between them changed.
+
+### 2. Bookings auto-complete 1 day after the event/delivery date — NEW
+- New command **`bookings:auto-complete`** (`app/Console/Commands/AutoCompleteBookings.php`): finds `approved` bookings whose service date has passed by 1 day and sets them `completed`. Appointment vendors are judged by `event_date`, order vendors by `delivery_date`.
+- Scheduled **daily at 01:00** in `routes/console.php` (`Schedule::command('bookings:auto-complete')->dailyAt('01:00')`).
+- **This is what makes escrow money clear on its own** — once a booking auto-completes, its earnings become withdrawable.
+- ⚠️ **Railway:** the scheduler must actually run. Add a Railway **Cron** that runs `php artisan bookings:auto-complete` on `0 1 * * *` (or a cron running `php artisan schedule:run` every minute). Without it, bookings never auto-complete.
+
+### 3. Vendors can't mark a booking complete before the date — guard added
+- `BookingController::complete()` now rejects (422) if `now()` is before the booking's `event_date` (appointment) / `delivery_date` (order). Prevents a vendor from faking an early completion to cash out an escrowed booking. The manual "complete" button still works, but only on/after the real date; otherwise the daily auto-complete handles it.
+
+### Not done yet (still open in this session)
+- **Ban with active bookings** — deciding/implementing what happens to a banned vendor's in-flight bookings (winding-down vs immediate refund). Customer refund is **record-only** for now (real payout waits on ShamCash payout API).
+
+---
+
+## UPDATES — 2026-06-29 (Amer + Claude session: admin system COMPLETED)
+
+The admin module is now feature-complete for everything possible pre-payout-API. Two-layer auth is unchanged (`auth:admins` + `role:` middleware). Role split: **support = view + KYC only**; **super_admin = everything** (bans, money, disputes, moderation, managing admins).
+
+### 1. Shared cancellation service — `App\Services\BookingCancellationService`
+- `cancelByPlatform(Booking, reason, notify=true)`: the single place that cancels a booking on the platform's behalf and settles money **fairly** — the customer always gets a **100% refund** (they did nothing wrong), unlike a customer self-cancellation which keeps BookingController's timed deposit tiers.
+- What it does (all inside a DB transaction): idempotency guard (skips already-finished bookings) → for an `approved` booking it **reverses the vendor's wallet credit** (a negative `refund` row netting the credit to 0) and **restores stock** → sets status `cancelled` → notifies the customer.
+- Reused by BOTH the ban flow and dispute resolution, so they can never drift apart.
+
+### 2. Vendor account states — added `winding_down` (3-state model)
+- New `vendors.winding_down` boolean. Combined with `is_active`, a vendor is now: **active** (`is_active=1`), **winding_down** (`is_active=0, winding_down=1`), or **banned** (`is_active=0, winding_down=0`).
+- `Vendor::$appends` exposes **`account_status`** = `active | winding_down | banned` in JSON.
+- `Vendor::finalizeBanIfCleared()` flips a winding-down vendor to fully banned once they have no more `pending`/`approved` bookings. Triggered by the `Booking` model's `updated` event (terminal status) **and** by the `bookings:auto-complete` command (which bulk-updates and so finalizes affected vendors itself).
+- A **winding-down** vendor is hidden from search and can't take new bookings (both driven by `is_active=0`), but the `EnsureActive` middleware and vendor login now let them through so they can finish existing work.
+
+### 3. Two ban modes + unban (super_admin ONLY) — replaced the old `toggleVendor`
+- `POST /admin/vendors/{id}/ban` — **immediate**: cancels + refunds every in-flight booking via the service, then fully bans. For fraud/urgent.
+- `POST /admin/vendors/{id}/ban-gradual` — **winding-down**: keeps only **committed** (`approved`) bookings so the vendor can finish them; drops unpaid drafts and **cancels + 100%-refunds any `pending`** booking (not yet approved = no commitment). Auto-finalizes to banned once the approved ones are done. (If there were no approved bookings, it bans immediately.)
+- `POST /admin/vendors/{id}/unban` — reinstate to `active`.
+
+### 4. Dispute resolution — `POST /admin/bookings/{id}/cancel` (super_admin)
+- Cancels ONE booking and refunds the customer 100% (same shared service), **without** touching the vendor's account. For complaints ("vendor no-show / bad service").
+
+### 5. Also added
+- **Detail views:** `GET /admin/users/{id}` (user + their bookings), `GET /admin/bookings/{id}` (full booking incl. payment). `GET /admin/vendors/{id}` already existed.
+- **Search / filters:** `GET /admin/vendors?search=&is_active=`, `GET /admin/users?search=`, `GET /admin/bookings?status=&vendor_id=&user_id=`.
+- **Review moderation:** `GET /admin/reviews?vendor_id=` (both roles), `DELETE /admin/reviews/{id}` (super_admin) — recomputes the vendor's `rating_avg` after deletion.
+- Every sensitive action writes to `admin_audit_logs`.
+
+### 6. Financial statistics
+- **`GET /admin/stats/financial`** (super_admin ONLY) — the full money picture from **verified** payments: `summary` (all-time `gross_volume` = customer paid, `platform_profit` = commission, `vendor_payouts`, `transactions`), plus `today` / `this_month` / `this_year` windows and a zero-filled **12-month `monthly_trend`** for charting.
+- `dashboard()` reworked: fixed a bug where monthly revenue used `whereMonth` without a year (counted that month across all years) and didn't filter `status=verified`. Renamed the money keys to **`profit_today` / `profit_month` / `profit_all_time`** and added `banned_vendors`, `total_bookings`, `completed_bookings`. (Naming change — tell Ali; the admin frontend isn't built yet.)
+
+### 7. Content moderation + money oversight
+- New shared **`App\Services\WalletService::balances()`** — the balance math moved out of `WalletController` (which now delegates to it) so the vendor's own wallet and an admin viewing it always agree.
+- **`GET /admin/vendors/{id}/wallet`** (super_admin) — any vendor's balances + full ledger, for money disputes.
+- **`DELETE /admin/products/{id}`** (super_admin) — remove an inappropriate product listing (+ its images from storage).
+- **`DELETE /admin/portfolio/{id}`** (super_admin) — remove an inappropriate portfolio item (+ its images).
+- All audited (`product.delete`, `portfolio.delete`).
+
+### 8. Money oversight — refunds due & withdrawals (closes the money loop)
+- Added tracking columns: `bookings.refund_amount` + `bookings.refund_paid_at`, and `wallet_transactions.paid_at`.
+- When a paid booking is cancelled, the amount owed to the customer is now **recorded** on the booking (`refund_amount`): 100% for a platform cancellation (ban/dispute), or the deposit-tier % for a customer self-cancellation. Both `BookingCancellationService` and `BookingController::cancel` set it.
+- **`GET /admin/refunds-due`** (super_admin) — cancelled bookings still owed a refund (+ `total_due`). **`POST /admin/refunds/{id}/mark-paid`** — admin marks it paid after sending money manually.
+- **`GET /admin/withdrawals?unpaid=1`** (super_admin) — vendor withdrawal requests (+ `total_unpaid`). **`POST /admin/withdrawals/{id}/mark-paid`** — mark a payout done.
+- Gives the admin full money visibility now; the actual send stays manual until the ShamCash payout API.
+
+### ⚠️ Notes / still open
+- **Customer refunds are RECORD-ONLY** at the send step. The booking is cancelled and the vendor's credit reversed, but actually sending money back to the customer waits on the **ShamCash payout API** (not built) — admin does it manually for now. The refund intent is captured in the audit log + the cancelled booking + verified payment.
+- Deferred (depend on future work): withdrawal/payout approval UI, complaints system, broadcast notifications.
+- Local admin tests were removed at Amer's request; behaviour was verified via tinker (immediate ban, gradual ban + auto-finalize, dispute — all pass).
+
+---
+
 ## Next Steps To Build (IN ORDER)
 
 ### IMMEDIATE (Current Session)

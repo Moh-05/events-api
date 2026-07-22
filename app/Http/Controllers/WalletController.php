@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\WalletTransaction;
-use Illuminate\Support\Collection;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 
 class WalletController extends Controller
 {
+    public function __construct(private WalletService $wallet)
+    {
+    }
+
     // Vendor wallet — balances + transaction history
     public function show(Request $request)
     {
@@ -24,7 +28,7 @@ class WalletController extends Controller
             ->latest()
             ->get();
 
-        $balances = $this->balances($transactions);
+        $balances = $this->wallet->balances($transactions);
 
         return response()->json([
             'status' => 'success',
@@ -44,7 +48,7 @@ class WalletController extends Controller
     public function withdraw(Request $request)
     {
         $vendor    = $request->user();
-        $available = $this->balances(
+        $available = $this->wallet->balances(
             WalletTransaction::where('vendor_id', $vendor->id)
                 ->with('booking:id,status')
                 ->get()
@@ -73,34 +77,4 @@ class WalletController extends Controller
         ]);
     }
 
-    // Derive the three balances from a vendor's transactions.
-    // A booking's earnings (credit minus any refund) stay in escrow (pending)
-    // while the booking is still in progress (pending/approved). They clear —
-    // become withdrawable — only once the booking is settled: completed (service
-    // delivered) or cancelled (final). This keeps the money refundable right up
-    // until the service actually happens. Withdrawals reduce available immediately.
-    private function balances(Collection $transactions): array
-    {
-        $withdrawn = (float) $transactions->where('type', 'withdrawal')->sum('amount'); // negative
-
-        $cleared = 0;
-        $pending = 0;
-
-        foreach ($transactions->whereIn('type', ['credit', 'refund'])->groupBy('booking_id') as $rows) {
-            $net    = (float) $rows->sum('amount');
-            $status = $rows->first()->booking?->status;
-
-            if (in_array($status, ['completed', 'cancelled'], true)) {
-                $cleared += $net;
-            } else {
-                $pending += $net;
-            }
-        }
-
-        return [
-            'available'    => round($cleared + $withdrawn, 2),
-            'pending'      => round($pending, 2),
-            'total_earned' => round($cleared, 2),
-        ];
-    }
 }

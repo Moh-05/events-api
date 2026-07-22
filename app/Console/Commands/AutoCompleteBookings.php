@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Booking;
+use App\Models\Vendor;
 use Illuminate\Console\Command;
 
 class AutoCompleteBookings extends Command
@@ -18,7 +19,7 @@ class AutoCompleteBookings extends Command
         // the vendor's escrowed money clears.
         $cutoff = now()->subDay();
 
-        $count = Booking::where('status', 'approved')
+        $due = Booking::where('status', 'approved')
             ->where(function ($q) use ($cutoff) {
                 // Appointment vendors → judged by event_date
                 $q->where(fn ($s) => $s->where('booking_style', 'appointment')
@@ -28,8 +29,18 @@ class AutoCompleteBookings extends Command
                     ->orWhere(fn ($s) => $s->where('booking_style', 'order')
                         ->whereNotNull('delivery_date')
                         ->where('delivery_date', '<=', $cutoff));
-            })
-            ->update(['status' => 'completed']);
+            });
+
+        // Vendors touched by this run — captured before the bulk update so we can
+        // finalize winding-down bans (bulk updates bypass the Booking model event).
+        $vendorIds = (clone $due)->pluck('vendor_id')->unique();
+
+        $count = $due->update(['status' => 'completed']);
+
+        Vendor::whereIn('id', $vendorIds)
+            ->where('winding_down', true)
+            ->get()
+            ->each->finalizeBanIfCleared();
 
         $this->info("Auto-completed {$count} booking(s).");
 

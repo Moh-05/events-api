@@ -11,10 +11,12 @@ class WalletTransaction extends Model
         'booking_id',
         'type',   // credit | refund | withdrawal
         'amount', // signed: credit > 0, refund < 0, withdrawal < 0
+        'paid_at',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount'  => 'decimal:2',
+        'paid_at' => 'datetime',
     ];
 
     public function vendor()

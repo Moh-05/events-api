@@ -46,7 +46,8 @@ return new class extends Migration
             $table->text('bio')->nullable();
             $table->decimal('rating_avg', 3, 2)->default(0);
             $table->boolean('is_approved')->default(false);
-            $table->boolean('is_active')->default(true);
+            $table->boolean('is_active')->default(true);          // visible to customers + can take new bookings
+            $table->boolean('winding_down')->default(false);      // banned but still allowed to finish existing bookings
             $table->text('rejection_reason')->nullable(); // why KYC was rejected (shown to vendor)
             $table->string('fcm_token')->nullable();
             $table->timestamps();
