@@ -39,6 +39,7 @@ class Vendor extends Authenticatable
         'rating_avg',
         'is_approved',
         'is_active',
+        'winding_down',
         'rejection_reason',
         'fcm_token',
     ];
@@ -48,8 +49,9 @@ class Vendor extends Authenticatable
         'fcm_token', // device token — never exposed in any API response
     ];
 
-    // Full public URL to the profile image, so the app uses it directly.
-    protected $appends = ['profile_image_url'];
+    // profile_image_url -> full public URL, used by the app directly.
+    // account_status    -> readable account state for API responses.
+    protected $appends = ['profile_image_url', 'account_status'];
 
     public function getProfileImageUrlAttribute(): ?string
     {
@@ -62,13 +64,44 @@ class Vendor extends Authenticatable
     protected function casts(): array
     {
         return [
-            'is_approved' => 'boolean',
-            'is_active'   => 'boolean',
-            'rating_avg'  => 'decimal:2',
-            'birth_date'  => 'date',
-            'latitude'    => 'decimal:8',
-            'longitude'   => 'decimal:8',
+            'is_approved'  => 'boolean',
+            'is_active'    => 'boolean',
+            'winding_down' => 'boolean',
+            'rating_avg'   => 'decimal:2',
+            'birth_date'   => 'date',
+            'latitude'     => 'decimal:8',
+            'longitude'    => 'decimal:8',
         ];
+    }
+
+    // Human-readable state derived from the two flags:
+    //   active        → normal
+    //   winding_down  → banned, but still finishing existing bookings
+    //   banned        → fully blocked
+    public function getAccountStatusAttribute(): string
+    {
+        if ($this->is_active) {
+            return 'active';
+        }
+
+        return $this->winding_down ? 'winding_down' : 'banned';
+    }
+
+    // Called after a booking ends. If this vendor was winding down and has no
+    // more active bookings, the ban becomes final (fully banned).
+    public function finalizeBanIfCleared(): void
+    {
+        if (! $this->winding_down) {
+            return;
+        }
+
+        $stillHasActive = $this->bookings()
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
+
+        if (! $stillHasActive) {
+            $this->update(['winding_down' => false]); // is_active already false → now fully banned
+        }
     }
 
     public function products()

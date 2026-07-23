@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\WalletTransaction;
-use Illuminate\Support\Collection;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 
 class WalletController extends Controller
 {
-    // Money is held for 3 days after approval (the refund window) before it
-    // becomes withdrawable.
-    private const HOLD_DAYS = 3;
+    public function __construct(private WalletService $wallet)
+    {
+    }
 
     // Vendor wallet — balances + transaction history
     public function show(Request $request)
@@ -28,7 +28,7 @@ class WalletController extends Controller
             ->latest()
             ->get();
 
-        $balances = $this->balances($transactions);
+        $balances = $this->wallet->balances($transactions);
 
         return response()->json([
             'status' => 'success',
@@ -37,7 +37,7 @@ class WalletController extends Controller
                 'pending_clearance' => $balances['pending'],
                 'total_earned'      => $balances['total_earned'],
                 'currency'          => 'SYP',
-                'pending_note'      => 'Pending money becomes available to withdraw 3 days after the booking is approved.',
+                'pending_note'      => 'Earnings stay pending until the booking is completed (service delivered), then become withdrawable.',
             ],
             'transactions' => $transactions,
         ]);
@@ -48,8 +48,10 @@ class WalletController extends Controller
     public function withdraw(Request $request)
     {
         $vendor    = $request->user();
-        $available = $this->balances(
-            WalletTransaction::where('vendor_id', $vendor->id)->get()
+        $available = $this->wallet->balances(
+            WalletTransaction::where('vendor_id', $vendor->id)
+                ->with('booking:id,status')
+                ->get()
         )['available'];
 
         if ($available <= 0) {
@@ -75,33 +77,4 @@ class WalletController extends Controller
         ]);
     }
 
-    // Derive the three balances from a vendor's transactions.
-    // Each booking's earnings (credit minus any refund) clear 3 days after the
-    // booking was approved — i.e. 3 days after the credit's created_at.
-    // Withdrawals reduce the available balance immediately.
-    private function balances(Collection $transactions): array
-    {
-        $cutoff    = now()->subDays(self::HOLD_DAYS);
-        $withdrawn = (float) $transactions->where('type', 'withdrawal')->sum('amount'); // negative
-
-        $cleared = 0;
-        $pending = 0;
-
-        foreach ($transactions->whereIn('type', ['credit', 'refund'])->groupBy('booking_id') as $rows) {
-            $net        = (float) $rows->sum('amount');
-            $approvedAt = $rows->firstWhere('type', 'credit')?->created_at;
-
-            if ($approvedAt && $approvedAt->lte($cutoff)) {
-                $cleared += $net;
-            } else {
-                $pending += $net;
-            }
-        }
-
-        return [
-            'available'    => round($cleared + $withdrawn, 2),
-            'pending'      => round($pending, 2),
-            'total_earned' => round($cleared, 2),
-        ];
-    }
 }

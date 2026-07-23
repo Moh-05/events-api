@@ -21,16 +21,34 @@ class Booking extends Model
         'delivery_address',
         'notes',
         'price_agreed',
+        'refund_amount',
+        'refund_paid_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'details'       => 'array',
-            'event_date'    => 'datetime',
-            'delivery_date' => 'datetime',
-            'price_agreed'  => 'decimal:2',
+            'details'        => 'array',
+            'event_date'     => 'datetime',
+            'delivery_date'  => 'datetime',
+            'price_agreed'   => 'decimal:2',
+            'refund_amount'  => 'decimal:2',
+            'refund_paid_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // When a booking reaches a terminal state, a winding-down vendor may have
+        // just cleared their last obligation → finalize the ban automatically.
+        // NOTE: bulk updates (e.g. bookings:auto-complete) bypass model events,
+        // so that command finalizes winding-down vendors itself.
+        static::updated(function (Booking $booking): void {
+            if ($booking->wasChanged('status')
+                && in_array($booking->status, ['completed', 'cancelled', 'declined'], true)) {
+                $booking->vendor?->finalizeBanIfCleared();
+            }
+        });
     }
 
     public function user()

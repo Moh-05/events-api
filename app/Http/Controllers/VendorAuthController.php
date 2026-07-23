@@ -51,8 +51,10 @@ class VendorAuthController extends Controller
         $vendor = Vendor::where('phone', $request->phone)->first();
 
         if ($vendor) {
-            // Banned vendors can't log in. Data stays intact; unbanning restores access.
-            if (!$vendor->is_active) {
+            // Fully banned vendors can't log in. Data stays intact; unbanning
+            // restores access. A winding-down vendor (banned but still finishing
+            // existing bookings) can still log in to complete their obligations.
+            if (!$vendor->is_active && !$vendor->winding_down) {
                 return response()->json([
                     'status'  => 'suspended',
                     'message' => 'Your account has been suspended. Please contact support.',

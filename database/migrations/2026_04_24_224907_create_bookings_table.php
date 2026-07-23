@@ -39,6 +39,14 @@ return new class extends Migration
                 // Shared
                 $table->text('notes')->nullable();
                 $table->decimal('price_agreed', 10, 2)->nullable();
+
+                // Customer refund tracking (set when a paid booking is cancelled).
+                // refund_amount = money owed back to the customer; refund_paid_at =
+                // when an admin actually sent it (null = still due). Real payout is
+                // manual until the ShamCash payout API exists.
+                $table->decimal('refund_amount', 12, 2)->nullable();
+                $table->timestamp('refund_paid_at')->nullable();
+
                 $table->timestamps();
             }
 

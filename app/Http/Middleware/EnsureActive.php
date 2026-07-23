@@ -17,6 +17,12 @@ class EnsureActive
 
         // is_active exists on users & vendors (admins don't have it, so they pass).
         if ($account && isset($account->is_active) && $account->is_active === false) {
+            // A vendor who is winding down (banned but finishing existing bookings)
+            // keeps full panel access so they can complete their obligations.
+            if (! empty($account->winding_down)) {
+                return $next($request);
+            }
+
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Your account has been suspended. Please contact support.',

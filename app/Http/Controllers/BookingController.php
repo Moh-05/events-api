@@ -332,7 +332,13 @@ class BookingController extends Controller
         // was never credited to the vendor. Full refund to the user; the
         // vendor's wallet is untouched.
         if ($booking->status === 'pending') {
-            $booking->update(['status' => 'cancelled']);
+            $paid = (float) Payment::where('booking_id', $booking->id)
+                ->where('status', 'verified')->value('amount_paid');
+
+            $booking->update([
+                'status'        => 'cancelled',
+                'refund_amount' => $paid > 0 ? round($paid, 2) : null, // 100% owed to the user
+            ]);
 
             (new NotificationService())->notifyVendor(
                 $booking->vendor,
@@ -361,11 +367,16 @@ class BookingController extends Controller
 
             $percent = $hours <= 24 ? 100 : ($hours <= 72 ? 50 : 0);
 
+            // What the customer gets back = that % of what they paid.
+            $paid         = (float) Payment::where('booking_id', $booking->id)
+                ->where('status', 'verified')->value('amount_paid');
+            $refundAmount = round($paid * $percent / 100, 2);
+
             // Debit the vendor's wallet by the refunded share of their payout.
             // It nets against the original credit (same booking_id), so it
             // clears on the same 3-day schedule as that credit.
             // Refund row + status change + stock restore happen together.
-            DB::transaction(function () use ($booking, $credit, $percent) {
+            DB::transaction(function () use ($booking, $credit, $percent, $refundAmount) {
                 if ($credit && $percent > 0) {
                     WalletTransaction::create([
                         'vendor_id'  => $booking->vendor_id,
@@ -375,7 +386,10 @@ class BookingController extends Controller
                     ]);
                 }
 
-                $booking->update(['status' => 'cancelled']);
+                $booking->update([
+                    'status'        => 'cancelled',
+                    'refund_amount' => $refundAmount > 0 ? $refundAmount : null,
+                ]);
 
                 // The approved booking had its stock decremented — give the unit back.
                 $this->restoreStock($booking);
@@ -427,8 +441,8 @@ class BookingController extends Controller
 
             $booking->update(['status' => 'approved']);
 
-            // Credit the vendor's payout. This row's created_at is the approval
-            // time — money is held 3 days (refund window) before it's withdrawable.
+            // Credit the vendor's payout. The money stays in escrow (pending)
+            // until the booking is completed — see WalletController::balances().
             $payout = (float) Payment::where('booking_id', $booking->id)
                 ->where('status', 'verified')
                 ->value('vendor_payout');
@@ -475,6 +489,20 @@ class BookingController extends Controller
             ->where('vendor_id', $vendor->id)
             ->where('status', 'approved')
             ->firstOrFail();
+
+        // Can't mark complete before the service actually happened — otherwise a
+        // vendor could complete early to cash out an escrowed booking. Bookings
+        // also auto-complete one day after this date (bookings:auto-complete).
+        $serviceDate = $booking->booking_style === 'order'
+            ? $booking->delivery_date
+            : $booking->event_date;
+
+        if ($serviceDate && now()->lt($serviceDate)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'You can only mark this completed on or after the event/delivery date',
+            ], 422);
+        }
 
         $booking->update(['status' => 'completed']);
         $booking->refresh();
