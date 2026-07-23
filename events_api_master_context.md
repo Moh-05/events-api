@@ -596,7 +596,84 @@ The admin module is now feature-complete for everything possible pre-payout-API.
 ### ⚠️ Notes / still open
 - **Customer refunds are RECORD-ONLY** at the send step. The booking is cancelled and the vendor's credit reversed, but actually sending money back to the customer waits on the **ShamCash payout API** (not built) — admin does it manually for now. The refund intent is captured in the audit log + the cancelled booking + verified payment.
 - Deferred (depend on future work): withdrawal/payout approval UI, complaints system, broadcast notifications.
-- Local admin tests were removed at Amer's request; behaviour was verified via tinker (immediate ban, gradual ban + auto-finalize, dispute — all pass).
+- Local admin tests were removed at Amer's request; behaviour was verified via tinker (immediate ban, gradual ban + auto-finalize, dispute — all pass). NOTE: `tests/Feature/AdminFullTest.php` (19 tests) is now back in the repo and passing.
+
+---
+
+## ADMIN DASHBOARD — COMPLETE ENDPOINT & SCREEN MAP (for the React design/build)
+
+The React admin dashboard is web-only. Auth = two layers: `auth:admins` guard + `role:` middleware.
+**Roles:** `super_admin` = everything. `support` = view + KYC only (blocked from bans, money, audit, managing admins).
+All lists are paginated (Laravel paginator JSON: `data`, `current_page`, `last_page`, `total`, ...).
+Every response is `{ "status": "success", ... }`. Every sensitive super_admin action writes an `admin_audit_logs` row.
+
+### Auth
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| POST | `/admin/login` | public (throttled 5/min) | Login screen. Returns admin + token. First admin seeded: `admin@haflati.com` / `0000` (change after first login). |
+| POST | `/admin/logout` | any admin | Revoke current token. |
+
+### Dashboard home
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/dashboard` | super_admin + support | Landing screen headline cards: `total_users`, `total_vendors`, `approved_vendors`, `pending_vendors`, `banned_vendors`, `total_bookings`, `active_bookings`, `completed_bookings`, `profit_today`, `profit_month`, `profit_all_time`. |
+
+### Vendors (KYC + management)
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/vendors?search=&is_active=` | both | Vendors list (searchable, filter by active). |
+| GET | `/admin/vendors/pending` | both | KYC queue — vendors awaiting approval. |
+| GET | `/admin/vendors/{id}` | both | Vendor detail. |
+| GET | `/admin/vendors/{id}/wallet` | super_admin | A vendor's balances + full ledger (money disputes). |
+| POST | `/admin/vendors/{id}/approve` | both | Approve KYC. |
+| POST | `/admin/vendors/{id}/reject` | both | Reject KYC (reason shown to vendor). |
+| POST | `/admin/vendors/{id}/ban` | super_admin | Immediate ban — cancels + 100%-refunds every in-flight booking, then fully bans. |
+| POST | `/admin/vendors/{id}/ban-gradual` | super_admin | Winding-down ban — keeps `approved` bookings to finish, cancels+refunds `pending`, auto-finalizes when done. |
+| POST | `/admin/vendors/{id}/unban` | super_admin | Reinstate to active. |
+
+Vendor `account_status` in JSON = `active | winding_down | banned` — use it for a status pill.
+
+### Users
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/users?search=` | both | Users list (searchable). |
+| GET | `/admin/users/{id}` | both | User detail + their bookings. |
+| POST | `/admin/users/{id}/toggle` | super_admin | Ban / unban a user (`is_active`). |
+
+### Bookings + disputes
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/bookings?status=&vendor_id=&user_id=` | both | Bookings list (filterable). |
+| GET | `/admin/bookings/{id}` | both | Booking detail incl. payment. |
+| POST | `/admin/bookings/{id}/cancel` | super_admin | Dispute resolution — cancel ONE booking + 100% refund the customer, vendor account untouched. |
+
+### Money oversight
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/payments` | super_admin | All payments (with booking.user + booking.vendor). |
+| GET | `/admin/stats/financial` | super_admin | Full money report: `summary` (gross_volume, platform_profit, vendor_payouts, transactions) + today/this_month/this_year + 12-month `monthly_trend` for charts. |
+| GET | `/admin/refunds-due` | super_admin | Cancelled bookings still owed a customer refund (+ `total_due`). |
+| POST | `/admin/refunds/{id}/mark-paid` | super_admin | Mark a refund paid after sending manually. |
+| GET | `/admin/withdrawals?unpaid=1` | super_admin | Vendor withdrawal requests (+ `total_unpaid`). |
+| POST | `/admin/withdrawals/{id}/mark-paid` | super_admin | Mark a payout done. |
+
+(Real send of both refunds and payouts stays manual until the ShamCash payout API exists.)
+
+### Content moderation
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/reviews?vendor_id=` | both | Reviews list. |
+| DELETE | `/admin/reviews/{id}` | super_admin | Remove a review (recomputes vendor `rating_avg`). |
+| DELETE | `/admin/products/{id}` | super_admin | Remove an inappropriate product listing (+ its images). |
+| DELETE | `/admin/portfolio/{id}` | super_admin | Remove an inappropriate portfolio item (+ its images). |
+
+### Audit + managing admins
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/audit-logs` | super_admin | Audit log viewer (who did what, with admin name/role). |
+| GET | `/admin/admins` | super_admin | List admin accounts. |
+| POST | `/admin/admins` | super_admin | Create an admin (hire support). |
+| DELETE | `/admin/admins/{id}` | super_admin | Remove an admin. |
 
 ---
 
