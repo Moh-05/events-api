@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreAppointmentBookingRequest;
+use App\Http\Requests\StoreOrderBookingRequest;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\Vendor;
 use App\Models\VendorProduct;
 use App\Models\WalletTransaction;
 use App\Services\NotificationService;
@@ -12,52 +15,22 @@ use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
-    // Customer sends a booking request.
-    // Appointment: one package (vendor_product_id), quantity is always 1.
-    // Order: cart-style — either a single vendor_product_id (+ optional
-    // quantity) or an items[] list of different products from the same vendor.
+    // Customer sends a booking request. One endpoint — the vendor's
+    // booking_style (server-side truth) decides which shape applies:
+    //   order       -> storeOrder():       items[] cart, delivery fields
+    //   appointment -> storeAppointment(): one package + event fields
     public function store(Request $request)
     {
+        // Just enough validation to know which product (and so which vendor)
+        // the request is about — each branch does its own strict validation.
         $request->validate([
-            'vendor_product_id' => 'required_without:items|exists:vendor_products,id',
-            'notes'             => 'sometimes|nullable|string',
-
-            // Appointment fields
-            'event_date'     => 'sometimes|nullable|date',
-            'event_location' => 'sometimes|nullable|string',
-            'duration_hours' => 'sometimes|nullable|integer',
-
-            // Order fields
-            'quantity'                   => 'sometimes|integer|min:1',
-            'items'                      => 'sometimes|array|min:1',
-            'items.*.vendor_product_id'  => 'required_with:items|exists:vendor_products,id',
-            'items.*.quantity'           => 'sometimes|integer|min:1',
-            'details'                    => 'sometimes|nullable|array',
-            'delivery_date'              => 'sometimes|nullable|date',
-            'delivery_address'           => 'sometimes|nullable|string',
+            'vendor_product_id'         => 'required_without:items|exists:vendor_products,id',
+            'items'                     => 'sometimes|array|min:1',
+            'items.*.vendor_product_id' => 'required_with:items|exists:vendor_products,id',
         ]);
 
-        $user = $request->user();
-
-        // Normalize both input shapes into one cart list: product_id => quantity.
-        // Duplicate product ids are merged by summing their quantities.
-        $cart = collect($request->items ?: [[
-                'vendor_product_id' => $request->vendor_product_id,
-                'quantity'          => $request->quantity ?? 1,
-            ]])
-            ->groupBy('vendor_product_id')
-            ->map(fn ($rows) => $rows->sum(fn ($row) => (int) ($row['quantity'] ?? 1)));
-
-        $products = VendorProduct::with('vendor')->findMany($cart->keys());
-        $vendor   = $products->first()?->vendor;
-
-        // All items must belong to one vendor — a booking has exactly one vendor.
-        if ($products->pluck('vendor_id')->unique()->count() > 1) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'All items must belong to the same vendor',
-            ], 422);
-        }
+        $firstId = $request->vendor_product_id ?? $request->items[0]['vendor_product_id'];
+        $vendor  = VendorProduct::with('vendor')->findOrFail($firstId)->vendor;
 
         // A banned (suspended) vendor can't receive new bookings.
         if (!$vendor || !$vendor->is_active) {
@@ -67,16 +40,36 @@ class BookingController extends Controller
             ], 403);
         }
 
-        // Multiple items only make sense for order vendors — an appointment
-        // books one package, quantity 1.
-        if ($vendor->booking_style !== 'order' && ($products->count() > 1 || $cart->max() > 1)) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Appointment bookings take a single package',
-            ], 422);
-        }
+        return $vendor->booking_style === 'order'
+            ? $this->storeOrder($request, $vendor)
+            : $this->storeAppointment($request, $vendor);
+    }
 
+    // Order vendors (sellers): cart-style — items[] is the only shape, even
+    // for a single product. Appointment fields are rejected outright.
+    private function storeOrder(Request $request, Vendor $vendor)
+    {
+        // Rules live in their own file: app/Http/Requests/StoreOrderBookingRequest.php
+        $request->validate((new StoreOrderBookingRequest())->rules());
+
+        // Map of product id => total quantity. Grouping by id then summing means
+        // the same product listed twice merges into one line with the combined qty.
+        $quantityByProductId = collect($request->items)
+            ->groupBy('vendor_product_id')
+            ->map(fn ($rows) => $rows->sum(fn ($row) => (int) ($row['quantity'] ?? 1)));
+
+        $products = VendorProduct::findMany($quantityByProductId->keys());
+
+        // Every product in the cart must pass every rule.
         foreach ($products as $product) {
+            // A booking has exactly one vendor — no mixing vendors in one order.
+            if ($product->vendor_id !== $vendor->id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'All items must belong to the same vendor',
+                ], 422);
+            }
+
             // Can't book an unavailable product. A product auto-hides
             // (is_available = false) the moment its stock hits 0, so this also
             // blocks booking a sold-out product.
@@ -89,7 +82,7 @@ class BookingController extends Controller
 
             // UX guard: can't ask for more units than are in stock right now.
             // The real oversell defense stays the atomic decrement at approve.
-            if ($product->stock !== null && $cart[$product->id] > $product->stock) {
+            if ($product->stock !== null && $quantityByProductId[$product->id] > $product->stock) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => "Only {$product->stock} of '{$product->name}' left in stock",
@@ -97,8 +90,56 @@ class BookingController extends Controller
             }
         }
 
-        // Check if date is already booked (appointment only)
-        if ($vendor->booking_style === 'appointment' && $request->event_date) {
+        // Booking + its item rows are created together or not at all.
+        $booking = DB::transaction(function () use ($request, $vendor, $products, $quantityByProductId) {
+            $booking = Booking::create([
+                'user_id'           => $request->user()->id,
+                'vendor_id'         => $vendor->id,
+                'vendor_product_id' => $products->first()->id, // primary product (kept for existing endpoints)
+                'booking_style'     => 'order',
+                'event_type'        => $vendor->vendor_type,
+                'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
+                'notes'             => $request->notes,
+                'details'           => $request->details,
+                'delivery_date'     => $request->delivery_date,
+                'delivery_address'  => $request->delivery_address,
+            ]);
+
+            foreach ($products as $product) {
+                $booking->items()->create([
+                    'vendor_product_id' => $product->id,
+                    'quantity'          => $quantityByProductId[$product->id],
+                    'unit_price'        => $product->price, // price snapshot at booking time
+                ]);
+            }
+
+            return $booking;
+        });
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking->load(['vendor', 'product', 'items.product']),
+        ]);
+    }
+
+    // Appointment vendors (services): one package, quantity is always 1.
+    // Cart/delivery fields are rejected outright.
+    private function storeAppointment(Request $request, Vendor $vendor)
+    {
+        // Rules live in their own file: app/Http/Requests/StoreAppointmentBookingRequest.php
+        $request->validate((new StoreAppointmentBookingRequest())->rules());
+
+        $product = VendorProduct::findOrFail($request->vendor_product_id);
+
+        if ($product->is_available === false) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => "'{$product->name}' is not available",
+            ], 409);
+        }
+
+        // Check if date is already booked
+        if ($request->event_date) {
             $conflict = Booking::where('vendor_id', $vendor->id)
                 ->whereIn('status', ['pending', 'approved'])
                 ->whereDate('event_date', $request->event_date)
@@ -112,35 +153,27 @@ class BookingController extends Controller
             }
         }
 
-        // Booking + its item rows are created together or not at all.
-        $booking = DB::transaction(function () use ($request, $user, $vendor, $products, $cart) {
+        // Booking + its single item row are created together or not at all.
+        $booking = DB::transaction(function () use ($request, $vendor, $product) {
             $booking = Booking::create([
-                'user_id'           => $user->id,
+                'user_id'           => $request->user()->id,
                 'vendor_id'         => $vendor->id,
-                'vendor_product_id' => $products->first()->id, // primary product (kept for existing endpoints)
-                'booking_style'     => $vendor->booking_style,
+                'vendor_product_id' => $product->id,
+                'booking_style'     => 'appointment',
                 'event_type'        => $vendor->vendor_type,
                 'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
                 'notes'             => $request->notes,
-
-                // Appointment
-                'event_date'     => $request->event_date,
-                'event_location' => $request->event_location,
-                'duration_hours' => $request->duration_hours,
-
-                // Order
-                'details'          => $request->details,
-                'delivery_date'    => $request->delivery_date,
-                'delivery_address' => $request->delivery_address,
+                'event_date'        => $request->event_date,
+                'event_location'    => $request->event_location,
+                'duration_hours'    => $request->duration_hours,
             ]);
 
-            foreach ($products as $product) {
-                $booking->items()->create([
-                    'vendor_product_id' => $product->id,
-                    'quantity'          => $cart[$product->id],
-                    'unit_price'        => $product->price, // price snapshot at booking time
-                ]);
-            }
+            // One item row (quantity 1) so orders and appointments read the same.
+            $booking->items()->create([
+                'vendor_product_id' => $product->id,
+                'quantity'          => 1,
+                'unit_price'        => $product->price, // price snapshot at booking time
+            ]);
 
             return $booking;
         });
@@ -157,23 +190,6 @@ class BookingController extends Controller
     // Customer updates a pending booking
     public function update(Request $request, int $id)
     {
-        $request->validate([
-            'notes'            => 'sometimes|nullable|string',
-
-            // Appointment fields
-            'event_date'       => 'sometimes|nullable|date',
-            'event_location'   => 'sometimes|nullable|string',
-            'duration_hours'   => 'sometimes|nullable|integer',
-
-            // Order fields
-            'items'                     => 'sometimes|array|min:1',
-            'items.*.vendor_product_id' => 'required_with:items|exists:vendor_products,id',
-            'items.*.quantity'          => 'sometimes|integer|min:1',
-            'details'          => 'sometimes|nullable|array',
-            'delivery_date'    => 'sometimes|nullable|date',
-            'delivery_address' => 'sometimes|nullable|string',
-        ]);
-
         $user    = $request->user();
         // Only an unpaid draft can be edited. Once the booking is paid (pending)
         // the details are locked, so changes wait for a cancel/refund instead.
@@ -181,6 +197,32 @@ class BookingController extends Controller
             ->where('user_id', $user->id)
             ->where('status', 'awaiting_payment')
             ->firstOrFail();
+
+        // Strict per style, same as store(): an order edits its cart/delivery,
+        // an appointment edits its event fields — never the other way around.
+        $request->validate($booking->booking_style === 'order'
+            ? [
+                'notes'                     => 'sometimes|nullable|string',
+                'items'                     => 'sometimes|array|min:1',
+                'items.*.vendor_product_id' => 'required_with:items|exists:vendor_products,id',
+                'items.*.quantity'          => 'sometimes|integer|min:1',
+                'details'                   => 'sometimes|nullable|array',
+                'delivery_date'             => 'sometimes|nullable|date',
+                'delivery_address'          => 'sometimes|nullable|string',
+                'event_date'                => 'prohibited',
+                'event_location'            => 'prohibited',
+                'duration_hours'            => 'prohibited',
+            ]
+            : [
+                'notes'            => 'sometimes|nullable|string',
+                'event_date'       => 'sometimes|nullable|date',
+                'event_location'   => 'sometimes|nullable|string',
+                'duration_hours'   => 'sometimes|nullable|integer',
+                'items'            => 'prohibited',
+                'details'          => 'prohibited',
+                'delivery_date'    => 'prohibited',
+                'delivery_address' => 'prohibited',
+            ]);
 
         // Check date conflict if date changed (appointment only)
         if ($booking->booking_style === 'appointment' && $request->event_date) {
@@ -199,14 +241,16 @@ class BookingController extends Controller
         }
 
 
-        // Replace the cart (order drafts only) — new items must be this
-        // vendor's, available, and within stock; old rows are swapped out.
-        if ($request->has('items') && $booking->booking_style === 'order') {
-            $cart = collect($request->items)
+        // Replace the cart (order drafts only — validation already guarantees
+        // that) — new items must be this vendor's, available, and within
+        // stock; old rows are swapped out.
+        if ($request->has('items')) {
+            // Map of product id => total quantity (same product twice merges).
+            $quantityByProductId = collect($request->items)
                 ->groupBy('vendor_product_id')
                 ->map(fn ($rows) => $rows->sum(fn ($row) => (int) ($row['quantity'] ?? 1)));
 
-            $products = VendorProduct::findMany($cart->keys());
+            $products = VendorProduct::findMany($quantityByProductId->keys());
 
             foreach ($products as $product) {
                 if ($product->vendor_id !== $booking->vendor_id) {
@@ -223,7 +267,7 @@ class BookingController extends Controller
                     ], 409);
                 }
 
-                if ($product->stock !== null && $cart[$product->id] > $product->stock) {
+                if ($product->stock !== null && $quantityByProductId[$product->id] > $product->stock) {
                     return response()->json([
                         'status'  => 'error',
                         'message' => "Only {$product->stock} of '{$product->name}' left in stock",
@@ -231,13 +275,13 @@ class BookingController extends Controller
                 }
             }
 
-            DB::transaction(function () use ($booking, $products, $cart) {
+            DB::transaction(function () use ($booking, $products, $quantityByProductId) {
                 $booking->items()->delete();
 
                 foreach ($products as $product) {
                     $booking->items()->create([
                         'vendor_product_id' => $product->id,
-                        'quantity'          => $cart[$product->id],
+                        'quantity'          => $quantityByProductId[$product->id],
                         'unit_price'        => $product->price,
                     ]);
                 }
@@ -419,7 +463,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'product', 'items.product']),
+            'booking' => $booking->load(['user:id,first_name,last_name,profile_image', 'vendor', 'product', 'items.product']),
         ]);
     }
 
@@ -444,7 +488,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'product', 'items.product']),
+            'booking' => $booking->load(['user:id,first_name,last_name,profile_image', 'vendor', 'product', 'items.product']),
         ]);
     }
 
@@ -470,7 +514,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'product', 'items.product']),
+            'booking' => $booking->load(['user:id,first_name,last_name,profile_image', 'vendor', 'product', 'items.product']),
         ]);
     }
 
@@ -533,7 +577,7 @@ class BookingController extends Controller
 
         if ($user instanceof \App\Models\Vendor) {
             $bookings = Booking::where('vendor_id', $user->id)
-                ->with(['product', 'items.product:id,name,price'])
+                ->with(['user:id,first_name,last_name,profile_image', 'product', 'items.product:id,name,price'])
                 ->latest()
                 ->get();
         } else {

@@ -5,6 +5,7 @@ use App\Http\Controllers\UserAuthController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\VendorProfileController;
 use App\Http\Controllers\VendorProductController;
+use App\Http\Controllers\VendorBrowseController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PaymentController;
@@ -31,6 +32,7 @@ Route::post('/vendor/verify-otp', [VendorAuthController::class, 'verifyOtp']);
 Route::post('/vendor/complete-registration', [VendorAuthController::class, 'completeRegistration']);
 
 // Public browse
+Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: Home / Explore / Filters
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);
 Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendorPortfolio']);

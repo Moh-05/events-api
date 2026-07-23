@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\StoresImages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class VendorProfileController extends Controller
 {
+    use StoresImages;
+
     public function show(Request $request)
     {
         return response()->json([
@@ -28,10 +31,11 @@ class VendorProfileController extends Controller
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
             'vendor_type'   => 'sometimes|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
             'vendor_style'  => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
+            'response_time' => 'sometimes|in:within_1h,within_2h,within_3h,within_24h',
         ]);
 
         $vendor = $request->user();
-        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style']);
+        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style', 'response_time']);
 
         if ($request->filled('vendor_type')) {
             // Seller categories are order-based; every other (service) category is appointment-based.
@@ -43,8 +47,10 @@ class VendorProfileController extends Controller
             if ($vendor->profile_image) {
                 Storage::disk('supabase')->delete($vendor->profile_image);
             }
-            $data['profile_image'] = $request->file('profile_image')
-                ->store('vendor_images', 'supabase');
+            $data['profile_image'] = $this->storeImageOrFail(
+                $request->file('profile_image'),
+                'vendor_images'
+            );
         }
 
         $vendor->update($data);

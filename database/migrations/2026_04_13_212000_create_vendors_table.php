@@ -44,6 +44,13 @@ return new class extends Migration
             $table->decimal('longitude', 11, 8)->nullable();
             $table->string('address')->nullable();
             $table->text('bio')->nullable();
+            // Vendor-chosen response-time badge (shown on the detail screen).
+            $table->enum('response_time', [
+                'within_1h',
+                'within_2h',
+                'within_3h',
+                'within_24h',
+            ])->nullable();
             $table->decimal('rating_avg', 3, 2)->default(0);
             $table->boolean('is_approved')->default(false);
             $table->boolean('is_active')->default(true);

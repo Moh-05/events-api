@@ -454,7 +454,75 @@ UltraMsg renewal · removing OTP/`0000`/`debug_notifications` · `APP_DEBUG=fals
 
 ---
 
-## Next Steps To Build (IN ORDER)
+## UPDATES — 2026-07-15 (booking refactor, Supabase verified live, design system, user-app roadmap)
+
+### 1. Booking store() refactored — strict order/appointment split (BREAKING for Flutter)
+- `store()` is now a small dispatcher: resolves the vendor from the request, runs the shared banned-vendor guard, then routes by `booking_style` to two private methods. One endpoint stays (`POST /bookings`) — the server decides the branch, Flutter can't call a "wrong" endpoint.
+- `storeOrder()` (sellers): **`items[]` is now the ONLY shape** — the legacy `vendor_product_id + quantity` shape for orders was REMOVED. Even one product = `items: [{vendor_product_id, quantity}]`. Appointment fields (`event_date`, `event_location`, `duration_hours`) are `prohibited` → 422.
+- `storeAppointment()` (services): `vendor_product_id` + event fields only; `items`/`details`/`delivery_*` are `prohibited` → 422. Also creates ONE `booking_items` row (qty 1, price snapshot) so every booking reads the same downstream.
+- Validation rules moved to their own files (Laravel FormRequest pattern): `app/Http/Requests/StoreOrderBookingRequest.php` + `StoreAppointmentBookingRequest.php`; controller does `$request->validate((new StoreOrderBookingRequest())->rules())`.
+- `update()` is strict per the booking's style too: order drafts can't send event fields, appointment drafts can't send cart fields.
+- Cart merge is the named map `$quantityByProductId = collect(items)->groupBy('vendor_product_id')->map(sum quantities)` — same product twice in the request merges into one line (key = product id, value = total qty).
+- Status at 2026-07-15: cart base commit `75a1e5a`→`75c1e5a` is pushed on `dev`; the refactor above is in the working tree, NOT yet committed — Mohamad reviewing before push. `main` does NOT have booking_items yet.
+
+### 2. Supabase images — verified live on Railway production
+- End-to-end proof: fresh vendor on prod → `POST /vendor/products` with a real 47KB jpg → response `image_url` on Supabase → GET on that URL = HTTP 200, identical byte size. Images now survive deploys for real.
+- Supabase facts (Mohamad asked): 1 GB storage is PERMANENT total capacity (not monthly, never resets). The "paused after 7 idle days" email = warning only for zero-activity projects; pause deletes NOTHING, one-click restore within 90 days. Any dashboard visit / upload / image GET resets the timer. Keep-alive idea deferred; manual touching is fine during testing.
+- Supabase org `Haflati`, project `events-api` (ref `hlgbsvyaoruetfrkvezb`), region eu-central-1, bucket `Haflati` (public). GitHub NOT connected to Supabase; RLS irrelevant (we only use Storage via S3 keys).
+- Railway CLI note: link is per-machine and can drop — `railway link --project distinguished-imagination` then `railway ssh --service events-api "php artisan migrate:fresh --force"`.
+
+### 3. Design system handoff (customer app blueprint)
+- Full design system delivered: `Haflati Design System-handoff/` (tokens, components, user + partners UI kits). Untracked copy sits in repo root as `desgin system/`. Customer screens: Onboarding, EventSelect (occasions), Home, Explore (map/GPS), Filters, Vendor, ServiceVendor, Reviews, Booking, Bookings, CancelBooking, Saved, Messages, Profile.
+- Designs are guidance, NOT contract — Mohamad decides what's worth building. Confirmed skips: "Cash at Venue" (breaks pay-first model — deliberate), delivery fee (fold into price v1), occasion selector backend (pure client-side mapping), Event Planner tab (already removed from design), AI UI (future).
+- Design/schema gaps decided earlier: `quantity` → SOLVED via booking_items; guests count → pending small nullable column; pay-in-full vs 20% deposit → pending business decision (currently deposit forced for appointments).
+
+### 4. USER APP — missing endpoints roadmap (rethought vs designs, ordered by importance)
+The vendor app is essentially API-complete. The customer app can auth/book/pay/review but CANNOT DISCOVER vendors. Missing, in priority order:
+
+**CRITICAL (one VendorBrowseController, unblocks Home/Explore/Filters/Vendor screens):**
+1. `GET /vendors` — public browse. Query params carry ALL the Filters screen: `vendor_type`, `city`, `min_rating`, `min_price`/`max_price` (needs computed `from_price` = min product price), `verified` (is_approved), `available_on` (date → excludes vendors with a pending/approved booking that day), `search` (name), `sort` (top_rated | most_booked | nearest | newest), pagination REQUIRED from day one.
+2. `GET /vendors/{id}` — public vendor detail header: name, bio, rating_avg, review count, city, verified, from_price, events-hosted count (completed bookings), joined date. (Products/portfolio/reviews sub-lists already exist.)
+3. `GET /vendors/nearby?lat=&lng=&radius=` — Explore map tab. Haversine on the existing lat/lng columns; returns distance_km, sorted.
+4. `GET /categories` — the 10 vendor_type tiles + vendor counts (or hardcode in Flutter — Mohamad decides).
+
+**IMPORTANT (small, complete the core loops):**
+5. `GET /bookings/{id}` — user booking detail (vendor side already has show()).
+6. Favorites/Saved — `GET /saved`, `POST /saved/{productId}`, `DELETE /saved/{productId}` + `is_saved` flag in product JSON. **Assigned to Amer.** (Design: favorites are on PRODUCTS, not vendors.)
+7. `GET /vendors/{id}/booked-dates` — public mirror of the vendor endpoint (booking calendar + "available on my date" filter).
+8. `POST /logout` + `POST /vendor/logout` — MISSING entirely (revoke current Sanctum token). Profile screen has Log Out.
+9. `GET /my-reviews` — user's own reviews (Profile → Activity shows Bookings/Reviews/Saved).
+
+**NOT building:** review replies (vendor replying to reviews) — decided out 2026-07-15 even though the design shows "Replies."
+
+**NICE-TO-HAVE / DECIDE LATER:**
+11. `guests` nullable int on bookings (Booking screen "Number of Guests").
+12. Pay-in-full option (`pay_full` flag changing expectedAmount) — needs business decision first.
+13. `GET /home` aggregate (one call = top-rated + recommended + categories) — perf polish only.
+14. Global `GET /search?q=` — v1 can lean on `GET /vendors?search=`.
+
+### 5. Chat system — agreed simple plan (after user endpoints)
+- **Messages live in Firebase Firestore, handled by the Flutter SDK client-side. The Laravel backend stores NO messages.** Free Spark tier, no card, realtime out of the box.
+- Thread id convention: `chat_{userId}_{vendorId}` (deterministic — both sides derive it, no create-thread endpoint needed).
+- Backend's only jobs: (a) `POST /chat/notify` — called by the sender's app after writing a message, backend fires FCM to the other party via existing NotificationService (Cloud Functions would need the paid Blaze plan/card — this avoids it); (b) optional later: mint Firebase custom auth tokens (we already have the service-account creds) so Firestore security rules can lock threads to their two participants.
+- Design's Archived/Unread/Online states: all client-side Firestore fields, zero backend.
+
+### 6. Arabic / translation — agreed simple plan
+- **UI strings: 100% Flutter-side** — the design system already ships `assets/translations/ar.json` + `en.json`. Zero backend work. RTL is Flutter layout work; tokens are direction-ready.
+- **API messages (validation/errors/notification titles): Laravel lang files** — `lang/ar/` + `lang/en/`, small middleware reads `Accept-Language` header and `App::setLocale()`. Wrap user-facing strings in `__()` progressively (notifications first, validation messages come translated by Laravel for free).
+- **User-generated content (names, bios, product descriptions): NOT translated.** Syrian vendors type Arabic already; content stays as typed. (Optional far-future: dual name_ar/name_en fields.)
+
+### 7. Smart Search API — separate FastAPI service (Moh + Amer, upcoming)
+- New standalone **FastAPI (Python) service** connecting to the SAME MySQL DB, powering AI/semantic "smart search" features for the app. Integration model: Flutter (or Laravel proxy) calls the FastAPI endpoints; it reads vendors/products from the shared DB.
+- Recommendations recorded for when it starts: give it a **read-only MySQL user** (it must never write app tables), host as a second Railway service in the same project (gets internal `mysql.railway.internal` access), keep it stateless, version its API (`/v1/...`), and don't block app flows on it (search degrades gracefully if the service is down).
+
+### Standing corrections to older sections
+- "FUTURE FEATURES → Cloudinary" is obsolete — persistent images are DONE via Supabase.
+- "Browse/Search API" + "Unavailable dates endpoint" are now items 1–4 + 7 of the roadmap above.
+- Old "IMMEDIATE (Current Session)" list (fix BookingController/PaymentController, admin table...) is all DONE long ago — kept below only as history.
+
+---
+
+## Next Steps To Build (IN ORDER) — historical (2026-06-06), superseded by the 2026-07-15 roadmap above
 
 ### IMMEDIATE (Current Session)
 
@@ -2373,11 +2441,11 @@ public function notifyAdmins(string $role, string $title, string $body): void
 10. **FCM Errors:** Log silently — never return as API error response
 11. **ShamCash Errors:** Return as JSON — user needs to know
 
-## Language Convention
+## Language Convention (UPDATED 2026-07-15)
 
-- Moh speaks Arabic and English mixed
-- Claude responds in Arabic with English technical terms
-- Example: "الـ controller بيعمل الـ validation أول"
+- Two people use this repo with Claude: **Mohamad → English**, **Amer → Arabic** (identify the speaker by the language they write in)
+- When answering Amer in Arabic: keep Arabic and English on separate lines, never mixed inline
+- No emojis/icons in code comments or user-facing strings (notification titles/bodies)
 
 ## Architecture Reminders
 
