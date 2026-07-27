@@ -168,6 +168,7 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">الفئة (نفس قيم complete-registration). يضبط <code>booking_style</code> تلقائياً.</td></tr>
         <tr><td class="field">vendor_style</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar"><span class="enum">service_provider · seller</span> — حقل مساعد للتطبيق (هون بيختارو الـ vendor). بيرجع مع بيانات الـ vendor عند login/signup.</td></tr>
         <tr><td class="field">profile_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة jpg/jpeg/png، حد أقصى 2MB.</td></tr>
+        <tr><td class="field">cover_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة الغلاف (cover) للبروفايل. jpg/jpeg/png، حد أقصى 2MB. إعادة الرفع تستبدل الصورة القديمة. بيرجع رابطها بحقل <code>cover_image_url</code>.</td></tr>
       </table>
     </div>
   </div>
@@ -176,6 +177,14 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/image</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة البروفايل الحالية.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/cover</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة الغلاف (cover) الحالية. رفع صورة غلاف يتم عبر <code>POST /vendor/profile</code> بحقل <code>cover_image</code>.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -297,7 +306,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط وبيانات العميل (كائن <code>user</code>: id، first_name، last_name، profile_image).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
