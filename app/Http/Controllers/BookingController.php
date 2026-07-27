@@ -312,7 +312,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'product']),
+            'booking' => $booking->load(['user:id,first_name,last_name,profile_image', 'vendor', 'product']),
         ]);
     }
 
@@ -337,7 +337,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'product']),
+            'booking' => $booking->load(['user:id,first_name,last_name,profile_image', 'vendor', 'product']),
         ]);
     }
 
@@ -363,7 +363,7 @@ class BookingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'booking' => $booking->load(['vendor', 'product']),
+            'booking' => $booking->load(['user:id,first_name,last_name,profile_image', 'vendor', 'product']),
         ]);
     }
 
@@ -418,7 +418,7 @@ class BookingController extends Controller
 
         if ($user instanceof \App\Models\Vendor) {
             $bookings = Booking::where('vendor_id', $user->id)
-                ->with(['product'])
+                ->with(['user:id,first_name,last_name,profile_image', 'product'])
                 ->latest()
                 ->get();
         } else {

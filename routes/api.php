@@ -76,6 +76,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::get('/vendor/profile', [VendorProfileController::class, 'show']);
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
+    Route::delete('/vendor/profile/cover', [VendorProfileController::class, 'deleteCover']);
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);
