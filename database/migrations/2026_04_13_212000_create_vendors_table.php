@@ -40,6 +40,7 @@ return new class extends Migration
                 'seller',
             ])->nullable();
             $table->string('profile_image')->nullable();
+            $table->string('cover_image')->nullable();
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
             $table->string('address')->nullable();

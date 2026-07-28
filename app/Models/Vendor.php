@@ -31,6 +31,7 @@ class Vendor extends Authenticatable
         'booking_style',
         'vendor_style',
         'profile_image',
+        'cover_image',
         'latitude',
         'longitude',
         'address',
@@ -50,8 +51,9 @@ class Vendor extends Authenticatable
     ];
 
     // profile_image_url -> full public URL, used by the app directly.
+    // cover_image_url   -> full public URL of the cover, used by the app directly.
     // account_status    -> readable account state for API responses.
-    protected $appends = ['profile_image_url', 'account_status'];
+    protected $appends = ['profile_image_url', 'cover_image_url', 'account_status'];
 
     public function getProfileImageUrlAttribute(): ?string
     {
@@ -59,6 +61,14 @@ class Vendor extends Authenticatable
         $disk = Storage::disk('supabase');
 
         return $this->profile_image ? $disk->url($this->profile_image) : null;
+    }
+
+    public function getCoverImageUrlAttribute(): ?string
+    {
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('supabase');
+
+        return $this->cover_image ? $disk->url($this->cover_image) : null;
     }
 
     protected function casts(): array

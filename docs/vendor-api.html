@@ -168,6 +168,7 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">الفئة (نفس قيم complete-registration). يضبط <code>booking_style</code> تلقائياً.</td></tr>
         <tr><td class="field">vendor_style</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar"><span class="enum">service_provider · seller</span> — حقل مساعد للتطبيق (هون بيختارو الـ vendor). بيرجع مع بيانات الـ vendor عند login/signup.</td></tr>
         <tr><td class="field">profile_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة jpg/jpeg/png، حد أقصى 2MB.</td></tr>
+        <tr><td class="field">cover_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة الغلاف (cover) للبروفايل. jpg/jpeg/png، حد أقصى 2MB. إعادة الرفع تستبدل الصورة القديمة. بيرجع رابطها بحقل <code>cover_image_url</code>.</td></tr>
       </table>
     </div>
   </div>
@@ -176,6 +177,14 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/image</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة البروفايل الحالية.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/cover</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة الغلاف (cover) الحالية. رفع صورة غلاف يتم عبر <code>POST /vendor/profile</code> بحقل <code>cover_image</code>.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -297,7 +306,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط وبيانات العميل (كائن <code>user</code>: id، first_name، last_name، profile_image).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -341,7 +350,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/bookings/{id}/approve</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor (محجوز 3 أيام).</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor لكنه محجوز (pending) حتى يكتمل الحجز (<code>completed</code>)، وعندها يصبح متاحاً للسحب.</div></div>
       <div class="lbl">Path</div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
@@ -427,9 +436,9 @@ td.ar{direction:rtl;text-align:right}
   <h2 id="wallet">7 · Wallet <span style="font-size:14px;color:var(--dim)">— المحفظة</span></h2>
 
   <div class="note-ar ar">
-    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز 3 أيام</b> (فترة استرجاع العميل). بعد 3 أيام يصبح <b>متاحاً للسحب</b>.
+    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز (pending)</b> طالما الحجز قيد التنفيذ (<code>pending</code>/<code>approved</code>)، ويصبح <b>متاحاً للسحب</b> عند اكتمال الحجز (<code>completed</code>) أو إلغائه نهائياً (<code>cancelled</code>).
     <span class="pill">available_balance</span> القابل للسحب الآن ·
-    <span class="pill">pending_clearance</span> محجوز ضمن الـ 3 أيام ·
+    <span class="pill">pending_clearance</span> محجوز حتى يكتمل الحجز ·
     <span class="pill">total_earned</span> الأرباح المؤكدة (بعد خصم الاسترجاعات).
   </div>
 

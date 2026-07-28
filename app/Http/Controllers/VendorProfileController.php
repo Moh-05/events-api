@@ -29,6 +29,7 @@ class VendorProfileController extends Controller
             'longitude'     => 'sometimes|numeric|between:-180,180',
             'address'       => 'sometimes|string|max:255',
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
+            'cover_image'   => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
             'vendor_type'   => 'sometimes|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
             'vendor_style'  => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
             'response_time' => 'sometimes|in:within_1h,within_2h,within_3h,within_24h',
@@ -53,6 +54,16 @@ class VendorProfileController extends Controller
             );
         }
 
+        if ($request->hasFile('cover_image')) {
+            if ($vendor->cover_image) {
+                Storage::disk('supabase')->delete($vendor->cover_image);
+            }
+            $data['cover_image'] = $this->storeImageOrFail(
+                $request->file('cover_image'),
+                'vendor_covers'
+            );
+        }
+
         $vendor->update($data);
 
         return response()->json([
@@ -73,6 +84,21 @@ class VendorProfileController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Profile image removed'
+        ]);
+    }
+
+    public function deleteCover(Request $request)
+    {
+        $vendor = $request->user();
+
+        if ($vendor->cover_image) {
+            Storage::disk('supabase')->delete($vendor->cover_image);
+            $vendor->update(['cover_image' => null]);
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Cover image removed'
         ]);
     }
 
