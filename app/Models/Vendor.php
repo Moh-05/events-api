@@ -137,4 +137,9 @@ class Vendor extends Authenticatable
     {
         return $this->hasMany(PortfolioItem::class);
     }
+
+    public function blockedDates()
+    {
+        return $this->hasMany(VendorBlockedDate::class);
+    }
 }

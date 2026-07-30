@@ -152,6 +152,19 @@ class BookingController extends Controller
                     'message' => 'This date is already booked',
                 ], 409);
             }
+
+            // Also respect a date the vendor manually blocked (offline booking).
+            // Compare on the date part only — event_date carries a time.
+            $blocked = \App\Models\VendorBlockedDate::where('vendor_id', $vendor->id)
+                ->whereDate('date', \Illuminate\Support\Carbon::parse($request->event_date)->toDateString())
+                ->exists();
+
+            if ($blocked) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'This date is not available',
+                ], 409);
+            }
         }
 
         // Booking + its single item row are created together or not at all.
@@ -769,22 +782,6 @@ class BookingController extends Controller
                 'last_month' => $lastMonth,
                 'growth'     => $growth, // percent, can be negative
             ],
-        ]);
-    }
-
-    // Booked dates for appointment vendors (used to block the calendar)
-    public function bookedDates(Request $request)
-    {
-        $vendor = $request->user();
-
-        $dates = Booking::where('vendor_id', $vendor->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->whereNotNull('event_date')
-            ->pluck('event_date');
-
-        return response()->json([
-            'status' => 'success',
-            'dates'  => $dates,
         ]);
     }
 }

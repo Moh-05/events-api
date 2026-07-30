@@ -6,6 +6,7 @@ use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\VendorProfileController;
 use App\Http\Controllers\VendorProductController;
 use App\Http\Controllers\VendorBrowseController;
+use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PaymentController;
@@ -36,6 +37,7 @@ Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: 
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);
 Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendorPortfolio']);
+Route::get('/vendors/{vendorId}/availability', [AvailabilityController::class, 'publicAvailability']); // unavailable dates for the calendar
 
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum
@@ -108,7 +110,10 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::post('/vendor/bookings/{id}/approve', [BookingController::class, 'approve']);
     Route::post('/vendor/bookings/{id}/decline', [BookingController::class, 'decline']);
     Route::post('/vendor/bookings/{id}/complete', [BookingController::class, 'complete']);
-    Route::get('/vendor/booked-dates', [BookingController::class, 'bookedDates']);
+    // Availability calendar (appointment vendors): booked (auto) + blocked (manual)
+    Route::get('/vendor/availability', [AvailabilityController::class, 'vendorAvailability']);
+    Route::post('/vendor/blocked-dates', [AvailabilityController::class, 'block']);
+    Route::delete('/vendor/blocked-dates/{date}', [AvailabilityController::class, 'unblock']);
 
     // Reviews (Vendor)
     Route::get('/vendor/reviews', [ReviewController::class, 'myReviews']);

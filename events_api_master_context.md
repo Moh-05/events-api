@@ -626,6 +626,17 @@ The `->exists()` check + `create()` weren't atomic → two simultaneous requests
 - **Flutter display rule:** show `event_date ?? old_event_date` (live date, or the archived one for cancelled/declined bookings).
 - Verified: book → double-book blocked by DB → cancel archives date → rebook same date succeeds.
 
+### 5. Availability calendar — booked + manual blocks (NEW, appointment vendors only)
+The old `GET /vendor/booked-dates` (bookings only, read-only) was replaced by a real availability system, because a vendor also gets booked OFFLINE (walk-in / phone) and must be able to block those days manually.
+- **New table `vendor_blocked_dates`** (`vendor_id`, `date`, `reason` nullable, unique `(vendor_id, date)`). Model `VendorBlockedDate`; `Vendor::blockedDates()`. Day-level only (hours are a per-service detail — vendors put them in the product's `meta`).
+- **New `AvailabilityController`:**
+  - `GET /vendor/availability` (vendor) → `{ booked: [dates], blocked: [{id,date,reason}] }` — labeled so the app shows why each day is off.
+  - `POST /vendor/blocked-dates` (vendor) → block a day (`date` required, `after_or_equal:today`; optional `reason`). 409 if the day already has a booking. Idempotent (firstOrCreate).
+  - `DELETE /vendor/blocked-dates/{date}` (vendor) → unblock (404 if not blocked).
+  - `GET /vendors/{id}/availability` (PUBLIC) → one flat `unavailable` list = booked + blocked merged, so the customer app greys out days BEFORE booking. Fills roadmap item #7.
+- **Booking guard updated:** `storeAppointment()` now also rejects a manually-blocked date (409 "This date is not available"), so a manual block really prevents in-app bookings. Availability held-status set is `['awaiting_payment','pending','approved']` (matches the conflict guard).
+- Order (seller) vendors have no calendar — they take many orders per day; all of this is appointment-only.
+
 ### Still open / deferred
 - `dev` not pushed (unreviewed booking refactor is the main reason — now reviewed + fixed, so closer to shippable).
 - `update()`'s order-cart replacement path reviewed only lightly; PaymentController item-total sum not re-audited this session.

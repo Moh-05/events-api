@@ -387,9 +387,30 @@ td.ar{direction:rtl;text-align:right}
   </div>
 
   <div class="ep">
-    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/booked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/availability</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">التواريخ المحجوزة (<code>pending</code> أو <code>approved</code>) لاستخدامها في تعطيل أيام الـ calendar.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">تقويم الـ vendor: <code>booked</code> (تواريخ عليها حجوزات نشطة تلقائياً) و <code>blocked</code> (تواريخ عطّلها الـ vendor يدوياً — كل واحد فيه id و date و reason). لمزوّدي المواعيد فقط.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/blocked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يعطّل يوماً يدوياً (مثلاً حجز تم خارج التطبيق، أو يوم إجازة). اليوم المعطّل يصير غير متاح للحجز داخل التطبيق. لا يمكن تعطيل يوم عليه حجز أصلاً (409).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">date</td><td class="type">date</td><td><span class="tag t-req">required</span></td><td class="ar">اليوم المراد تعطيله (اليوم أو بعده).</td></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب اختياري يظهر للـ vendor، حتى 255.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/blocked-dates/{date}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يلغي تعطيل يوم (يرجّعه متاحاً). <code>{date}</code> بصيغة YYYY-MM-DD في الـ URL. 404 إذا اليوم مش معطّل.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
