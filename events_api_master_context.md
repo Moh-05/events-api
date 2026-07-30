@@ -631,6 +631,8 @@ The `->exists()` check + `create()` weren't atomic → two simultaneous requests
 - `update()`'s order-cart replacement path reviewed only lightly; PaymentController item-total sum not re-audited this session.
 - Homepage `GET /products` (+ `discount_percent` for Best Offers) still the next customer-app build.
 
+> **IMPORTANT — Home page redesigned (build to the NEW design, not the folder).** The Home screen in `desgin system/` (the static handoff copy) is OUTDATED. The current Home is the redesign Mohamad approved with Claude Design — **5 rails**: (1) **Top Rated Vendors** (vendors) → `GET /vendors?sort=top_rated`; (2) **Best Offers** (items with a discount badge + strikethrough price) → needs `discount_percent`; (3) **Discover Services** (service items, horizontal) → `GET /products?type=service`; (4) **Discover Products** (product items, horizontal) → `GET /products?type=product`; (5) **Recently Added** (items, NEW badge) → `GET /products?sort=newest`. Search is always over items (`GET /products?search=`). The occasion selector at the top only changes Top Rated Vendors + the Explore banner (client-side mapping) — it does NOT affect the item rails. Service vs product = the vendor's `booking_style` (`appointment` = service, `order` = product). Build backend to THIS, not the old Home HTML.
+
 ---
 
 ## ADMIN DASHBOARD — COMPLETE ENDPOINT & SCREEN MAP (for the React design/build)
