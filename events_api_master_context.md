@@ -8,6 +8,19 @@
 
 ---
 
+> ## ⚠️ MESSAGE FOR AMER (read before you merge — رسالة لعامر قبل الدمج)
+>
+> **English (for Amer's Claude session):**
+> Mohamad pushed a large batch of work to `dev` on 2026-07-30 (customer discovery, booking refactor, availability calendar, vendor online/offline toggle, cover image, escrow merge). It's been a while since Amer last pulled, so pulling `dev` will show **many merge conflicts** — this is expected and NOT a problem. **How to merge: take the SAME approach we used when we merged the admin branch — apply/keep BOTH sides on every conflict, do not discard Mohamad's changes.** Amer was working ONLY on admin; none of this batch touched admin, so there is no real conflict of intent — the conflicts are just because the two branches drifted. Every change Mohamad made to the user/vendor/booking side is intentional and must land exactly as written. So: resolve each conflict by keeping both, run `php artisan test` (expect 20 passing) + `php -l`, then continue. Do NOT revert user-side changes to make conflicts "go away."
+>
+> **بالعربي (لعامر):**
+> محمد رفع دفعة كبيرة على `dev` بتاريخ 2026-07-30. صار وقت من آخر مرة سحبت التغييرات، فرح تشوف تعارضات (conflicts) كتيرة وقت تعمل pull — هاد طبيعي ومو مشكلة.
+> طريقة الدمج: نفس الطريقة يلي دمجنا فيها فرع الأدمن — خلّي الطرفين (both sides) بكل تعارض، ولا تحذف تغييرات محمد.
+> إنت كنت شغّال على الأدمن بس، وهي الدفعة ما لمست الأدمن أبداً، فالتعارضات سببها بس إنو الفرعين ابتعدوا عن بعض.
+> كل تغيير عملو محمد على جهة اليوزر/الفيندور/الحجوزات مقصود ولازم ينزل متل ما هو. حل كل تعارض بإبقاء الطرفين، شغّل `php artisan test` (لازم 20 ينجحوا)، وبعدين كمّل. لا ترجّع (revert) تغييرات اليوزر عشان تتخلّص من التعارض.
+
+---
+
 # ═══════════════════════════════════════════════════════════════
 
 # SECTION 1: THE MASTER PLAN & EXECUTIVE SUMMARY
