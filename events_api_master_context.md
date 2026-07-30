@@ -600,6 +600,39 @@ The admin module is now feature-complete for everything possible pre-payout-API.
 
 ---
 
+## UPDATES — 2026-07-28 (Moh session: admin merge, cover image deployed, booking review fixes)
+
+### 1. Branch state / git
+- Amer's admin work lived on branch **`origin/admin-complete`** (NOT `origin/dev`). Merged into local `dev` keeping BOTH sides on every conflict (Vendor `$appends`, BookingController cancel, master context). All 20 tests pass after merge. `dev` is LOCAL only — not pushed (unreviewed by choice).
+- Amer's two commits: **escrow fix** (money clears on completion, not 3 days — see 2026-06-29 section) + **admin complete** (ban modes, disputes, moderation, financial stats, money oversight). He did NOT change our plan beyond the escrow rule Mohamad approved; everything else was additive.
+
+### 2. Two Flutter-needed changes shipped to production via a `bug-fix` branch off `main`
+Because `dev` had lots of unreviewed work, we did NOT merge dev→main. Instead branched `bug-fix` off `main`, added only the two items, merged to `main`, pushed (deployed). Then replicated on `dev`. (Workflow saved as a Claude memory.)
+- **Customer identity in vendor booking responses:** the vendor-facing responses (`GET /vendor/bookings` list, approve, complete, decline) now eager-load the customer as **`user` { id, first_name, last_name, profile_image }** so the vendor app shows who booked instead of only a `user_id`. Customer-facing responses (store/update) deliberately unchanged.
+- **Vendor cover image (NEW):** `vendors.cover_image` column; upload via `POST /vendor/profile` with a `cover_image` file (re-upload replaces, mirrors `profile_image`); **`DELETE /vendor/profile/cover`** to remove; **`cover_image_url`** computed in JSON (Supabase, stored under `vendor_covers/`). Verified live end-to-end on production (upload → Supabase URL 200 → delete → null).
+- Production DB was reset with `migrate:fresh --force` (Option A — test data only) so the new column applied. `docs/vendor-api.html` updated (Arabic) for both.
+
+### 3. Booking code review — logic fixes (dev, all 20 tests pass)
+Reviewed the refactored `store()`/`storeOrder()`/`storeAppointment()` + FormRequests. Found and fixed:
+- **REGRESSION fix (was BUG #15):** the date-conflict check had dropped `awaiting_payment`. Re-added to BOTH `storeAppointment()` and `update()` → conflict now blocks `['awaiting_payment','pending','approved']`. Without it, two users could book the same date while one was still an unpaid draft.
+- **Appointment date now required:** `StoreAppointmentBookingRequest` `event_date` is now `required|date|after:now` (was `sometimes|nullable`). A service booking must have a future date.
+- **Vendor guard hardened:** `store()` now blocks a booking unless the vendor is **`is_approved` AND `is_active`** (was only `is_active`). An unapproved/KYC-pending vendor can no longer be booked even by POSTing a product id directly.
+
+### 4. Double-booking race condition — FIXED with a DB-level slot lock (NEW columns)
+The `->exists()` check + `create()` weren't atomic → two simultaneous requests could both pass and double-book a date. Fixed the same way `transaction_id` is protected (DB constraint + catch):
+- **`bookings.event_day`** — a STORED generated column = `DATE(event_date)` (NULL when `event_date` is NULL). **Unique index on `(vendor_id, event_day)`** → the database itself forbids two bookings for the same vendor on the same day (day-level, matching the `whereDate` logic). MySQL ignores NULLs, so orders and cancelled/declined appointments are exempt and never collide.
+- **`bookings.old_event_date`** — preserves the date for display after cancel/decline. A `Booking::saving` model hook: when status becomes `cancelled`/`declined`, it copies `event_date` → `old_event_date` and nulls `event_date` (frees the slot + drops the row out of the unique index). One hook covers all 3 cancel paths + decline.
+- `storeAppointment()` create wrapped in try/catch → a race that slips past the PHP check is caught as a clean `409 "This date is already booked"`.
+- **Flutter display rule:** show `event_date ?? old_event_date` (live date, or the archived one for cancelled/declined bookings).
+- Verified: book → double-book blocked by DB → cancel archives date → rebook same date succeeds.
+
+### Still open / deferred
+- `dev` not pushed (unreviewed booking refactor is the main reason — now reviewed + fixed, so closer to shippable).
+- `update()`'s order-cart replacement path reviewed only lightly; PaymentController item-total sum not re-audited this session.
+- Homepage `GET /products` (+ `discount_percent` for Best Offers) still the next customer-app build.
+
+---
+
 ## ADMIN DASHBOARD — COMPLETE ENDPOINT & SCREEN MAP (for the React design/build)
 
 The React admin dashboard is web-only. Auth = two layers: `auth:admins` guard + `role:` middleware.
@@ -2285,6 +2318,20 @@ because new flow is: vendor approves first (→ awaiting_payment), then user pay
 ```php
 ->whereIn('status', ['pending', 'awaiting_payment', 'approved'])
 ```
+
+**Note (2026-07-28):** the booking refactor accidentally dropped `awaiting_payment` again; re-added to both `storeAppointment()` and `update()`. See BUG #16 for the DB-level guard that now backs it up.
+
+### BUG #16: Double-Booking Race Condition (2026-07-28)
+
+**Problem:** the appointment date guard is `->exists()` then `create()` — not atomic. Two simultaneous requests both pass the "date free?" check before either inserts, so both book the same date.
+**Fix (DB is the final judge, like BUG #14 for transaction_id):**
+
+1. STORED generated column `bookings.event_day` = `DATE(event_date)` (NULL when `event_date` is NULL).
+2. Unique index on `(vendor_id, event_day)` — DB physically forbids two bookings per vendor per day. NULLs are ignored, so orders + cancelled/declined rows never collide.
+3. `bookings.old_event_date` keeps the date for display; a `Booking::saving` hook moves `event_date` → `old_event_date` and nulls `event_date` on cancel/decline (frees the slot, drops out of the index).
+4. `storeAppointment()` create wrapped in try/catch → duplicate-key error becomes a clean 409.
+
+Flutter display: `event_date ?? old_event_date`.
 
 ---
 

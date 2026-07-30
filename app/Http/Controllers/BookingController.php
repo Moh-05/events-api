@@ -32,8 +32,9 @@ class BookingController extends Controller
         $firstId = $request->vendor_product_id ?? $request->items[0]['vendor_product_id'];
         $vendor  = VendorProduct::with('vendor')->findOrFail($firstId)->vendor;
 
-        // A banned (suspended) vendor can't receive new bookings.
-        if (!$vendor || !$vendor->is_active) {
+        // A vendor can only receive bookings if they are both approved (KYC done)
+        // and active (not banned).
+        if (!$vendor || !$vendor->is_approved || !$vendor->is_active) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'This vendor is currently unavailable',
@@ -141,7 +142,7 @@ class BookingController extends Controller
         // Check if date is already booked
         if ($request->event_date) {
             $conflict = Booking::where('vendor_id', $vendor->id)
-                ->whereIn('status', ['pending', 'approved'])
+                ->whereIn('status', ['awaiting_payment', 'pending', 'approved'])
                 ->whereDate('event_date', $request->event_date)
                 ->exists();
 
@@ -154,29 +155,39 @@ class BookingController extends Controller
         }
 
         // Booking + its single item row are created together or not at all.
-        $booking = DB::transaction(function () use ($request, $vendor, $product) {
-            $booking = Booking::create([
-                'user_id'           => $request->user()->id,
-                'vendor_id'         => $vendor->id,
-                'vendor_product_id' => $product->id,
-                'booking_style'     => 'appointment',
-                'event_type'        => $vendor->vendor_type,
-                'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
-                'notes'             => $request->notes,
-                'event_date'        => $request->event_date,
-                'event_location'    => $request->event_location,
-                'duration_hours'    => $request->duration_hours,
-            ]);
+        // The (vendor_id, event_day) unique index is the real double-booking
+        // guard: if two requests race past the check above, the DB rejects the
+        // second insert and we turn that into the same clean 409.
+        try {
+            $booking = DB::transaction(function () use ($request, $vendor, $product) {
+                $booking = Booking::create([
+                    'user_id'           => $request->user()->id,
+                    'vendor_id'         => $vendor->id,
+                    'vendor_product_id' => $product->id,
+                    'booking_style'     => 'appointment',
+                    'event_type'        => $vendor->vendor_type,
+                    'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
+                    'notes'             => $request->notes,
+                    'event_date'        => $request->event_date,
+                    'event_location'    => $request->event_location,
+                    'duration_hours'    => $request->duration_hours,
+                ]);
 
-            // One item row (quantity 1) so orders and appointments read the same.
-            $booking->items()->create([
-                'vendor_product_id' => $product->id,
-                'quantity'          => 1,
-                'unit_price'        => $product->price, // price snapshot at booking time
-            ]);
+                // One item row (quantity 1) so orders and appointments read the same.
+                $booking->items()->create([
+                    'vendor_product_id' => $product->id,
+                    'quantity'          => 1,
+                    'unit_price'        => $product->price, // price snapshot at booking time
+                ]);
 
-            return $booking;
-        });
+                return $booking;
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'This date is already booked',
+            ], 409);
+        }
 
         return response()->json([
             'status'  => 'success',
@@ -228,7 +239,7 @@ class BookingController extends Controller
         if ($booking->booking_style === 'appointment' && $request->event_date) {
             $conflict = Booking::where('vendor_id', $booking->vendor_id)
                 ->where('id', '!=', $id)
-                ->whereIn('status', ['pending', 'approved'])
+                ->whereIn('status', ['awaiting_payment', 'pending', 'approved'])
                 ->whereDate('event_date', $request->event_date)
                 ->exists();
 

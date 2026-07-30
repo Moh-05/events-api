@@ -13,6 +13,7 @@ class Booking extends Model
         'booking_style',
         'status',
         'event_date',
+        'old_event_date',
         'event_type',
         'event_location',
         'duration_hours',
@@ -30,15 +31,29 @@ class Booking extends Model
         return [
             'details'        => 'array',
             'event_date'     => 'datetime',
-            'delivery_date'  => 'datetime',
-            'price_agreed'   => 'decimal:2',
-            'refund_amount'  => 'decimal:2',
-            'refund_paid_at' => 'datetime',
+            'delivery_date'   => 'datetime',
+            'old_event_date'  => 'datetime',
+            'price_agreed'    => 'decimal:2',
+            'refund_amount'   => 'decimal:2',
+            'refund_paid_at'  => 'datetime',
         ];
     }
 
     protected static function booted(): void
     {
+        // When a booking is cancelled or declined, free its calendar slot for
+        // rebooking: move event_date into old_event_date (kept for display) and
+        // null event_date — which also nulls the generated event_day, dropping
+        // this row out of the (vendor_id, event_day) unique index.
+        static::saving(function (Booking $booking): void {
+            if ($booking->isDirty('status')
+                && in_array($booking->status, ['cancelled', 'declined'], true)
+                && $booking->event_date !== null) {
+                $booking->old_event_date = $booking->event_date;
+                $booking->event_date     = null;
+            }
+        });
+
         // When a booking reaches a terminal state, a winding-down vendor may have
         // just cleared their last obligation → finalize the ban automatically.
         // NOTE: bulk updates (e.g. bookings:auto-complete) bypass model events,
