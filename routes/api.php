@@ -81,6 +81,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
     Route::delete('/vendor/profile/cover', [VendorProfileController::class, 'deleteCover']);
+    Route::post('/vendor/availability/toggle', [VendorProfileController::class, 'toggleAvailability']); // online/offline for new bookings
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);

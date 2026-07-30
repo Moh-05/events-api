@@ -33,11 +33,14 @@ class VendorBrowseController extends Controller
         //             (profile_image feeds the image URL; lat/lng feed map pins)
         // withMin  -> adds products_min_price  (the "From 180,000 SYP" on cards)
         // withCount-> adds bookings_count      (for the most_booked sort)
+        // Offline vendors (is_accepting_bookings = false) still appear in browse —
+        // the profile shows a "not accepting bookings" banner and disables booking.
         $query = Vendor::where('is_approved', true)
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'city', 'rating_avg',
                 'response_time', 'profile_image', 'latitude', 'longitude',
+                'is_accepting_bookings',
             ])
             ->withMin('products', 'price')
             ->withCount('bookings');

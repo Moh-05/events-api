@@ -102,6 +102,30 @@ class VendorProfileController extends Controller
         ]);
     }
 
+    // Vendor sets themselves online / offline for new bookings. Offline = hidden
+    // from browse + can't receive new bookings, but stays logged in and manages
+    // existing ones. Send { is_accepting_bookings: true|false }, or send nothing
+    // to flip the current value.
+    public function toggleAvailability(Request $request)
+    {
+        $request->validate([
+            'is_accepting_bookings' => 'sometimes|boolean',
+        ]);
+
+        $vendor = $request->user();
+
+        $vendor->update([
+            'is_accepting_bookings' => $request->has('is_accepting_bookings')
+                ? $request->boolean('is_accepting_bookings')
+                : ! $vendor->is_accepting_bookings,
+        ]);
+
+        return response()->json([
+            'status'                => 'success',
+            'is_accepting_bookings' => $vendor->is_accepting_bookings,
+        ]);
+    }
+
     // Save / update the device FCM token (the app sends it on login)
     public function updateFcmToken(Request $request)
     {

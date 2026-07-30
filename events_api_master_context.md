@@ -637,6 +637,16 @@ The old `GET /vendor/booked-dates` (bookings only, read-only) was replaced by a 
 - **Booking guard updated:** `storeAppointment()` now also rejects a manually-blocked date (409 "This date is not available"), so a manual block really prevents in-app bookings. Availability held-status set is `['awaiting_payment','pending','approved']` (matches the conflict guard).
 - Order (seller) vendors have no calendar — they take many orders per day; all of this is appointment-only.
 
+### 6. Vendor self online/offline toggle (NEW)
+Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can set themselves unavailable for NEW bookings while staying logged in and managing existing ones.
+- **New column `vendors.is_accepting_bookings`** (boolean, default true). NOT the same as `is_active` — `is_active=false` is the ADMIN ban and blocks login; `is_accepting_bookings=false` is vendor-controlled and does NOT block login.
+- **`POST /vendor/availability/toggle`** (`VendorProfileController::toggleAvailability`) — send `{ is_accepting_bookings: true|false }` or nothing to flip. Returns the new value.
+- **Behavior (per Mohamad's decision):** an offline vendor STILL appears in browse — the flag `is_accepting_bookings` is returned in the vendor card + full vendor JSON so the customer app shows a "currently not accepting bookings" banner on the profile and disables the booking button. It is NOT hidden from browse.
+- **Booking guard:** `store()` now also blocks if `!is_accepting_bookings` (403), so an offline vendor can't receive new bookings even by POSTing directly.
+- Verified: default true; toggle off → still in browse (flag=false) → booking 403; toggle on → booking 200. All 20 tests pass.
+
+> **OPEN — public sub-resource endpoints don't gate on vendor state (PRE-EXISTING, Mohamad wants to discuss first before any fix).** These public endpoints return a vendor's data WITHOUT checking `is_approved`/`is_active`: `GET /vendors/{id}/products/search`, `GET /vendors/{id}/reviews`, `GET /vendors/{id}/portfolio`. So a banned or not-yet-approved vendor's products/reviews/portfolio are still fetchable if you hit the URL with their id directly (they just don't appear in browse). Booking `store()`, browse, and public availability DO gate correctly; these three do not. When fixing: add `is_approved` + `is_active` only — NOT `is_accepting_bookings` (an offline vendor's products/reviews should still be viewable, just not bookable). Deferred at Mohamad's request pending discussion.
+
 ### Still open / deferred
 - `dev` not pushed (unreviewed booking refactor is the main reason — now reviewed + fixed, so closer to shippable).
 - `update()`'s order-cart replacement path reviewed only lightly; PaymentController item-total sum not re-audited this session.

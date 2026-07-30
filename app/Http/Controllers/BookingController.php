@@ -32,9 +32,9 @@ class BookingController extends Controller
         $firstId = $request->vendor_product_id ?? $request->items[0]['vendor_product_id'];
         $vendor  = VendorProduct::with('vendor')->findOrFail($firstId)->vendor;
 
-        // A vendor can only receive bookings if they are both approved (KYC done)
-        // and active (not banned).
-        if (!$vendor || !$vendor->is_approved || !$vendor->is_active) {
+        // A vendor can only receive bookings if they are approved (KYC done),
+        // active (not banned), and currently accepting bookings (not self-offline).
+        if (!$vendor || !$vendor->is_approved || !$vendor->is_active || !$vendor->is_accepting_bookings) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'This vendor is currently unavailable',

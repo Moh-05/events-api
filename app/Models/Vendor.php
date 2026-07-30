@@ -41,6 +41,7 @@ class Vendor extends Authenticatable
         'is_approved',
         'is_active',
         'winding_down',
+        'is_accepting_bookings',
         'rejection_reason',
         'fcm_token',
     ];
@@ -74,9 +75,10 @@ class Vendor extends Authenticatable
     protected function casts(): array
     {
         return [
-            'is_approved'  => 'boolean',
-            'is_active'    => 'boolean',
-            'winding_down' => 'boolean',
+            'is_approved'           => 'boolean',
+            'is_active'             => 'boolean',
+            'winding_down'          => 'boolean',
+            'is_accepting_bookings' => 'boolean',
             'rating_avg'   => 'decimal:2',
             'birth_date'   => 'date',
             'latitude'     => 'decimal:8',
