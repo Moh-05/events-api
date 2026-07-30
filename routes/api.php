@@ -5,6 +5,8 @@ use App\Http\Controllers\UserAuthController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\VendorProfileController;
 use App\Http\Controllers\VendorProductController;
+use App\Http\Controllers\VendorBrowseController;
+use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PaymentController;
@@ -31,9 +33,11 @@ Route::post('/vendor/verify-otp', [VendorAuthController::class, 'verifyOtp']);
 Route::post('/vendor/complete-registration', [VendorAuthController::class, 'completeRegistration']);
 
 // Public browse
+Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: Home / Explore / Filters
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);
 Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendorPortfolio']);
+Route::get('/vendors/{vendorId}/availability', [AvailabilityController::class, 'publicAvailability']); // unavailable dates for the calendar
 
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum
@@ -77,6 +81,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
     Route::delete('/vendor/profile/cover', [VendorProfileController::class, 'deleteCover']);
+    Route::post('/vendor/availability/toggle', [VendorProfileController::class, 'toggleAvailability']); // online/offline for new bookings
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);
@@ -106,7 +111,10 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::post('/vendor/bookings/{id}/approve', [BookingController::class, 'approve']);
     Route::post('/vendor/bookings/{id}/decline', [BookingController::class, 'decline']);
     Route::post('/vendor/bookings/{id}/complete', [BookingController::class, 'complete']);
-    Route::get('/vendor/booked-dates', [BookingController::class, 'bookedDates']);
+    // Availability calendar (appointment vendors): booked (auto) + blocked (manual)
+    Route::get('/vendor/availability', [AvailabilityController::class, 'vendorAvailability']);
+    Route::post('/vendor/blocked-dates', [AvailabilityController::class, 'block']);
+    Route::delete('/vendor/blocked-dates/{date}', [AvailabilityController::class, 'unblock']);
 
     // Reviews (Vendor)
     Route::get('/vendor/reviews', [ReviewController::class, 'myReviews']);
@@ -141,22 +149,52 @@ Route::middleware('auth:admins')->group(function () {
     Route::middleware('role:super_admin,support')->group(function () {
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
 
-        Route::get('/admin/vendors', [AdminController::class, 'vendors']);
+        Route::get('/admin/vendors', [AdminController::class, 'vendors']);                    // ?search= ?is_active=
         Route::get('/admin/vendors/pending', [AdminController::class, 'pendingVendors']);
         Route::get('/admin/vendors/{id}', [AdminController::class, 'vendorDetail']);
         Route::post('/admin/vendors/{id}/approve', [AdminController::class, 'approveVendor']);
         Route::post('/admin/vendors/{id}/reject', [AdminController::class, 'rejectVendor']);
 
-        Route::get('/admin/users', [AdminController::class, 'users']);
-        Route::get('/admin/bookings', [AdminController::class, 'bookings']);
+        Route::get('/admin/users', [AdminController::class, 'users']);                        // ?search=
+        Route::get('/admin/users/{id}', [AdminController::class, 'userDetail']);              // user + their bookings
+
+        Route::get('/admin/bookings', [AdminController::class, 'bookings']);                  // ?status= ?vendor_id= ?user_id=
+        Route::get('/admin/bookings/{id}', [AdminController::class, 'bookingDetail']);
+
+        Route::get('/admin/reviews', [AdminController::class, 'reviews']);                    // ?vendor_id=
     });
 
-    // ── Sensitive actions — super_admin ONLY (ban, money, audit, manage admins) ──
+    // ── Sensitive actions — super_admin ONLY (ban, money, disputes, audit, admins) ──
     Route::middleware('role:super_admin')->group(function () {
-        Route::post('/admin/vendors/{id}/toggle', [AdminController::class, 'toggleVendor']); // ban/unban vendor
-        Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleUser']);     // ban/unban user
+        // Vendor account state
+        Route::post('/admin/vendors/{id}/ban', [AdminController::class, 'banVendor']);           // immediate: cancel + refund all
+        Route::post('/admin/vendors/{id}/ban-gradual', [AdminController::class, 'banVendorGradual']); // winding-down
+        Route::post('/admin/vendors/{id}/unban', [AdminController::class, 'unbanVendor']);
 
+        // User account state
+        Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleUser']);         // ban/unban user
+
+        // Dispute resolution — cancel + refund a single booking
+        Route::post('/admin/bookings/{id}/cancel', [AdminController::class, 'cancelBooking']);
+
+        // Content moderation — remove abusive review / product / portfolio item
+        Route::delete('/admin/reviews/{id}', [AdminController::class, 'deleteReview']);
+        Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct']);
+        Route::delete('/admin/portfolio/{id}', [AdminController::class, 'deletePortfolioItem']);
+
+        // Money oversight
+        Route::get('/admin/vendors/{id}/wallet', [AdminController::class, 'vendorWallet']); // a vendor's earnings/ledger
         Route::get('/admin/payments', [AdminController::class, 'payments']);
+        Route::get('/admin/stats/financial', [AdminController::class, 'financials']); // income/profit report
+
+        // Refunds owed to customers (pay out manually, then mark paid)
+        Route::get('/admin/refunds-due', [AdminController::class, 'refundsDue']);
+        Route::post('/admin/refunds/{id}/mark-paid', [AdminController::class, 'markRefundPaid']);
+
+        // Vendor withdrawal payouts
+        Route::get('/admin/withdrawals', [AdminController::class, 'withdrawals']);          // ?unpaid=1
+        Route::post('/admin/withdrawals/{id}/mark-paid', [AdminController::class, 'markWithdrawalPaid']);
+
         Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
 
         // Manage admin accounts (hire/remove support)

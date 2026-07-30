@@ -27,6 +27,10 @@ return new class extends Migration
 
                 // Appointment fields
                 $table->dateTime('event_date')->nullable();
+                // Keeps the date for display after a booking is cancelled/declined:
+                // event_date is nulled then (to free the slot for rebooking + drop
+                // out of the unique index), old_event_date preserves it for history.
+                $table->dateTime('old_event_date')->nullable();
                 $table->string('event_type')->nullable();
                 $table->string('event_location')->nullable();
                 $table->integer('duration_hours')->nullable();
@@ -39,7 +43,25 @@ return new class extends Migration
                 // Shared
                 $table->text('notes')->nullable();
                 $table->decimal('price_agreed', 10, 2)->nullable();
+
+                // Customer refund tracking (set when a paid booking is cancelled).
+                // refund_amount = money owed back to the customer; refund_paid_at =
+                // when an admin actually sent it (null = still due). Real payout is
+                // manual until the ShamCash payout API exists.
+                $table->decimal('refund_amount', 12, 2)->nullable();
+                $table->timestamp('refund_paid_at')->nullable();
+
                 $table->timestamps();
+
+                // Day-level slot lock: the DB itself forbids two bookings for the
+                // same vendor on the same day. event_day is the date part of
+                // event_date (null when event_date is null — so orders and
+                // cancelled/declined appointments are exempt and never collide,
+                // since MySQL unique indexes ignore NULLs).
+                $table->date('event_day')
+                    ->storedAs('CASE WHEN event_date IS NULL THEN NULL ELSE DATE(event_date) END')
+                    ->nullable();
+                $table->unique(['vendor_id', 'event_day']);
             }
 
 

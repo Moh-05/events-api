@@ -8,6 +8,19 @@
 
 ---
 
+> ## ⚠️ MESSAGE FOR AMER (read before you merge — رسالة لعامر قبل الدمج)
+>
+> **English (for Amer's Claude session):**
+> Mohamad pushed a large batch of work to `dev` on 2026-07-30 (customer discovery, booking refactor, availability calendar, vendor online/offline toggle, cover image, escrow merge). It's been a while since Amer last pulled, so pulling `dev` will show **many merge conflicts** — this is expected and NOT a problem. **How to merge: take the SAME approach we used when we merged the admin branch — apply/keep BOTH sides on every conflict, do not discard Mohamad's changes.** Amer was working ONLY on admin; none of this batch touched admin, so there is no real conflict of intent — the conflicts are just because the two branches drifted. Every change Mohamad made to the user/vendor/booking side is intentional and must land exactly as written. So: resolve each conflict by keeping both, run `php artisan test` (expect 20 passing) + `php -l`, then continue. Do NOT revert user-side changes to make conflicts "go away."
+>
+> **بالعربي (لعامر):**
+> محمد رفع دفعة كبيرة على `dev` بتاريخ 2026-07-30. صار وقت من آخر مرة سحبت التغييرات، فرح تشوف تعارضات (conflicts) كتيرة وقت تعمل pull — هاد طبيعي ومو مشكلة.
+> طريقة الدمج: نفس الطريقة يلي دمجنا فيها فرع الأدمن — خلّي الطرفين (both sides) بكل تعارض، ولا تحذف تغييرات محمد.
+> إنت كنت شغّال على الأدمن بس، وهي الدفعة ما لمست الأدمن أبداً، فالتعارضات سببها بس إنو الفرعين ابتعدوا عن بعض.
+> كل تغيير عملو محمد على جهة اليوزر/الفيندور/الحجوزات مقصود ولازم ينزل متل ما هو. حل كل تعارض بإبقاء الطرفين، شغّل `php artisan test` (لازم 20 ينجحوا)، وبعدين كمّل. لا ترجّع (revert) تغييرات اليوزر عشان تتخلّص من التعارض.
+
+---
+
 # ═══════════════════════════════════════════════════════════════
 
 # SECTION 1: THE MASTER PLAN & EXECUTIVE SUMMARY
@@ -425,16 +438,315 @@ The Vendor app has two dashboard styles (service providers vs store/order vendor
 ### 7. Testing helpers — REMOVE before production
 - **Payment bypass:** `transaction_id = "0000"` skips ShamCash verification and is reusable across bookings (stored internally as `0000-{bookingId}`).
 - OTP still returned in auth responses; **UltraMsg subscription stopped** (trial not extended) → OTPs are not actually sent via WhatsApp during testing.
-- **Images not persistent** — wiped on every Railway deploy. Acceptable while testing; move to Cloudflare R2 before launch.
+- ~~Images not persistent~~ — SOLVED 2026-07-03: moved to Supabase Storage (see UPDATES — 2026-07-03).
 
 ### Deferred by decision (fine for testing)
-Persistent images (R2) · UltraMsg renewal · removing OTP/`0000`/`debug_notifications` · `APP_DEBUG=false` · ShamCash payout+refund API · reviews completed-only rule · pagination · Arabic translation · chat · favorites (Amer's task).
+UltraMsg renewal · removing OTP/`0000`/`debug_notifications` · `APP_DEBUG=false` · ShamCash payout+refund API · reviews completed-only rule · pagination · Arabic translation · chat · favorites (Amer's task).
 
 > **Docs:** `docs/vendor-api.html` is the up-to-date Vendor App API reference for the Flutter team (new categories, `vendor_style`, Portfolio section).
 
 ---
 
-## Next Steps To Build (IN ORDER)
+## UPDATES — 2026-07-03 (Supabase images + booking items / cart)
+
+### 1. Supabase Storage — images now survive deploys
+- Railway's container disk is wiped on every deploy, so locally-stored uploads kept disappearing. All image uploads/deletes moved from the local `public` disk to a new S3-compatible **`supabase` disk** (`config/filesystems.php`), backed by Supabase Storage (free tier, bucket `Haflati`, public reads).
+- Package: `league/flysystem-aws-s3-v3`. Env vars (local `.env` + Railway): `SUPABASE_S3_ENDPOINT`, `SUPABASE_S3_REGION`, `SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY`, `SUPABASE_S3_BUCKET`, `SUPABASE_PUBLIC_URL`.
+- New computed URL fields in every JSON response (Flutter uses these directly): `image_url` on `VendorProductImage` + `PortfolioItemImage`, `profile_image_url` on `User` + `Vendor`. DB still stores only the short path.
+- Supabase free tier pauses after ~7 idle days (resume in dashboard). **Rotate the S3 secret key before launch.**
+
+### 2. Booking items — cart-style orders (`booking_items` table)
+- An order can now hold **multiple different products from the same vendor, each with its own quantity** (e.g. 1× Red Rose + 2× White Rose). New table `booking_items`: `booking_id`, `vendor_product_id`, `quantity`, `unit_price` (**price snapshot at booking time** — later vendor price changes don't alter what an existing order owes). Model `BookingItem`; `Booking::items()` hasMany.
+- `POST /bookings` accepts either the old shape (`vendor_product_id` + optional `quantity`) or `items: [{vendor_product_id, quantity}, ...]`. Duplicate product ids are merged. Appointments unchanged: single package, quantity forced to 1 (`items`/qty>1 → 422). All items must be same vendor (422). Per-item availability + stock guards at booking (409 "Only N of 'X' left in stock").
+- `bookings.vendor_product_id` still points to the first item (kept so existing vendor endpoints don't break).
+- **Payment:** order total = sum of `unit_price × quantity` over items; appointment stays deposit% of package. Commission 15/85 applies to the total.
+- **Stock:** approve decrements **every item by its quantity** atomically (`WHERE stock >= qty`), all-or-nothing in one transaction — if any item can't be covered the whole approval fails 409 and rolls back. Cancel of an approved booking restores every item's quantity. Sold-out auto-hide/un-hide unchanged.
+- `PATCH`-style `POST /bookings/{id}` on an unpaid order draft can replace the items list (same guards, new snapshots).
+- Bookings now return `items` (with product) everywhere: user store/update/index, vendor index/show/recentOrders, payment response, approve/decline/complete.
+- Full flow verified locally: multi-item book → `0000` pay (exact total) → approve (stock −per item) → cancel (stock restored, wallet netted); guards: overbook, mixed vendors, appointment+qty, plain appointment regression.
+
+---
+
+## UPDATES — 2026-07-15 (booking refactor, Supabase verified live, design system, user-app roadmap)
+
+### 1. Booking store() refactored — strict order/appointment split (BREAKING for Flutter)
+- `store()` is now a small dispatcher: resolves the vendor from the request, runs the shared banned-vendor guard, then routes by `booking_style` to two private methods. One endpoint stays (`POST /bookings`) — the server decides the branch, Flutter can't call a "wrong" endpoint.
+- `storeOrder()` (sellers): **`items[]` is now the ONLY shape** — the legacy `vendor_product_id + quantity` shape for orders was REMOVED. Even one product = `items: [{vendor_product_id, quantity}]`. Appointment fields (`event_date`, `event_location`, `duration_hours`) are `prohibited` → 422.
+- `storeAppointment()` (services): `vendor_product_id` + event fields only; `items`/`details`/`delivery_*` are `prohibited` → 422. Also creates ONE `booking_items` row (qty 1, price snapshot) so every booking reads the same downstream.
+- Validation rules moved to their own files (Laravel FormRequest pattern): `app/Http/Requests/StoreOrderBookingRequest.php` + `StoreAppointmentBookingRequest.php`; controller does `$request->validate((new StoreOrderBookingRequest())->rules())`.
+- `update()` is strict per the booking's style too: order drafts can't send event fields, appointment drafts can't send cart fields.
+- Cart merge is the named map `$quantityByProductId = collect(items)->groupBy('vendor_product_id')->map(sum quantities)` — same product twice in the request merges into one line (key = product id, value = total qty).
+- Status at 2026-07-15: cart base commit `75a1e5a`→`75c1e5a` is pushed on `dev`; the refactor above is in the working tree, NOT yet committed — Mohamad reviewing before push. `main` does NOT have booking_items yet.
+
+### 2. Supabase images — verified live on Railway production
+- End-to-end proof: fresh vendor on prod → `POST /vendor/products` with a real 47KB jpg → response `image_url` on Supabase → GET on that URL = HTTP 200, identical byte size. Images now survive deploys for real.
+- Supabase facts (Mohamad asked): 1 GB storage is PERMANENT total capacity (not monthly, never resets). The "paused after 7 idle days" email = warning only for zero-activity projects; pause deletes NOTHING, one-click restore within 90 days. Any dashboard visit / upload / image GET resets the timer. Keep-alive idea deferred; manual touching is fine during testing.
+- Supabase org `Haflati`, project `events-api` (ref `hlgbsvyaoruetfrkvezb`), region eu-central-1, bucket `Haflati` (public). GitHub NOT connected to Supabase; RLS irrelevant (we only use Storage via S3 keys).
+- Railway CLI note: link is per-machine and can drop — `railway link --project distinguished-imagination` then `railway ssh --service events-api "php artisan migrate:fresh --force"`.
+
+### 3. Design system handoff (customer app blueprint)
+- Full design system delivered: `Haflati Design System-handoff/` (tokens, components, user + partners UI kits). Untracked copy sits in repo root as `desgin system/`. Customer screens: Onboarding, EventSelect (occasions), Home, Explore (map/GPS), Filters, Vendor, ServiceVendor, Reviews, Booking, Bookings, CancelBooking, Saved, Messages, Profile.
+- Designs are guidance, NOT contract — Mohamad decides what's worth building. Confirmed skips: "Cash at Venue" (breaks pay-first model — deliberate), delivery fee (fold into price v1), occasion selector backend (pure client-side mapping), Event Planner tab (already removed from design), AI UI (future).
+- Design/schema gaps decided earlier: `quantity` → SOLVED via booking_items; guests count → pending small nullable column; pay-in-full vs 20% deposit → pending business decision (currently deposit forced for appointments).
+
+### 4. USER APP — missing endpoints roadmap (rethought vs designs, ordered by importance)
+The vendor app is essentially API-complete. The customer app can auth/book/pay/review but CANNOT DISCOVER vendors. Missing, in priority order:
+
+**CRITICAL (one VendorBrowseController, unblocks Home/Explore/Filters/Vendor screens):**
+1. `GET /vendors` — public browse. Query params carry ALL the Filters screen: `vendor_type`, `city`, `min_rating`, `min_price`/`max_price` (needs computed `from_price` = min product price), `verified` (is_approved), `available_on` (date → excludes vendors with a pending/approved booking that day), `search` (name), `sort` (top_rated | most_booked | nearest | newest), pagination REQUIRED from day one.
+2. `GET /vendors/{id}` — public vendor detail header: name, bio, rating_avg, review count, city, verified, from_price, events-hosted count (completed bookings), joined date. (Products/portfolio/reviews sub-lists already exist.)
+3. `GET /vendors/nearby?lat=&lng=&radius=` — Explore map tab. Haversine on the existing lat/lng columns; returns distance_km, sorted.
+4. `GET /categories` — the 10 vendor_type tiles + vendor counts (or hardcode in Flutter — Mohamad decides).
+
+**IMPORTANT (small, complete the core loops):**
+5. `GET /bookings/{id}` — user booking detail (vendor side already has show()).
+6. Favorites/Saved — `GET /saved`, `POST /saved/{productId}`, `DELETE /saved/{productId}` + `is_saved` flag in product JSON. **Assigned to Amer.** (Design: favorites are on PRODUCTS, not vendors.)
+7. `GET /vendors/{id}/booked-dates` — public mirror of the vendor endpoint (booking calendar + "available on my date" filter).
+8. `POST /logout` + `POST /vendor/logout` — MISSING entirely (revoke current Sanctum token). Profile screen has Log Out.
+9. `GET /my-reviews` — user's own reviews (Profile → Activity shows Bookings/Reviews/Saved).
+
+**NOT building:** review replies (vendor replying to reviews) — decided out 2026-07-15 even though the design shows "Replies."
+
+**NICE-TO-HAVE / DECIDE LATER:**
+11. `guests` nullable int on bookings (Booking screen "Number of Guests").
+12. Pay-in-full option (`pay_full` flag changing expectedAmount) — needs business decision first.
+13. `GET /home` aggregate (one call = top-rated + recommended + categories) — perf polish only.
+14. Global `GET /search?q=` — v1 can lean on `GET /vendors?search=`.
+
+### 5. Chat system — agreed simple plan (after user endpoints)
+- **Messages live in Firebase Firestore, handled by the Flutter SDK client-side. The Laravel backend stores NO messages.** Free Spark tier, no card, realtime out of the box.
+- Thread id convention: `chat_{userId}_{vendorId}` (deterministic — both sides derive it, no create-thread endpoint needed).
+- Backend's only jobs: (a) `POST /chat/notify` — called by the sender's app after writing a message, backend fires FCM to the other party via existing NotificationService (Cloud Functions would need the paid Blaze plan/card — this avoids it); (b) optional later: mint Firebase custom auth tokens (we already have the service-account creds) so Firestore security rules can lock threads to their two participants.
+- Design's Archived/Unread/Online states: all client-side Firestore fields, zero backend.
+
+### 6. Arabic / translation — agreed simple plan
+- **UI strings: 100% Flutter-side** — the design system already ships `assets/translations/ar.json` + `en.json`. Zero backend work. RTL is Flutter layout work; tokens are direction-ready.
+- **API messages (validation/errors/notification titles): Laravel lang files** — `lang/ar/` + `lang/en/`, small middleware reads `Accept-Language` header and `App::setLocale()`. Wrap user-facing strings in `__()` progressively (notifications first, validation messages come translated by Laravel for free).
+- **User-generated content (names, bios, product descriptions): NOT translated.** Syrian vendors type Arabic already; content stays as typed. (Optional far-future: dual name_ar/name_en fields.)
+
+### 7. Smart Search API — separate FastAPI service (Moh + Amer, upcoming)
+- New standalone **FastAPI (Python) service** connecting to the SAME MySQL DB, powering AI/semantic "smart search" features for the app. Integration model: Flutter (or Laravel proxy) calls the FastAPI endpoints; it reads vendors/products from the shared DB.
+- Recommendations recorded for when it starts: give it a **read-only MySQL user** (it must never write app tables), host as a second Railway service in the same project (gets internal `mysql.railway.internal` access), keep it stateless, version its API (`/v1/...`), and don't block app flows on it (search degrades gracefully if the service is down).
+
+### Standing corrections to older sections
+- "FUTURE FEATURES → Cloudinary" is obsolete — persistent images are DONE via Supabase.
+- "Browse/Search API" + "Unavailable dates endpoint" are now items 1–4 + 7 of the roadmap above.
+- Old "IMMEDIATE (Current Session)" list (fix BookingController/PaymentController, admin table...) is all DONE long ago — kept below only as history.
+
+---
+
+## UPDATES — 2026-06-29 (Amer + Claude session: escrow fix + auto-complete)
+
+> ⚠️ **Mohamad — this touches the wallet you built.** The change is intentional; please read before merging.
+
+### 1. Vendor earnings now clear on COMPLETION, not 3 days after approval (ESCROW FIX)
+- **Problem it fixes:** the old rule cleared a booking's payout **3 days after approval**. But an appointment (e.g. a wedding hall) can be booked months ahead, so the vendor could **withdraw money for a service that hadn't happened yet**. If the booking was then cancelled or the vendor banned before the event, the money was already gone — the platform couldn't refund the customer.
+- **New rule:** a booking's earnings stay in **escrow (`pending_clearance`)** while the booking is still `pending`/`approved`, and only become **withdrawable (`available`)** once the booking is **`completed`** (service delivered) or **`cancelled`** (final). This keeps the money refundable right up until the service actually happens.
+- **Where:** `WalletController::balances()` — the clearing test is now `in_array($booking->status, ['completed','cancelled'])` instead of the `created_at + 3 days` time check. `HOLD_DAYS` const removed. `withdraw()` now eager-loads `booking:id,status`. `pending_note` text updated.
+- **No API shape change** — same `available_balance` / `pending_clearance` / `total_earned` keys; only *when* money moves between them changed.
+
+### 2. Bookings auto-complete 1 day after the event/delivery date — NEW
+- New command **`bookings:auto-complete`** (`app/Console/Commands/AutoCompleteBookings.php`): finds `approved` bookings whose service date has passed by 1 day and sets them `completed`. Appointment vendors are judged by `event_date`, order vendors by `delivery_date`.
+- Scheduled **daily at 01:00** in `routes/console.php` (`Schedule::command('bookings:auto-complete')->dailyAt('01:00')`).
+- **This is what makes escrow money clear on its own** — once a booking auto-completes, its earnings become withdrawable.
+- ⚠️ **Railway:** the scheduler must actually run. Add a Railway **Cron** that runs `php artisan bookings:auto-complete` on `0 1 * * *` (or a cron running `php artisan schedule:run` every minute). Without it, bookings never auto-complete.
+
+### 3. Vendors can't mark a booking complete before the date — guard added
+- `BookingController::complete()` now rejects (422) if `now()` is before the booking's `event_date` (appointment) / `delivery_date` (order). Prevents a vendor from faking an early completion to cash out an escrowed booking. The manual "complete" button still works, but only on/after the real date; otherwise the daily auto-complete handles it.
+
+### Not done yet (still open in this session)
+- **Ban with active bookings** — deciding/implementing what happens to a banned vendor's in-flight bookings (winding-down vs immediate refund). Customer refund is **record-only** for now (real payout waits on ShamCash payout API).
+
+---
+
+## UPDATES — 2026-06-29 (Amer + Claude session: admin system COMPLETED)
+
+The admin module is now feature-complete for everything possible pre-payout-API. Two-layer auth is unchanged (`auth:admins` + `role:` middleware). Role split: **support = view + KYC only**; **super_admin = everything** (bans, money, disputes, moderation, managing admins).
+
+### 1. Shared cancellation service — `App\Services\BookingCancellationService`
+- `cancelByPlatform(Booking, reason, notify=true)`: the single place that cancels a booking on the platform's behalf and settles money **fairly** — the customer always gets a **100% refund** (they did nothing wrong), unlike a customer self-cancellation which keeps BookingController's timed deposit tiers.
+- What it does (all inside a DB transaction): idempotency guard (skips already-finished bookings) → for an `approved` booking it **reverses the vendor's wallet credit** (a negative `refund` row netting the credit to 0) and **restores stock** → sets status `cancelled` → notifies the customer.
+- Reused by BOTH the ban flow and dispute resolution, so they can never drift apart.
+
+### 2. Vendor account states — added `winding_down` (3-state model)
+- New `vendors.winding_down` boolean. Combined with `is_active`, a vendor is now: **active** (`is_active=1`), **winding_down** (`is_active=0, winding_down=1`), or **banned** (`is_active=0, winding_down=0`).
+- `Vendor::$appends` exposes **`account_status`** = `active | winding_down | banned` in JSON.
+- `Vendor::finalizeBanIfCleared()` flips a winding-down vendor to fully banned once they have no more `pending`/`approved` bookings. Triggered by the `Booking` model's `updated` event (terminal status) **and** by the `bookings:auto-complete` command (which bulk-updates and so finalizes affected vendors itself).
+- A **winding-down** vendor is hidden from search and can't take new bookings (both driven by `is_active=0`), but the `EnsureActive` middleware and vendor login now let them through so they can finish existing work.
+
+### 3. Two ban modes + unban (super_admin ONLY) — replaced the old `toggleVendor`
+- `POST /admin/vendors/{id}/ban` — **immediate**: cancels + refunds every in-flight booking via the service, then fully bans. For fraud/urgent.
+- `POST /admin/vendors/{id}/ban-gradual` — **winding-down**: keeps only **committed** (`approved`) bookings so the vendor can finish them; drops unpaid drafts and **cancels + 100%-refunds any `pending`** booking (not yet approved = no commitment). Auto-finalizes to banned once the approved ones are done. (If there were no approved bookings, it bans immediately.)
+- `POST /admin/vendors/{id}/unban` — reinstate to `active`.
+
+### 4. Dispute resolution — `POST /admin/bookings/{id}/cancel` (super_admin)
+- Cancels ONE booking and refunds the customer 100% (same shared service), **without** touching the vendor's account. For complaints ("vendor no-show / bad service").
+
+### 5. Also added
+- **Detail views:** `GET /admin/users/{id}` (user + their bookings), `GET /admin/bookings/{id}` (full booking incl. payment). `GET /admin/vendors/{id}` already existed.
+- **Search / filters:** `GET /admin/vendors?search=&is_active=`, `GET /admin/users?search=`, `GET /admin/bookings?status=&vendor_id=&user_id=`.
+- **Review moderation:** `GET /admin/reviews?vendor_id=` (both roles), `DELETE /admin/reviews/{id}` (super_admin) — recomputes the vendor's `rating_avg` after deletion.
+- Every sensitive action writes to `admin_audit_logs`.
+
+### 6. Financial statistics
+- **`GET /admin/stats/financial`** (super_admin ONLY) — the full money picture from **verified** payments: `summary` (all-time `gross_volume` = customer paid, `platform_profit` = commission, `vendor_payouts`, `transactions`), plus `today` / `this_month` / `this_year` windows and a zero-filled **12-month `monthly_trend`** for charting.
+- `dashboard()` reworked: fixed a bug where monthly revenue used `whereMonth` without a year (counted that month across all years) and didn't filter `status=verified`. Renamed the money keys to **`profit_today` / `profit_month` / `profit_all_time`** and added `banned_vendors`, `total_bookings`, `completed_bookings`. (Naming change — tell Ali; the admin frontend isn't built yet.)
+
+### 7. Content moderation + money oversight
+- New shared **`App\Services\WalletService::balances()`** — the balance math moved out of `WalletController` (which now delegates to it) so the vendor's own wallet and an admin viewing it always agree.
+- **`GET /admin/vendors/{id}/wallet`** (super_admin) — any vendor's balances + full ledger, for money disputes.
+- **`DELETE /admin/products/{id}`** (super_admin) — remove an inappropriate product listing (+ its images from storage).
+- **`DELETE /admin/portfolio/{id}`** (super_admin) — remove an inappropriate portfolio item (+ its images).
+- All audited (`product.delete`, `portfolio.delete`).
+
+### 8. Money oversight — refunds due & withdrawals (closes the money loop)
+- Added tracking columns: `bookings.refund_amount` + `bookings.refund_paid_at`, and `wallet_transactions.paid_at`.
+- When a paid booking is cancelled, the amount owed to the customer is now **recorded** on the booking (`refund_amount`): 100% for a platform cancellation (ban/dispute), or the deposit-tier % for a customer self-cancellation. Both `BookingCancellationService` and `BookingController::cancel` set it.
+- **`GET /admin/refunds-due`** (super_admin) — cancelled bookings still owed a refund (+ `total_due`). **`POST /admin/refunds/{id}/mark-paid`** — admin marks it paid after sending money manually.
+- **`GET /admin/withdrawals?unpaid=1`** (super_admin) — vendor withdrawal requests (+ `total_unpaid`). **`POST /admin/withdrawals/{id}/mark-paid`** — mark a payout done.
+- Gives the admin full money visibility now; the actual send stays manual until the ShamCash payout API.
+
+### ⚠️ Notes / still open
+- **Customer refunds are RECORD-ONLY** at the send step. The booking is cancelled and the vendor's credit reversed, but actually sending money back to the customer waits on the **ShamCash payout API** (not built) — admin does it manually for now. The refund intent is captured in the audit log + the cancelled booking + verified payment.
+- Deferred (depend on future work): withdrawal/payout approval UI, complaints system, broadcast notifications.
+- Local admin tests were removed at Amer's request; behaviour was verified via tinker (immediate ban, gradual ban + auto-finalize, dispute — all pass). NOTE: `tests/Feature/AdminFullTest.php` (19 tests) is now back in the repo and passing.
+
+---
+
+## UPDATES — 2026-07-28 (Moh session: admin merge, cover image deployed, booking review fixes)
+
+### 1. Branch state / git
+- Amer's admin work lived on branch **`origin/admin-complete`** (NOT `origin/dev`). Merged into local `dev` keeping BOTH sides on every conflict (Vendor `$appends`, BookingController cancel, master context). All 20 tests pass after merge. `dev` is LOCAL only — not pushed (unreviewed by choice).
+- Amer's two commits: **escrow fix** (money clears on completion, not 3 days — see 2026-06-29 section) + **admin complete** (ban modes, disputes, moderation, financial stats, money oversight). He did NOT change our plan beyond the escrow rule Mohamad approved; everything else was additive.
+
+### 2. Two Flutter-needed changes shipped to production via a `bug-fix` branch off `main`
+Because `dev` had lots of unreviewed work, we did NOT merge dev→main. Instead branched `bug-fix` off `main`, added only the two items, merged to `main`, pushed (deployed). Then replicated on `dev`. (Workflow saved as a Claude memory.)
+- **Customer identity in vendor booking responses:** the vendor-facing responses (`GET /vendor/bookings` list, approve, complete, decline) now eager-load the customer as **`user` { id, first_name, last_name, profile_image }** so the vendor app shows who booked instead of only a `user_id`. Customer-facing responses (store/update) deliberately unchanged.
+- **Vendor cover image (NEW):** `vendors.cover_image` column; upload via `POST /vendor/profile` with a `cover_image` file (re-upload replaces, mirrors `profile_image`); **`DELETE /vendor/profile/cover`** to remove; **`cover_image_url`** computed in JSON (Supabase, stored under `vendor_covers/`). Verified live end-to-end on production (upload → Supabase URL 200 → delete → null).
+- Production DB was reset with `migrate:fresh --force` (Option A — test data only) so the new column applied. `docs/vendor-api.html` updated (Arabic) for both.
+
+### 3. Booking code review — logic fixes (dev, all 20 tests pass)
+Reviewed the refactored `store()`/`storeOrder()`/`storeAppointment()` + FormRequests. Found and fixed:
+- **REGRESSION fix (was BUG #15):** the date-conflict check had dropped `awaiting_payment`. Re-added to BOTH `storeAppointment()` and `update()` → conflict now blocks `['awaiting_payment','pending','approved']`. Without it, two users could book the same date while one was still an unpaid draft.
+- **Appointment date now required:** `StoreAppointmentBookingRequest` `event_date` is now `required|date|after:now` (was `sometimes|nullable`). A service booking must have a future date.
+- **Vendor guard hardened:** `store()` now blocks a booking unless the vendor is **`is_approved` AND `is_active`** (was only `is_active`). An unapproved/KYC-pending vendor can no longer be booked even by POSTing a product id directly.
+
+### 4. Double-booking race condition — FIXED with a DB-level slot lock (NEW columns)
+The `->exists()` check + `create()` weren't atomic → two simultaneous requests could both pass and double-book a date. Fixed the same way `transaction_id` is protected (DB constraint + catch):
+- **`bookings.event_day`** — a STORED generated column = `DATE(event_date)` (NULL when `event_date` is NULL). **Unique index on `(vendor_id, event_day)`** → the database itself forbids two bookings for the same vendor on the same day (day-level, matching the `whereDate` logic). MySQL ignores NULLs, so orders and cancelled/declined appointments are exempt and never collide.
+- **`bookings.old_event_date`** — preserves the date for display after cancel/decline. A `Booking::saving` model hook: when status becomes `cancelled`/`declined`, it copies `event_date` → `old_event_date` and nulls `event_date` (frees the slot + drops the row out of the unique index). One hook covers all 3 cancel paths + decline.
+- `storeAppointment()` create wrapped in try/catch → a race that slips past the PHP check is caught as a clean `409 "This date is already booked"`.
+- **Flutter display rule:** show `event_date ?? old_event_date` (live date, or the archived one for cancelled/declined bookings).
+- Verified: book → double-book blocked by DB → cancel archives date → rebook same date succeeds.
+
+### 5. Availability calendar — booked + manual blocks (NEW, appointment vendors only)
+The old `GET /vendor/booked-dates` (bookings only, read-only) was replaced by a real availability system, because a vendor also gets booked OFFLINE (walk-in / phone) and must be able to block those days manually.
+- **New table `vendor_blocked_dates`** (`vendor_id`, `date`, `reason` nullable, unique `(vendor_id, date)`). Model `VendorBlockedDate`; `Vendor::blockedDates()`. Day-level only (hours are a per-service detail — vendors put them in the product's `meta`).
+- **New `AvailabilityController`:**
+  - `GET /vendor/availability` (vendor) → `{ booked: [dates], blocked: [{id,date,reason}] }` — labeled so the app shows why each day is off.
+  - `POST /vendor/blocked-dates` (vendor) → block a day (`date` required, `after_or_equal:today`; optional `reason`). 409 if the day already has a booking. Idempotent (firstOrCreate).
+  - `DELETE /vendor/blocked-dates/{date}` (vendor) → unblock (404 if not blocked).
+  - `GET /vendors/{id}/availability` (PUBLIC) → one flat `unavailable` list = booked + blocked merged, so the customer app greys out days BEFORE booking. Fills roadmap item #7.
+- **Booking guard updated:** `storeAppointment()` now also rejects a manually-blocked date (409 "This date is not available"), so a manual block really prevents in-app bookings. Availability held-status set is `['awaiting_payment','pending','approved']` (matches the conflict guard).
+- Order (seller) vendors have no calendar — they take many orders per day; all of this is appointment-only.
+
+### 6. Vendor self online/offline toggle (NEW)
+Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can set themselves unavailable for NEW bookings while staying logged in and managing existing ones.
+- **New column `vendors.is_accepting_bookings`** (boolean, default true). NOT the same as `is_active` — `is_active=false` is the ADMIN ban and blocks login; `is_accepting_bookings=false` is vendor-controlled and does NOT block login.
+- **`POST /vendor/availability/toggle`** (`VendorProfileController::toggleAvailability`) — send `{ is_accepting_bookings: true|false }` or nothing to flip. Returns the new value.
+- **Behavior (per Mohamad's decision):** an offline vendor STILL appears in browse — the flag `is_accepting_bookings` is returned in the vendor card + full vendor JSON so the customer app shows a "currently not accepting bookings" banner on the profile and disables the booking button. It is NOT hidden from browse.
+- **Booking guard:** `store()` now also blocks if `!is_accepting_bookings` (403), so an offline vendor can't receive new bookings even by POSTing directly.
+- Verified: default true; toggle off → still in browse (flag=false) → booking 403; toggle on → booking 200. All 20 tests pass.
+
+> **OPEN — public sub-resource endpoints don't gate on vendor state (PRE-EXISTING, Mohamad wants to discuss first before any fix).** These public endpoints return a vendor's data WITHOUT checking `is_approved`/`is_active`: `GET /vendors/{id}/products/search`, `GET /vendors/{id}/reviews`, `GET /vendors/{id}/portfolio`. So a banned or not-yet-approved vendor's products/reviews/portfolio are still fetchable if you hit the URL with their id directly (they just don't appear in browse). Booking `store()`, browse, and public availability DO gate correctly; these three do not. When fixing: add `is_approved` + `is_active` only — NOT `is_accepting_bookings` (an offline vendor's products/reviews should still be viewable, just not bookable). Deferred at Mohamad's request pending discussion.
+
+### Still open / deferred
+- `dev` not pushed (unreviewed booking refactor is the main reason — now reviewed + fixed, so closer to shippable).
+- `update()`'s order-cart replacement path reviewed only lightly; PaymentController item-total sum not re-audited this session.
+- Homepage `GET /products` (+ `discount_percent` for Best Offers) still the next customer-app build.
+
+> **IMPORTANT — Home page redesigned (build to the NEW design, not the folder).** The Home screen in `desgin system/` (the static handoff copy) is OUTDATED. The current Home is the redesign Mohamad approved with Claude Design — **5 rails**: (1) **Top Rated Vendors** (vendors) → `GET /vendors?sort=top_rated`; (2) **Best Offers** (items with a discount badge + strikethrough price) → needs `discount_percent`; (3) **Discover Services** (service items, horizontal) → `GET /products?type=service`; (4) **Discover Products** (product items, horizontal) → `GET /products?type=product`; (5) **Recently Added** (items, NEW badge) → `GET /products?sort=newest`. Search is always over items (`GET /products?search=`). The occasion selector at the top only changes Top Rated Vendors + the Explore banner (client-side mapping) — it does NOT affect the item rails. Service vs product = the vendor's `booking_style` (`appointment` = service, `order` = product). Build backend to THIS, not the old Home HTML.
+
+---
+
+## ADMIN DASHBOARD — COMPLETE ENDPOINT & SCREEN MAP (for the React design/build)
+
+The React admin dashboard is web-only. Auth = two layers: `auth:admins` guard + `role:` middleware.
+**Roles:** `super_admin` = everything. `support` = view + KYC only (blocked from bans, money, audit, managing admins).
+All lists are paginated (Laravel paginator JSON: `data`, `current_page`, `last_page`, `total`, ...).
+Every response is `{ "status": "success", ... }`. Every sensitive super_admin action writes an `admin_audit_logs` row.
+
+### Auth
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| POST | `/admin/login` | public (throttled 5/min) | Login screen. Returns admin + token. First admin seeded: `admin@haflati.com` / `0000` (change after first login). |
+| POST | `/admin/logout` | any admin | Revoke current token. |
+
+### Dashboard home
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/dashboard` | super_admin + support | Landing screen headline cards: `total_users`, `total_vendors`, `approved_vendors`, `pending_vendors`, `banned_vendors`, `total_bookings`, `active_bookings`, `completed_bookings`, `profit_today`, `profit_month`, `profit_all_time`. |
+
+### Vendors (KYC + management)
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/vendors?search=&is_active=` | both | Vendors list (searchable, filter by active). |
+| GET | `/admin/vendors/pending` | both | KYC queue — vendors awaiting approval. |
+| GET | `/admin/vendors/{id}` | both | Vendor detail. |
+| GET | `/admin/vendors/{id}/wallet` | super_admin | A vendor's balances + full ledger (money disputes). |
+| POST | `/admin/vendors/{id}/approve` | both | Approve KYC. |
+| POST | `/admin/vendors/{id}/reject` | both | Reject KYC (reason shown to vendor). |
+| POST | `/admin/vendors/{id}/ban` | super_admin | Immediate ban — cancels + 100%-refunds every in-flight booking, then fully bans. |
+| POST | `/admin/vendors/{id}/ban-gradual` | super_admin | Winding-down ban — keeps `approved` bookings to finish, cancels+refunds `pending`, auto-finalizes when done. |
+| POST | `/admin/vendors/{id}/unban` | super_admin | Reinstate to active. |
+
+Vendor `account_status` in JSON = `active | winding_down | banned` — use it for a status pill.
+
+### Users
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/users?search=` | both | Users list (searchable). |
+| GET | `/admin/users/{id}` | both | User detail + their bookings. |
+| POST | `/admin/users/{id}/toggle` | super_admin | Ban / unban a user (`is_active`). |
+
+### Bookings + disputes
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/bookings?status=&vendor_id=&user_id=` | both | Bookings list (filterable). |
+| GET | `/admin/bookings/{id}` | both | Booking detail incl. payment. |
+| POST | `/admin/bookings/{id}/cancel` | super_admin | Dispute resolution — cancel ONE booking + 100% refund the customer, vendor account untouched. |
+
+### Money oversight
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/payments` | super_admin | All payments (with booking.user + booking.vendor). |
+| GET | `/admin/stats/financial` | super_admin | Full money report: `summary` (gross_volume, platform_profit, vendor_payouts, transactions) + today/this_month/this_year + 12-month `monthly_trend` for charts. |
+| GET | `/admin/refunds-due` | super_admin | Cancelled bookings still owed a customer refund (+ `total_due`). |
+| POST | `/admin/refunds/{id}/mark-paid` | super_admin | Mark a refund paid after sending manually. |
+| GET | `/admin/withdrawals?unpaid=1` | super_admin | Vendor withdrawal requests (+ `total_unpaid`). |
+| POST | `/admin/withdrawals/{id}/mark-paid` | super_admin | Mark a payout done. |
+
+(Real send of both refunds and payouts stays manual until the ShamCash payout API exists.)
+
+### Content moderation
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/reviews?vendor_id=` | both | Reviews list. |
+| DELETE | `/admin/reviews/{id}` | super_admin | Remove a review (recomputes vendor `rating_avg`). |
+| DELETE | `/admin/products/{id}` | super_admin | Remove an inappropriate product listing (+ its images). |
+| DELETE | `/admin/portfolio/{id}` | super_admin | Remove an inappropriate portfolio item (+ its images). |
+
+### Audit + managing admins
+| Method | Endpoint | Role | Screen / purpose |
+| --- | --- | --- | --- |
+| GET | `/admin/audit-logs` | super_admin | Audit log viewer (who did what, with admin name/role). |
+| GET | `/admin/admins` | super_admin | List admin accounts. |
+| POST | `/admin/admins` | super_admin | Create an admin (hire support). |
+| DELETE | `/admin/admins/{id}` | super_admin | Remove an admin. |
+
+---
+
+## Next Steps To Build (IN ORDER) — historical (2026-06-06), superseded by the 2026-07-15 roadmap above
 
 ### IMMEDIATE (Current Session)
 
@@ -2043,6 +2355,20 @@ because new flow is: vendor approves first (→ awaiting_payment), then user pay
 ->whereIn('status', ['pending', 'awaiting_payment', 'approved'])
 ```
 
+**Note (2026-07-28):** the booking refactor accidentally dropped `awaiting_payment` again; re-added to both `storeAppointment()` and `update()`. See BUG #16 for the DB-level guard that now backs it up.
+
+### BUG #16: Double-Booking Race Condition (2026-07-28)
+
+**Problem:** the appointment date guard is `->exists()` then `create()` — not atomic. Two simultaneous requests both pass the "date free?" check before either inserts, so both book the same date.
+**Fix (DB is the final judge, like BUG #14 for transaction_id):**
+
+1. STORED generated column `bookings.event_day` = `DATE(event_date)` (NULL when `event_date` is NULL).
+2. Unique index on `(vendor_id, event_day)` — DB physically forbids two bookings per vendor per day. NULLs are ignored, so orders + cancelled/declined rows never collide.
+3. `bookings.old_event_date` keeps the date for display; a `Booking::saving` hook moves `event_date` → `old_event_date` and nulls `event_date` on cancel/decline (frees the slot, drops out of the index).
+4. `storeAppointment()` create wrapped in try/catch → duplicate-key error becomes a clean 409.
+
+Flutter display: `event_date ?? old_event_date`.
+
 ---
 
 ## Auth Config (config/auth.php)
@@ -2353,11 +2679,11 @@ public function notifyAdmins(string $role, string $title, string $body): void
 10. **FCM Errors:** Log silently — never return as API error response
 11. **ShamCash Errors:** Return as JSON — user needs to know
 
-## Language Convention
+## Language Convention (UPDATED 2026-07-15)
 
-- Moh speaks Arabic and English mixed
-- Claude responds in Arabic with English technical terms
-- Example: "الـ controller بيعمل الـ validation أول"
+- Two people use this repo with Claude: **Mohamad → English**, **Amer → Arabic** (identify the speaker by the language they write in)
+- When answering Amer in Arabic: keep Arabic and English on separate lines, never mixed inline
+- No emojis/icons in code comments or user-facing strings (notification titles/bodies)
 
 ## Architecture Reminders
 

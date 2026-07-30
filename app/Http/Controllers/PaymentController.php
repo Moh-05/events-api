@@ -47,11 +47,15 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        $product       = $booking->product;
-        $vendor        = $booking->vendor;
+        $product = $booking->product;
+        $vendor  = $booking->vendor;
+
+        // Appointment: deposit % of the single package price.
+        // Order: full cart total — sum of unit_price × quantity over the item
+        // rows (unit_price is the snapshot taken at booking time).
         $expectedAmount = $vendor->booking_style === 'appointment'
             ? round($product->price * ($product->deposit_percent / 100), 2)
-            : $product->price;
+            : round($booking->items->sum(fn ($item) => $item->unit_price * $item->quantity), 2);
 
         if ($isTest) {
             $result = ['verified' => true, 'sender_name' => 'TEST'];
@@ -111,7 +115,7 @@ class PaymentController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Payment verified successfully',
-            'booking' => $booking->load(['vendor', 'product']),
+            'booking' => $booking->load(['vendor', 'product', 'items.product']),
             'payment' => $payment,
             'debug_notifications' => [
                 'user'   => $notifyUser,

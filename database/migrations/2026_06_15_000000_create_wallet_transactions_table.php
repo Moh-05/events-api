@@ -16,7 +16,9 @@ return new class extends Migration
             $table->enum('type', ['credit', 'refund', 'withdrawal']);
             // signed: credit > 0, refund < 0, withdrawal < 0
             $table->decimal('amount', 10, 2);
-            // a credit's created_at IS the approval time; it clears 3 days later
+            // For withdrawals: when the admin actually paid the vendor out
+            // (null = requested but not yet paid). Meaningless for credit/refund.
+            $table->timestamp('paid_at')->nullable();
             $table->timestamps();
         });
     }

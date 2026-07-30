@@ -350,7 +350,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/bookings/{id}/approve</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor (محجوز 3 أيام).</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor لكنه محجوز (pending) حتى يكتمل الحجز (<code>completed</code>)، وعندها يصبح متاحاً للسحب.</div></div>
       <div class="lbl">Path</div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
@@ -387,9 +387,42 @@ td.ar{direction:rtl;text-align:right}
   </div>
 
   <div class="ep">
-    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/booked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/availability/toggle</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">التواريخ المحجوزة (<code>pending</code> أو <code>approved</code>) لاستخدامها في تعطيل أيام الـ calendar.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">يبدّل حالة الـ vendor بين متاح / غير متاح لاستقبال الحجوزات. لما يكون <code>is_accepting_bookings = false</code>: يظل ظاهراً في التصفّح لكن صفحته تعرض "غير متاح حالياً لاستقبال الحجوزات" ولا يمكن الحجز منه (403)، ويبقى مسجّل دخوله ويدير حجوزاته الحالية. مختلف تماماً عن <code>is_active</code> (حظر الأدمن).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">is_accepting_bookings</td><td class="type">boolean</td><td><span class="tag t-opt">optional</span></td><td class="ar">القيمة المطلوبة. إذا لم تُرسل، يقلب القيمة الحالية (toggle).</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/availability</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تقويم الـ vendor: <code>booked</code> (تواريخ عليها حجوزات نشطة تلقائياً) و <code>blocked</code> (تواريخ عطّلها الـ vendor يدوياً — كل واحد فيه id و date و reason). لمزوّدي المواعيد فقط.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/blocked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يعطّل يوماً يدوياً (مثلاً حجز تم خارج التطبيق، أو يوم إجازة). اليوم المعطّل يصير غير متاح للحجز داخل التطبيق. لا يمكن تعطيل يوم عليه حجز أصلاً (409).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">date</td><td class="type">date</td><td><span class="tag t-req">required</span></td><td class="ar">اليوم المراد تعطيله (اليوم أو بعده).</td></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب اختياري يظهر للـ vendor، حتى 255.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/blocked-dates/{date}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يلغي تعطيل يوم (يرجّعه متاحاً). <code>{date}</code> بصيغة YYYY-MM-DD في الـ URL. 404 إذا اليوم مش معطّل.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -436,9 +469,9 @@ td.ar{direction:rtl;text-align:right}
   <h2 id="wallet">7 · Wallet <span style="font-size:14px;color:var(--dim)">— المحفظة</span></h2>
 
   <div class="note-ar ar">
-    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز 3 أيام</b> (فترة استرجاع العميل). بعد 3 أيام يصبح <b>متاحاً للسحب</b>.
+    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز (pending)</b> طالما الحجز قيد التنفيذ (<code>pending</code>/<code>approved</code>)، ويصبح <b>متاحاً للسحب</b> عند اكتمال الحجز (<code>completed</code>) أو إلغائه نهائياً (<code>cancelled</code>).
     <span class="pill">available_balance</span> القابل للسحب الآن ·
-    <span class="pill">pending_clearance</span> محجوز ضمن الـ 3 أيام ·
+    <span class="pill">pending_clearance</span> محجوز حتى يكتمل الحجز ·
     <span class="pill">total_earned</span> الأرباح المؤكدة (بعد خصم الاسترجاعات).
   </div>
 
