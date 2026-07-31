@@ -59,6 +59,20 @@ td.ar{direction:rtl;text-align:right}
 .toc{columns:2;column-gap:30px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 24px;margin:14px 0 8px}
 .toc a{color:var(--text);text-decoration:none;font-size:14px;display:block;padding:3px 0}
 .toc a:hover{color:var(--gold2)}
+
+/* responses */
+.resp{margin-top:14px}
+.resp-item{margin:8px 0;border:1px solid rgba(255,255,255,.07);border-radius:8px;overflow:hidden}
+.resp-head{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:12.5px;font-weight:600}
+.sc{font-family:'Consolas',monospace;font-weight:700;font-size:12px;padding:2px 9px;border-radius:5px}
+.sc-2{background:rgba(76,175,125,.18);color:#5ec98e}    /* 2xx */
+.sc-4{background:rgba(224,96,106,.16);color:#e88b93}    /* 4xx */
+.resp-desc{color:var(--dim);font-size:12.5px;font-weight:400}
+pre.json{background:var(--code);color:#d6d2e6;padding:12px 14px;margin:0;font-family:'Consolas','Courier New',monospace;font-size:12.5px;line-height:1.55;overflow-x:auto;white-space:pre}
+pre.json .k{color:#8fb7e0}      /* json key */
+pre.json .s{color:#c9a84c}      /* string   */
+pre.json .n{color:#c98e6e}      /* number/bool/null */
+pre.json .c{color:#5a5470}      /* comment  */
 </style>
 </head>
 <body>
@@ -79,6 +93,38 @@ td.ar{direction:rtl;text-align:right}
       كل الـ endpoints تحتاج الـ <code>Authorization: Bearer {token}</code> ما عدا تسجيل الدخول (send-otp / verify-otp / complete-registration).
       الـ token بتاخذه من الـ login. للتجربة الحالية: الـ <code>otp</code> برجع جوّا الـ response مباشرة، فما بتحتاج WhatsApp.
       أي طلب فيه رفع صور (المنتجات أو صورة البروفايل) لازم يكون <code>multipart/form-data</code>، والباقي <code>JSON</code>.
+    </div>
+  </div>
+
+  <!-- ───────── COMMON RESPONSES ───────── -->
+  <div class="intro">
+    <h3>Common Responses — ردود مشتركة</h3>
+    <div class="note-ar ar">
+      هي الردود ممكن ترجع من <b>أي</b> endpoint، فمذكورة هون مرّة وحدة بدل ما تتكرر بكل نقطة. تحت كل endpoint بنذكر بس الردود الخاصة فيه.
+      كل الردود JSON. النجاح غالباً فيه <code>"status": "success"</code>، والخطأ فيه <code>"status": "error"</code> و <code>"message"</code>.
+    </div>
+
+    <div class="resp">
+      <div class="resp-item">
+        <div class="resp-head"><span class="sc sc-4">401</span><span class="resp-desc">Unauthenticated — التوكن ناقص أو غير صالح (على أي endpoint محمي). أرسل دائماً <code>Accept: application/json</code> وإلا بيرجع redirect.</span></div>
+<pre class="json"><span class="k">"message"</span>: <span class="s">"Unauthenticated."</span></pre>
+      </div>
+      <div class="resp-item">
+        <div class="resp-head"><span class="sc sc-4">403</span><span class="resp-desc">Account suspended — الحساب محظور من الأدمن (يمنع تسجيل الدخول واستخدام الـ endpoints).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"suspended"</span>,
+  <span class="k">"message"</span>: <span class="s">"Your account has been suspended. Please contact support."</span>
+}</pre>
+      </div>
+      <div class="resp-item">
+        <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">Validation error — حقل ناقص أو غير صحيح. <code>errors</code> فيه رسالة لكل حقل. (مثال عام).</span></div>
+<pre class="json">{
+  <span class="k">"message"</span>: <span class="s">"The phone field is required."</span>,
+  <span class="k">"errors"</span>: {
+    <span class="k">"phone"</span>: [<span class="s">"The phone field is required."</span>]
+  }
+}</pre>
+      </div>
     </div>
   </div>
 
@@ -107,6 +153,22 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">phone</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الموبايل، أرقام فقط مع إمكانية <code>+</code> (7–15 خانة).</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الإرسال. <code>otp</code> يظهر للتجربة فقط. <code>ultramsg_status</code>=404 يعني اشتراك WhatsApp موقوف حالياً (طبيعي بالتجربة).</span></div>
+<pre class="json">{
+  <span class="k">"message"</span>: <span class="s">"OTP sent"</span>,
+  <span class="k">"otp"</span>: <span class="n">834192</span>,
+  <span class="k">"ultramsg_status"</span>: <span class="n">404</span>,
+  <span class="k">"ultramsg_response"</span>: { <span class="c">/* رد WhatsApp */</span> }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">رقم غير صالح (فاضي، أحرف، أو خارج 7–15 خانة).</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"The phone field is required."</span>, <span class="k">"errors"</span>: { <span class="k">"phone"</span>: [ <span class="s">"..."</span> ] } }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -120,6 +182,47 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">phone</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">نفس الرقم المُرسل له الـ OTP.</td></tr>
         <tr><td class="field">otp</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">الرمز المكوّن من 6 أرقام.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">الرقم موجود مسبقاً — تسجيل دخول. يرجّع <code>token</code> وكامل بيانات الـ vendor.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"login"</span>,
+  <span class="k">"token"</span>: <span class="s">"12|aBcD3fGhIjKlMnOpQrStUvWxYz..."</span>,
+  <span class="k">"vendor"</span>: {
+    <span class="k">"id"</span>: <span class="n">7</span>,
+    <span class="k">"first_name"</span>: <span class="s">"Sara"</span>,
+    <span class="k">"last_name"</span>: <span class="s">"Ahmad"</span>,
+    <span class="k">"phone"</span>: <span class="s">"+963991234567"</span>,
+    <span class="k">"vendor_type"</span>: <span class="s">"photographer"</span>,
+    <span class="k">"booking_style"</span>: <span class="s">"appointment"</span>,
+    <span class="k">"is_accepting_bookings"</span>: <span class="n">true</span>,
+    <span class="k">"profile_image_url"</span>: <span class="n">null</span>,
+    <span class="k">"cover_image_url"</span>: <span class="n">null</span>,
+    <span class="k">"account_status"</span>: <span class="s">"active"</span>
+    <span class="c">/* ... باقي حقول الـ vendor. fcm_token غير موجود أبداً */</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">رقم جديد — يرجّع <code>registration_token</code> (صالح 15 دقيقة) لإكمال التسجيل.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"new_vendor"</span>,
+  <span class="k">"registration_token"</span>: <span class="s">"a1b2c3...64chars"</span>
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">400</span><span class="resp-desc">الـ OTP خاطئ أو منتهي الصلاحية.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"Invalid OTP"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">403</span><span class="resp-desc">الحساب محظور نهائياً من الأدمن — يمنع الدخول.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"suspended"</span>,
+  <span class="k">"message"</span>: <span class="s">"Your account has been suspended. Please contact support."</span>
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -138,6 +241,42 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">الفئة. خدمات: <span class="enum">photographer · makeupArtist · dj · weddingHall</span> · بيع: <span class="enum">flowers · gifts · dresses · accessories · candles · cakes</span></td></tr>
         <tr><td class="field">vendor_style</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar"><span class="enum">service_provider · seller</span> — حقل مساعد للتطبيق فقط (بدون منطق بالـ backend)، بيرجع مع بيانات الـ vendor.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم إنشاء الحساب. يرجّع <code>token</code> وبيانات الـ vendor الجديد. <code>booking_style</code> اتحدّد تلقائياً حسب الفئة.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"token"</span>: <span class="s">"13|xYzAbCdEfGhIjKlMnOpQr..."</span>,
+  <span class="k">"vendor"</span>: {
+    <span class="k">"id"</span>: <span class="n">42</span>,
+    <span class="k">"first_name"</span>: <span class="s">"Sara"</span>,
+    <span class="k">"last_name"</span>: <span class="s">"Ahmad"</span>,
+    <span class="k">"phone"</span>: <span class="s">"+963991234567"</span>,
+    <span class="k">"city"</span>: <span class="s">"Damascus"</span>,
+    <span class="k">"birth_date"</span>: <span class="s">"1998-04-12T00:00:00.000000Z"</span>,
+    <span class="k">"vendor_type"</span>: <span class="s">"cakes"</span>,
+    <span class="k">"booking_style"</span>: <span class="s">"order"</span>,
+    <span class="k">"vendor_style"</span>: <span class="s">"seller"</span>,
+    <span class="k">"is_approved"</span>: <span class="n">false</span>,
+    <span class="k">"is_active"</span>: <span class="n">true</span>,
+    <span class="k">"is_accepting_bookings"</span>: <span class="n">true</span>,
+    <span class="k">"profile_image_url"</span>: <span class="n">null</span>,
+    <span class="k">"cover_image_url"</span>: <span class="n">null</span>,
+    <span class="k">"account_status"</span>: <span class="s">"active"</span>
+    <span class="c">/* ... created_at / updated_at. fcm_token غير موجود أبداً */</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">403</span><span class="resp-desc">الـ <code>registration_token</code> منتهي الصلاحية أو غير صالح.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"Expired"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">حقل ناقص أو غير صالح (مثلاً <code>vendor_type</code> خارج القائمة، أو <code>first_name</code> فيه أرقام).</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"The selected vendor type is invalid."</span>, <span class="k">"errors"</span>: { <span class="k">"vendor_type"</span>: [ <span class="s">"..."</span> ] } }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -149,6 +288,40 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع بيانات الـ vendor الحالي (المسجّل دخوله بالـ token).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">بيانات الـ vendor كاملة. <code>fcm_token</code> و <code>remember_token</code> غير موجودين أبداً.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"vendor"</span>: {
+    <span class="k">"id"</span>: <span class="n">7</span>,
+    <span class="k">"first_name"</span>: <span class="s">"Sara"</span>,
+    <span class="k">"last_name"</span>: <span class="s">"Ahmad"</span>,
+    <span class="k">"phone"</span>: <span class="s">"+963991234567"</span>,
+    <span class="k">"city"</span>: <span class="s">"Damascus"</span>,
+    <span class="k">"business_name"</span>: <span class="s">"Sara Studio"</span>,
+    <span class="k">"bio"</span>: <span class="s">"Wedding photographer"</span>,
+    <span class="k">"vendor_type"</span>: <span class="s">"photographer"</span>,
+    <span class="k">"booking_style"</span>: <span class="s">"appointment"</span>,
+    <span class="k">"vendor_style"</span>: <span class="s">"service_provider"</span>,
+    <span class="k">"latitude"</span>: <span class="s">"33.51023800"</span>,
+    <span class="k">"longitude"</span>: <span class="s">"36.29128600"</span>,
+    <span class="k">"address"</span>: <span class="s">"Mazzeh, Damascus"</span>,
+    <span class="k">"response_time"</span>: <span class="s">"within_2h"</span>,
+    <span class="k">"rating_avg"</span>: <span class="s">"4.80"</span>,
+    <span class="k">"is_approved"</span>: <span class="n">true</span>,
+    <span class="k">"is_active"</span>: <span class="n">true</span>,
+    <span class="k">"is_accepting_bookings"</span>: <span class="n">true</span>,
+    <span class="k">"birth_date"</span>: <span class="s">"1998-04-12T00:00:00.000000Z"</span>,
+    <span class="k">"profile_image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/vendor_images/ab12.jpg"</span>,
+    <span class="k">"cover_image_url"</span>: <span class="n">null</span>,
+    <span class="k">"account_status"</span>: <span class="s">"active"</span>
+    <span class="c">/* ... created_at / updated_at. fcm_token و remember_token غير موجودين */</span>
+  }
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -170,6 +343,26 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">profile_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة jpg/jpeg/png، حد أقصى 2MB.</td></tr>
         <tr><td class="field">cover_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة الغلاف (cover) للبروفايل. jpg/jpeg/png، حد أقصى 2MB. إعادة الرفع تستبدل الصورة القديمة. بيرجع رابطها بحقل <code>cover_image_url</code>.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم التحديث. يرجّع بيانات الـ vendor بعد التعديل (نفس شكل GET profile) مع الروابط المحدّثة للصور.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"vendor"</span>: {
+    <span class="k">"id"</span>: <span class="n">7</span>,
+    <span class="k">"business_name"</span>: <span class="s">"Sara Studio"</span>,
+    <span class="k">"bio"</span>: <span class="s">"Wedding photographer"</span>,
+    <span class="k">"vendor_type"</span>: <span class="s">"photographer"</span>,
+    <span class="k">"booking_style"</span>: <span class="s">"appointment"</span>,
+    <span class="k">"profile_image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/vendor_images/ab12.jpg"</span>,
+    <span class="k">"cover_image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/vendor_covers/cd34.jpg"</span>,
+    <span class="k">"account_status"</span>: <span class="s">"active"</span>
+    <span class="c">/* ... باقي حقول الـ vendor. fcm_token و remember_token غير موجودين */</span>
+  }
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -178,6 +371,13 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة البروفايل الحالية.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الحذف (نفس الرد حتى لو ما كان في صورة أصلاً).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"Profile image removed"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -186,6 +386,13 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة الغلاف (cover) الحالية. رفع صورة غلاف يتم عبر <code>POST /vendor/profile</code> بحقل <code>cover_image</code>.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الحذف (نفس الرد حتى لو ما كان في صورة غلاف أصلاً).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"Cover image removed"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -198,6 +405,13 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">fcm_token</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">الـ device token من Firebase.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم حفظ الـ token. الـ token نفسه لا يُرجَع أبداً في أي رد.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -209,6 +423,39 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع كل منتجات/خدمات الـ vendor المتاحة، مع صورها.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">مصفوفة المنتجات المتاحة فقط (<code>is_available = true</code>). كل منتج معه مصفوفة <code>images</code> وكل صورة فيها <code>image_url</code> (Supabase).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"products"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">15</span>,
+      <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+      <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>,
+      <span class="k">"description"</span>: <span class="s">"Rich dark chocolate, serves 10"</span>,
+      <span class="k">"price"</span>: <span class="s">"150000.00"</span>,
+      <span class="k">"stock"</span>: <span class="n">8</span>,
+      <span class="k">"is_available"</span>: <span class="n">true</span>,
+      <span class="k">"deposit_percent"</span>: <span class="n">20</span>,
+      <span class="k">"meta"</span>: { <span class="c">/* بيانات إضافية حرّة */</span> },
+      <span class="k">"images"</span>: [
+        {
+          <span class="k">"id"</span>: <span class="n">31</span>,
+          <span class="k">"vendor_product_id"</span>: <span class="n">15</span>,
+          <span class="k">"is_primary"</span>: <span class="n">true</span>,
+          <span class="k">"image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/product_images/ab.jpg"</span>
+        }
+        <span class="c">/* ... باقي الصور */</span>
+      ]
+      <span class="c">/* ... created_at / updated_at */</span>
+    }
+    <span class="c">/* ... باقي المنتجات */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -227,6 +474,38 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">meta</td><td class="type">array</td><td><span class="tag t-opt">optional</span></td><td class="ar">بيانات إضافية حرّة (key/value).</td></tr>
         <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">ترتيب الصورة الرئيسية (افتراضي 0).</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الإنشاء. يرجّع المنتج مع صوره (<code>image_url</code> لكل صورة). <code>deposit_percent</code> ثابت 20% من الـ DB.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"product"</span>: {
+    <span class="k">"id"</span>: <span class="n">16</span>,
+    <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+    <span class="k">"name"</span>: <span class="s">"Vanilla Cake"</span>,
+    <span class="k">"description"</span>: <span class="n">null</span>,
+    <span class="k">"price"</span>: <span class="s">"120000.00"</span>,
+    <span class="k">"stock"</span>: <span class="n">10</span>,
+    <span class="k">"is_available"</span>: <span class="n">true</span>,
+    <span class="k">"deposit_percent"</span>: <span class="n">20</span>,
+    <span class="k">"meta"</span>: [],
+    <span class="k">"images"</span>: [
+      {
+        <span class="k">"id"</span>: <span class="n">40</span>,
+        <span class="k">"vendor_product_id"</span>: <span class="n">16</span>,
+        <span class="k">"is_primary"</span>: <span class="n">true</span>,
+        <span class="k">"image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/product_images/ef.jpg"</span>
+      }
+    ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">لم تُرسل أي صورة (<code>images</code> مطلوبة) أو صورة بصيغة/حجم غير مسموح.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"The images field is required."</span>, <span class="k">"errors"</span>: { <span class="k">"images"</span>: [ <span class="s">"..."</span> ] } }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -235,6 +514,28 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">أكثر 5 منتجات مبيعاً (حسب عدد الحجوزات المدفوعة/النشطة).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">حتى 5 منتجات مرتّبة تنازلياً حسب <code>bookings_count</code> (عدد الحجوزات بحالة pending/approved/completed). كل منتج معه صوره.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"products"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">15</span>,
+      <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>,
+      <span class="k">"price"</span>: <span class="s">"150000.00"</span>,
+      <span class="k">"stock"</span>: <span class="n">8</span>,
+      <span class="k">"is_available"</span>: <span class="n">true</span>,
+      <span class="k">"bookings_count"</span>: <span class="n">23</span>,
+      <span class="k">"images"</span>: [ { <span class="k">"is_primary"</span>: <span class="n">true</span>, <span class="k">"image_url"</span>: <span class="s">"https://.../product_images/ab.jpg"</span> } ]
+      <span class="c">/* ... باقي حقول المنتج */</span>
+    }
+    <span class="c">/* ... حتى 5 منتجات */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -247,6 +548,29 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">threshold</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">الحد الأدنى (افتراضي 5). مثال: <code>?threshold=3</code></td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">المنتجات التي عندها <code>stock</code> (غير null) وأقل من أو يساوي الـ threshold، مرتّبة تصاعدياً. يرجّع الـ <code>threshold</code> المستخدم و <code>count</code>.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"threshold"</span>: <span class="n">5</span>,
+  <span class="k">"count"</span>: <span class="n">2</span>,
+  <span class="k">"products"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">18</span>,
+      <span class="k">"name"</span>: <span class="s">"Red Roses Bouquet"</span>,
+      <span class="k">"price"</span>: <span class="s">"75000.00"</span>,
+      <span class="k">"stock"</span>: <span class="n">1</span>,
+      <span class="k">"is_available"</span>: <span class="n">true</span>,
+      <span class="k">"images"</span>: [ { <span class="k">"is_primary"</span>: <span class="n">true</span>, <span class="k">"image_url"</span>: <span class="s">"https://.../product_images/rs.jpg"</span> } ]
+      <span class="c">/* ... باقي حقول المنتج */</span>
+    }
+    <span class="c">/* ... باقي المنتجات منخفضة المخزون */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -259,6 +583,30 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم المنتج في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">المنتج بكامل حقوله وصوره.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"product"</span>: {
+    <span class="k">"id"</span>: <span class="n">15</span>,
+    <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+    <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>,
+    <span class="k">"description"</span>: <span class="s">"Rich dark chocolate, serves 10"</span>,
+    <span class="k">"price"</span>: <span class="s">"150000.00"</span>,
+    <span class="k">"stock"</span>: <span class="n">8</span>,
+    <span class="k">"is_available"</span>: <span class="n">true</span>,
+    <span class="k">"deposit_percent"</span>: <span class="n">20</span>,
+    <span class="k">"images"</span>: [ { <span class="k">"id"</span>: <span class="n">31</span>, <span class="k">"is_primary"</span>: <span class="n">true</span>, <span class="k">"image_url"</span>: <span class="s">"https://.../product_images/ab.jpg"</span> } ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">المنتج غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\VendorProduct] 15"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -275,6 +623,27 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">delete_image_ids[]</td><td class="type">integer[]</td><td><span class="tag t-opt">optional</span></td><td class="ar">أرقام الصور المراد حذفها.</td></tr>
         <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">تحديد الصورة الرئيسية.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم التحديث. يرجّع المنتج بعد التعديل مع الصور المحدّثة (بعد حذف/إضافة الصور).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"product"</span>: {
+    <span class="k">"id"</span>: <span class="n">15</span>,
+    <span class="k">"name"</span>: <span class="s">"Chocolate Cake (updated)"</span>,
+    <span class="k">"price"</span>: <span class="s">"160000.00"</span>,
+    <span class="k">"stock"</span>: <span class="n">6</span>,
+    <span class="k">"is_available"</span>: <span class="n">true</span>,
+    <span class="k">"images"</span>: [ { <span class="k">"id"</span>: <span class="n">44</span>, <span class="k">"is_primary"</span>: <span class="n">false</span>, <span class="k">"image_url"</span>: <span class="s">"https://.../product_images/new.jpg"</span> } ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">المنتج غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\VendorProduct] 15"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -287,6 +656,17 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم المنتج في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الحذف (المنتج وكل صوره من التخزين).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"Product deleted successfully"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">المنتج غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\VendorProduct] 15"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -308,6 +688,49 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط وبيانات العميل (كائن <code>user</code>: id، first_name، last_name، profile_image).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">مصفوفة الحجوزات، الأحدث أولاً. كل حجز فيه <code>user</code> (بيانات العميل) و <code>product</code> و <code>items</code> (كل عنصر: product + quantity + unit_price).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"bookings"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">201</span>,
+      <span class="k">"user_id"</span>: <span class="n">88</span>,
+      <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+      <span class="k">"vendor_product_id"</span>: <span class="n">15</span>,
+      <span class="k">"booking_style"</span>: <span class="s">"order"</span>,
+      <span class="k">"status"</span>: <span class="s">"pending"</span>,
+      <span class="k">"event_type"</span>: <span class="s">"cakes"</span>,
+      <span class="k">"event_date"</span>: <span class="n">null</span>,
+      <span class="k">"delivery_date"</span>: <span class="s">"2026-08-10T00:00:00.000000Z"</span>,
+      <span class="k">"delivery_address"</span>: <span class="s">"Mazzeh, Damascus"</span>,
+      <span class="k">"notes"</span>: <span class="s">"Happy birthday message"</span>,
+      <span class="k">"refund_amount"</span>: <span class="n">null</span>,
+      <span class="k">"user"</span>: {
+        <span class="k">"id"</span>: <span class="n">88</span>,
+        <span class="k">"first_name"</span>: <span class="s">"Lana"</span>,
+        <span class="k">"last_name"</span>: <span class="s">"Khaled"</span>,
+        <span class="k">"profile_image"</span>: <span class="n">null</span>
+      },
+      <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> <span class="c">/* ... */</span> },
+      <span class="k">"items"</span>: [
+        {
+          <span class="k">"id"</span>: <span class="n">310</span>,
+          <span class="k">"vendor_product_id"</span>: <span class="n">15</span>,
+          <span class="k">"quantity"</span>: <span class="n">2</span>,
+          <span class="k">"unit_price"</span>: <span class="s">"150000.00"</span>,
+          <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> }
+        }
+      ]
+      <span class="c">/* ... created_at / updated_at */</span>
+    }
+    <span class="c">/* ... باقي الحجوزات */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -316,6 +739,27 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">آخر 10 طلبات حجز بحالة <code>pending</code> (بانتظار موافقتك)، مع اسم العميل والمنتج.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">حتى 10 حجوزات بحالة <code>pending</code> فقط. <code>user</code> هنا يحمل الاسم فقط (بدون profile_image)، و <code>product</code> يحمل id/name/price.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"bookings"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">201</span>,
+      <span class="k">"status"</span>: <span class="s">"pending"</span>,
+      <span class="k">"booking_style"</span>: <span class="s">"appointment"</span>,
+      <span class="k">"event_date"</span>: <span class="s">"2026-08-20T18:00:00.000000Z"</span>,
+      <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span> },
+      <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Full-day Package"</span>, <span class="k">"price"</span>: <span class="s">"500000.00"</span> }
+      <span class="c">/* ... باقي حقول الحجز */</span>
+    }
+    <span class="c">/* ... حتى 10 */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -324,6 +768,30 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">آخر 10 طلبات لمتاجر الطلبات (<code>booking_style = order</code>)، بدون المسوّدات غير المدفوعة.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">المفتاح هنا <code>orders</code> (وليس bookings). حتى 10 طلبات <code>order</code> باستثناء <code>awaiting_payment</code>. كل طلب معه <code>user</code> و <code>product</code> و <code>items</code>.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"orders"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">205</span>,
+      <span class="k">"booking_style"</span>: <span class="s">"order"</span>,
+      <span class="k">"status"</span>: <span class="s">"approved"</span>,
+      <span class="k">"delivery_date"</span>: <span class="s">"2026-08-10T00:00:00.000000Z"</span>,
+      <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span> },
+      <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> },
+      <span class="k">"items"</span>: [
+        { <span class="k">"quantity"</span>: <span class="n">2</span>, <span class="k">"unit_price"</span>: <span class="s">"150000.00"</span>, <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> } }
+      ]
+      <span class="c">/* ... باقي حقول الطلب */</span>
+    }
+    <span class="c">/* ... حتى 10 */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -332,6 +800,34 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">الفعاليات القادمة: الحجوزات <code>approved</code> التي تاريخها في المستقبل (لمزوّدي المواعيد فقط).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">لمزوّد مواعيد (<code>booking_style = appointment</code>): الحجوزات <code>approved</code> بتاريخ مستقبلي، مرتّبة تصاعدياً حسب <code>event_date</code>. <code>product</code> يحمل id/name فقط.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"bookings"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">210</span>,
+      <span class="k">"status"</span>: <span class="s">"approved"</span>,
+      <span class="k">"event_date"</span>: <span class="s">"2026-08-20T18:00:00.000000Z"</span>,
+      <span class="k">"event_location"</span>: <span class="s">"Sham Palace Hall"</span>,
+      <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span> },
+      <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Full-day Package"</span> }
+      <span class="c">/* ... باقي حقول الحجز */</span>
+    }
+  ]
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">لمتجر طلبات (<code>booking_style = order</code>): لا يوجد تقويم فعاليات — يرجّع مصفوفة فارغة مع ملاحظة.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"bookings"</span>: [],
+  <span class="k">"note"</span>: <span class="s">"Only appointment vendors have upcoming events"</span>
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -344,6 +840,43 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تفاصيل الحجز الكاملة. هنا <code>user</code> يحمل أيضاً <code>phone</code>، و <code>product</code> معه <code>images</code>، إضافة إلى كائن <code>payment</code> (الدفعة).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"booking"</span>: {
+    <span class="k">"id"</span>: <span class="n">201</span>,
+    <span class="k">"status"</span>: <span class="s">"approved"</span>,
+    <span class="k">"booking_style"</span>: <span class="s">"appointment"</span>,
+    <span class="k">"event_date"</span>: <span class="s">"2026-08-20T18:00:00.000000Z"</span>,
+    <span class="k">"event_location"</span>: <span class="s">"Sham Palace Hall"</span>,
+    <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span>, <span class="k">"phone"</span>: <span class="s">"+963955112233"</span>, <span class="k">"profile_image"</span>: <span class="n">null</span> },
+    <span class="k">"product"</span>: {
+      <span class="k">"id"</span>: <span class="n">15</span>,
+      <span class="k">"name"</span>: <span class="s">"Full-day Package"</span>,
+      <span class="k">"price"</span>: <span class="s">"500000.00"</span>,
+      <span class="k">"images"</span>: [ { <span class="k">"is_primary"</span>: <span class="n">true</span>, <span class="k">"image_url"</span>: <span class="s">"https://.../product_images/ab.jpg"</span> } ]
+    },
+    <span class="k">"items"</span>: [ { <span class="k">"quantity"</span>: <span class="n">1</span>, <span class="k">"unit_price"</span>: <span class="s">"500000.00"</span>, <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Full-day Package"</span>, <span class="k">"price"</span>: <span class="s">"500000.00"</span> } } ],
+    <span class="k">"payment"</span>: {
+      <span class="k">"id"</span>: <span class="n">77</span>,
+      <span class="k">"booking_id"</span>: <span class="n">201</span>,
+      <span class="k">"status"</span>: <span class="s">"verified"</span>,
+      <span class="k">"amount_paid"</span>: <span class="s">"100000.00"</span>,
+      <span class="k">"vendor_payout"</span>: <span class="s">"85000.00"</span>
+      <span class="c">/* ... commission وباقي حقول الدفعة */</span>
+    }
+    <span class="c">/* ... created_at / updated_at */</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">الحجز غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\Booking] 201"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -357,6 +890,31 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
       </table>
       <div class="lbl" style="margin-top:8px">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تمت الموافقة (<code>pending</code> → <code>approved</code>). خُصم المخزون وأُضيف العربون للمحفظة (محجوز). يرجّع الحجز بعد التحديث مع <code>user</code>/<code>product</code>/<code>items</code>.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"booking"</span>: {
+    <span class="k">"id"</span>: <span class="n">201</span>,
+    <span class="k">"status"</span>: <span class="s">"approved"</span>,
+    <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span>, <span class="k">"profile_image"</span>: <span class="n">null</span> },
+    <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> },
+    <span class="k">"items"</span>: [ { <span class="k">"quantity"</span>: <span class="n">2</span>, <span class="k">"unit_price"</span>: <span class="s">"150000.00"</span>, <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span> } } ]
+    <span class="c">/* ... باقي حقول الحجز */</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">409</span><span class="resp-desc">أحد المنتجات نفد مخزونه — لا يمكن الموافقة (الخصم الذرّي فشل). الموافقة كلها تفشل معاً.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"error"</span>, <span class="k">"message"</span>: <span class="s">"This product is out of stock — cannot approve"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">الحجز غير موجود، أو لا يخص هذا الـ vendor، أو حالته ليست <code>pending</code> (مثلاً تمت الموافقة عليه سابقاً).</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\Booking] 201"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -370,6 +928,28 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
       </table>
       <div class="lbl" style="margin-top:8px">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الرفض (<code>pending</code> → <code>declined</code>). لا يُخصم مخزون. عند الرفض يُفرَّغ <code>event_date</code> (يُنقل إلى <code>old_event_date</code>) ليتحرر التاريخ.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"booking"</span>: {
+    <span class="k">"id"</span>: <span class="n">201</span>,
+    <span class="k">"status"</span>: <span class="s">"declined"</span>,
+    <span class="k">"event_date"</span>: <span class="n">null</span>,
+    <span class="k">"old_event_date"</span>: <span class="s">"2026-08-20T18:00:00.000000Z"</span>,
+    <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span>, <span class="k">"profile_image"</span>: <span class="n">null</span> },
+    <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Full-day Package"</span> },
+    <span class="k">"items"</span>: [ <span class="c">/* ... */</span> ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">الحجز غير موجود، أو لا يخص هذا الـ vendor، أو حالته ليست <code>pending</code>.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\Booking] 201"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -383,6 +963,30 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الحجز في الـ URL.</td></tr>
       </table>
       <div class="lbl" style="margin-top:8px">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم التعليم كمنتهٍ (<code>approved</code> → <code>completed</code>). يصبح العربون في المحفظة قابلاً للسحب. يرجّع الحجز بعد التحديث.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"booking"</span>: {
+    <span class="k">"id"</span>: <span class="n">201</span>,
+    <span class="k">"status"</span>: <span class="s">"completed"</span>,
+    <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span>, <span class="k">"profile_image"</span>: <span class="n">null</span> },
+    <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Full-day Package"</span> },
+    <span class="k">"items"</span>: [ <span class="c">/* ... */</span> ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">لسّا ما وصل تاريخ الفعالية/التسليم — لا يمكن التعليم كمنتهٍ قبل الموعد.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"error"</span>, <span class="k">"message"</span>: <span class="s">"You can only mark this completed on or after the event/delivery date"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">الحجز غير موجود، أو لا يخص هذا الـ vendor، أو حالته ليست <code>approved</code>.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\Booking] 201"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -395,6 +999,13 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">is_accepting_bookings</td><td class="type">boolean</td><td><span class="tag t-opt">optional</span></td><td class="ar">القيمة المطلوبة. إذا لم تُرسل، يقلب القيمة الحالية (toggle).</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم التبديل. يرجّع القيمة الجديدة فقط.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"is_accepting_bookings"</span>: <span class="n">false</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -403,6 +1014,19 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">تقويم الـ vendor: <code>booked</code> (تواريخ عليها حجوزات نشطة تلقائياً) و <code>blocked</code> (تواريخ عطّلها الـ vendor يدوياً — كل واحد فيه id و date و reason). لمزوّدي المواعيد فقط.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc"><code>booked</code> مصفوفة تواريخ (YYYY-MM-DD) عليها حجوزات نشطة. <code>blocked</code> مصفوفة كائنات (id/date/reason) عطّلها الـ vendor يدوياً.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"booked"</span>: [ <span class="s">"2026-08-20"</span>, <span class="s">"2026-08-25"</span> ],
+  <span class="k">"blocked"</span>: [
+    { <span class="k">"id"</span>: <span class="n">3</span>, <span class="k">"date"</span>: <span class="s">"2026-08-22"</span>, <span class="k">"reason"</span>: <span class="s">"Day off"</span> }
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -416,6 +1040,24 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">date</td><td class="type">date</td><td><span class="tag t-req">required</span></td><td class="ar">اليوم المراد تعطيله (اليوم أو بعده).</td></tr>
         <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب اختياري يظهر للـ vendor، حتى 255.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم تعطيل اليوم. تعطيل يوم معطّل مسبقاً لا يسبّب خطأ (idempotent) ويرجّع نفس الرد.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"blocked"</span>: { <span class="k">"id"</span>: <span class="n">3</span>, <span class="k">"date"</span>: <span class="s">"2026-08-22"</span>, <span class="k">"reason"</span>: <span class="s">"Day off"</span> }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">409</span><span class="resp-desc">اليوم عليه حجز داخل التطبيق أصلاً — لا يمكن تعطيله.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"error"</span>, <span class="k">"message"</span>: <span class="s">"This date already has a booking"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">التاريخ ناقص أو في الماضي (يجب أن يكون اليوم أو بعده).</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"The date field must be a date after or equal to today."</span>, <span class="k">"errors"</span>: { <span class="k">"date"</span>: [ <span class="s">"..."</span> ] } }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -424,6 +1066,17 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يلغي تعطيل يوم (يرجّعه متاحاً). <code>{date}</code> بصيغة YYYY-MM-DD في الـ URL. 404 إذا اليوم مش معطّل.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم إلغاء التعطيل (اليوم صار متاحاً للحجز مجدداً).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"Date unblocked"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">اليوم غير معطّل أصلاً (لا يوجد شيء ليُلغى).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"error"</span>, <span class="k">"message"</span>: <span class="s">"This date is not blocked"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -435,6 +1088,28 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">تقييمات الـ vendor مع اسم صاحب كل تقييم، والعدد الكلي والمعدّل.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">العدد الكلي والمعدّل + مصفوفة التقييمات (الأحدث أولاً)، كل تقييم معه <code>user</code> (الاسم فقط).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"total_reviews"</span>: <span class="n">42</span>,
+  <span class="k">"rating_avg"</span>: <span class="s">"4.80"</span>,
+  <span class="k">"reviews"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">120</span>,
+      <span class="k">"booking_id"</span>: <span class="n">201</span>,
+      <span class="k">"rating"</span>: <span class="n">5</span>,
+      <span class="k">"comment"</span>: <span class="s">"Amazing work!"</span>,
+      <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span> }
+      <span class="c">/* ... created_at */</span>
+    }
+    <span class="c">/* ... باقي التقييمات */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -443,6 +1118,26 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">ملخّص التقييمات: المعدّل، التوزيع على النجوم (1–5) بالنسبة المئوية، نسبة الإيجابي، والاتجاه مقارنة بالشهر الماضي.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc"><code>star_breakdown</code> كائن مفاتيحه "5".."1" وكل واحد فيه count و percent. <code>positive_percent</code> (4+5 نجوم). <code>trend</code> نسبة مقارنة بالشهر الماضي (قد تكون سالبة).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"rating_avg"</span>: <span class="n">4.8</span>,
+  <span class="k">"total_reviews"</span>: <span class="n">42</span>,
+  <span class="k">"star_breakdown"</span>: {
+    <span class="k">"5"</span>: { <span class="k">"count"</span>: <span class="n">34</span>, <span class="k">"percent"</span>: <span class="n">81</span> },
+    <span class="k">"4"</span>: { <span class="k">"count"</span>: <span class="n">5</span>,  <span class="k">"percent"</span>: <span class="n">11.9</span> },
+    <span class="k">"3"</span>: { <span class="k">"count"</span>: <span class="n">2</span>,  <span class="k">"percent"</span>: <span class="n">4.8</span> },
+    <span class="k">"2"</span>: { <span class="k">"count"</span>: <span class="n">1</span>,  <span class="k">"percent"</span>: <span class="n">2.4</span> },
+    <span class="k">"1"</span>: { <span class="k">"count"</span>: <span class="n">0</span>,  <span class="k">"percent"</span>: <span class="n">0</span> }
+  },
+  <span class="k">"positive_percent"</span>: <span class="n">92.9</span>,
+  <span class="k">"trend"</span>: <span class="n">3.2</span>
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -454,6 +1149,28 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">إحصائيات لوحة التحكم: عدد الحجوزات حسب الحالة، إجمالي الأرباح، المعدّل، وعدد التقييمات.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">عدّاد الحجوزات لكل حالة، إجمالي الأرباح (مجموع <code>vendor_payout</code> من الدفعات المؤكّدة)، المعدّل، وعدد التقييمات.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"stats"</span>: {
+    <span class="k">"bookings"</span>: {
+      <span class="k">"total"</span>: <span class="n">120</span>,
+      <span class="k">"pending"</span>: <span class="n">4</span>,
+      <span class="k">"approved"</span>: <span class="n">7</span>,
+      <span class="k">"completed"</span>: <span class="n">102</span>,
+      <span class="k">"declined"</span>: <span class="n">3</span>,
+      <span class="k">"cancelled"</span>: <span class="n">4</span>
+    },
+    <span class="k">"earnings"</span>: <span class="n">8670000</span>,
+    <span class="k">"rating_avg"</span>: <span class="n">4.8</span>,
+    <span class="k">"total_reviews"</span>: <span class="n">42</span>
+  }
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -462,6 +1179,20 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">أرباح هذا الشهر مقابل الشهر الماضي مع نسبة النمو (growth %).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">أرباح الشهر الحالي والماضي ونسبة النمو <code>growth</code> (نسبة مئوية، قد تكون سالبة).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"earnings"</span>: {
+    <span class="k">"this_month"</span>: <span class="n">1250000</span>,
+    <span class="k">"last_month"</span>: <span class="n">1000000</span>,
+    <span class="k">"growth"</span>: <span class="n">25</span>
+  }
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -480,6 +1211,46 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع أرصدة المحفظة (available / pending / total earned) + سجل الحركات (transactions). كل حركة تحتوي الـ booking مع العميل والمنتج. المبلغ <code>amount</code> بإشارة (سالب = خروج).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">الأرصدة + سجل الحركات. <code>type</code>: credit / refund / withdrawal. <code>amount</code> بإشارة (سالب = سحب أو استرجاع). كل حركة معها الـ <code>booking</code> (العميل والمنتج)، والسحب bookingه null.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"wallet"</span>: {
+    <span class="k">"available_balance"</span>: <span class="n">425000</span>,
+    <span class="k">"pending_clearance"</span>: <span class="n">170000</span>,
+    <span class="k">"total_earned"</span>: <span class="n">425000</span>,
+    <span class="k">"currency"</span>: <span class="s">"SYP"</span>,
+    <span class="k">"pending_note"</span>: <span class="s">"Earnings stay pending until the booking is completed (service delivered), then become withdrawable."</span>
+  },
+  <span class="k">"transactions"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">501</span>,
+      <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+      <span class="k">"booking_id"</span>: <span class="n">201</span>,
+      <span class="k">"type"</span>: <span class="s">"credit"</span>,
+      <span class="k">"amount"</span>: <span class="s">"85000.00"</span>,
+      <span class="k">"booking"</span>: {
+        <span class="k">"id"</span>: <span class="n">201</span>,
+        <span class="k">"status"</span>: <span class="s">"completed"</span>,
+        <span class="k">"booking_style"</span>: <span class="s">"appointment"</span>,
+        <span class="k">"user"</span>: { <span class="k">"id"</span>: <span class="n">88</span>, <span class="k">"first_name"</span>: <span class="s">"Lana"</span>, <span class="k">"last_name"</span>: <span class="s">"Khaled"</span> },
+        <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Full-day Package"</span>, <span class="k">"price"</span>: <span class="s">"500000.00"</span> }
+      }
+    },
+    {
+      <span class="k">"id"</span>: <span class="n">502</span>,
+      <span class="k">"booking_id"</span>: <span class="n">null</span>,
+      <span class="k">"type"</span>: <span class="s">"withdrawal"</span>,
+      <span class="k">"amount"</span>: <span class="s">"-200000.00"</span>,
+      <span class="k">"booking"</span>: <span class="n">null</span>
+    }
+    <span class="c">/* ... باقي الحركات */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -488,6 +1259,29 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يسحب كامل الرصيد المتاح (<code>available_balance</code>) ويصفّره. (الدفع الفعلي للبنك سيُضاف لاحقاً عند توفّر ShamCash payout API.) يرجّع خطأ 422 إذا لا يوجد رصيد متاح.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم السحب. يرجّع المبلغ المسحوب وصفّر الرصيد المتاح، مع حركة السحب (<code>amount</code> سالب).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"message"</span>: <span class="s">"Withdrawal successful (real payout pending ShamCash payout API)"</span>,
+  <span class="k">"amount_withdrawn"</span>: <span class="n">425000</span>,
+  <span class="k">"available_balance"</span>: <span class="n">0</span>,
+  <span class="k">"withdrawal"</span>: {
+    <span class="k">"id"</span>: <span class="n">503</span>,
+    <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+    <span class="k">"booking_id"</span>: <span class="n">null</span>,
+    <span class="k">"type"</span>: <span class="s">"withdrawal"</span>,
+    <span class="k">"amount"</span>: <span class="n">-425000</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">لا يوجد رصيد متاح للسحب (available ≤ 0).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"error"</span>, <span class="k">"message"</span>: <span class="s">"No balance available to withdraw yet"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -499,6 +1293,29 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">قائمة إشعارات الـ vendor (الأحدث أولاً) + عدد غير المقروء <code>unread_count</code> (لأيقونة الجرس).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc"><code>unread_count</code> عدد غير المقروء. كل إشعار فيه <code>data</code> (غالباً <code>booking_id</code>) و <code>read_at</code> (null = غير مقروء).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"unread_count"</span>: <span class="n">2</span>,
+  <span class="k">"notifications"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">910</span>,
+      <span class="k">"notifiable_type"</span>: <span class="s">"vendor"</span>,
+      <span class="k">"notifiable_id"</span>: <span class="n">7</span>,
+      <span class="k">"title"</span>: <span class="s">"New Review"</span>,
+      <span class="k">"body"</span>: <span class="s">"You received a 5-star review."</span>,
+      <span class="k">"data"</span>: { <span class="k">"booking_id"</span>: <span class="n">201</span> },
+      <span class="k">"read_at"</span>: <span class="n">null</span>
+      <span class="c">/* ... created_at */</span>
+    }
+    <span class="c">/* ... باقي الإشعارات */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -511,6 +1328,26 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الإشعار في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم التعليم كمقروء. يرجّع الإشعار مع <code>read_at</code> محدّث.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"notification"</span>: {
+    <span class="k">"id"</span>: <span class="n">910</span>,
+    <span class="k">"title"</span>: <span class="s">"New Review"</span>,
+    <span class="k">"body"</span>: <span class="s">"You received a 5-star review."</span>,
+    <span class="k">"data"</span>: { <span class="k">"booking_id"</span>: <span class="n">201</span> },
+    <span class="k">"read_at"</span>: <span class="s">"2026-07-31T10:15:00.000000Z"</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">الإشعار غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"error"</span>, <span class="k">"message"</span>: <span class="s">"Notification not found"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -519,6 +1356,13 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">تعليم كل الإشعارات غير المقروءة كمقروءة.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم تعليم كل غير المقروء كمقروء.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"All notifications marked as read"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -534,6 +1378,34 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع كل عناصر معرض الـ vendor الحالي مع صورها (الأحدث أولاً).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">المفتاح <code>portfolio</code>: مصفوفة العناصر (الأحدث أولاً)، كل عنصر معه <code>images</code> وكل صورة فيها <code>image_url</code> و <code>is_primary</code>.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"portfolio"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="n">61</span>,
+      <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+      <span class="k">"title"</span>: <span class="s">"Sara & Omar Wedding"</span>,
+      <span class="k">"description"</span>: <span class="s">"Full-day coverage"</span>,
+      <span class="k">"images"</span>: [
+        {
+          <span class="k">"id"</span>: <span class="n">140</span>,
+          <span class="k">"portfolio_item_id"</span>: <span class="n">61</span>,
+          <span class="k">"is_primary"</span>: <span class="n">true</span>,
+          <span class="k">"image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/portfolio_images/ab.jpg"</span>
+        }
+        <span class="c">/* ... باقي الصور */</span>
+      ]
+      <span class="c">/* ... created_at / updated_at */</span>
+    }
+    <span class="c">/* ... باقي العناصر */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -549,6 +1421,38 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">description</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">وصف العنصر.</td></tr>
         <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">ترتيب الصورة الرئيسية (افتراضي 0).</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم إنشاء العنصر. المفتاح <code>item</code> معه <code>images</code> (كل صورة فيها <code>image_url</code> على Supabase و <code>is_primary</code>).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"item"</span>: {
+    <span class="k">"id"</span>: <span class="n">62</span>,
+    <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+    <span class="k">"title"</span>: <span class="s">"Sara & Omar Wedding"</span>,
+    <span class="k">"description"</span>: <span class="s">"Full-day coverage"</span>,
+    <span class="k">"images"</span>: [
+      {
+        <span class="k">"id"</span>: <span class="n">141</span>,
+        <span class="k">"portfolio_item_id"</span>: <span class="n">62</span>,
+        <span class="k">"is_primary"</span>: <span class="n">true</span>,
+        <span class="k">"image_url"</span>: <span class="s">"https://xyz.supabase.co/storage/v1/object/public/haflati/portfolio_images/ab.jpg"</span>
+      }
+      <span class="c">/* ... باقي الصور */</span>
+    ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">لا يوجد صور (<code>images</code> مطلوبة) أو صيغة/حجم صورة غير صالح.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"The images field is required."</span>, <span class="k">"errors"</span>: { <span class="k">"images"</span>: [ <span class="s">"..."</span> ] } }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">503</span><span class="resp-desc">فشل رفع الصورة للتخزين (Supabase غير متاح مؤقتاً).</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"Image upload failed — storage unavailable, please try again"</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -561,6 +1465,29 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم العنصر في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">المفتاح <code>item</code>: العنصر مع كل صوره.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"item"</span>: {
+    <span class="k">"id"</span>: <span class="n">61</span>,
+    <span class="k">"vendor_id"</span>: <span class="n">7</span>,
+    <span class="k">"title"</span>: <span class="s">"Sara & Omar Wedding"</span>,
+    <span class="k">"description"</span>: <span class="s">"Full-day coverage"</span>,
+    <span class="k">"images"</span>: [
+      { <span class="k">"id"</span>: <span class="n">140</span>, <span class="k">"is_primary"</span>: <span class="n">true</span>, <span class="k">"image_url"</span>: <span class="s">"https://xyz.supabase.co/.../ab.jpg"</span> }
+      <span class="c">/* ... باقي الصور */</span>
+    ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">العنصر غير موجود، أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\PortfolioItem]."</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -577,6 +1504,28 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">delete_image_ids[]</td><td class="type">integer[]</td><td><span class="tag t-opt">optional</span></td><td class="ar">أرقام الصور المراد حذفها.</td></tr>
         <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">تحديد الصورة الرئيسية بين الصور الجديدة المرفوعة.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم التحديث. المفتاح <code>item</code> معه قائمة الصور المحدّثة (بعد الإضافة/الحذف).</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"item"</span>: {
+    <span class="k">"id"</span>: <span class="n">61</span>,
+    <span class="k">"title"</span>: <span class="s">"Updated title"</span>,
+    <span class="k">"images"</span>: [ <span class="c">/* الصور بعد التعديل، كل صورة فيها image_url */</span> ]
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">العنصر غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\PortfolioItem]."</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">422</span><span class="resp-desc">صورة غير صالحة (نوع/حجم) أو قيمة خاطئة في <code>delete_image_ids</code>.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"The images.0 must be an image."</span>, <span class="k">"errors"</span>: { <span class="c">/* ... */</span> } }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -589,6 +1538,17 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم العنصر في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم الحذف (العنصر وكل صوره من التخزين).</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"Portfolio item deleted"</span> }</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-4">404</span><span class="resp-desc">العنصر غير موجود أو لا يخص هذا الـ vendor.</span></div>
+<pre class="json">{ <span class="k">"message"</span>: <span class="s">"No query results for model [App\\Models\\PortfolioItem]."</span> }</pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -601,6 +1561,19 @@ td.ar{direction:rtl;text-align:right}
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
         <tr><td class="field">{vendorId}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الـ vendor في الـ URL.</td></tr>
       </table>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">نفس شكل <code>GET /vendor/portfolio</code>: المفتاح <code>portfolio</code> مصفوفة العناصر مع صورها. يرجّع مصفوفة فارغة إذا ما في أعمال.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"portfolio"</span>: [
+    { <span class="k">"id"</span>: <span class="n">61</span>, <span class="k">"title"</span>: <span class="s">"Sara & Omar Wedding"</span>, <span class="k">"images"</span>: [ <span class="c">/* كل صورة فيها image_url */</span> ] }
+    <span class="c">/* ... باقي العناصر */</span>
+  ]
+}</pre>
+        </div>
+      </div>
     </div>
   </div>
 
