@@ -22,6 +22,7 @@ class Booking extends Model
         'delivery_address',
         'notes',
         'price_agreed',
+        'responded_at',
         'refund_amount',
         'refund_paid_at',
     ];
@@ -36,6 +37,7 @@ class Booking extends Model
             'price_agreed'    => 'decimal:2',
             'refund_amount'   => 'decimal:2',
             'refund_paid_at'  => 'datetime',
+            'responded_at'    => 'datetime',
         ];
     }
 

@@ -41,21 +41,37 @@ class ReviewController extends Controller
             ], 422);
         }
 
-        // Check if already reviewed
-        if (Review::where('booking_id', $booking->id)->exists()) {
+        // One review per booking (unique booking_id). Look at trashed rows too:
+        // a live review blocks a second one; a soft-deleted one (the user removed
+        // their old review) is restored and overwritten so they can review again.
+        $existing = Review::withTrashed()
+            ->where('booking_id', $booking->id)
+            ->first();
+
+        if ($existing && ! $existing->trashed()) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'You have already reviewed this booking',
             ], 409);
         }
 
-        $review = Review::create([
-            'booking_id' => $booking->id,
-            'user_id'    => $user->id,
-            'vendor_id'  => $booking->vendor_id,
-            'rating'     => $request->rating,
-            'comment'    => $request->comment,
-        ]);
+        if ($existing) {
+            // Re-review: bring the old (deleted) row back with the new content.
+            $existing->restore();
+            $existing->update([
+                'rating'  => $request->rating,
+                'comment' => $request->comment,
+            ]);
+            $review = $existing;
+        } else {
+            $review = Review::create([
+                'booking_id' => $booking->id,
+                'user_id'    => $user->id,
+                'vendor_id'  => $booking->vendor_id,
+                'rating'     => $request->rating,
+                'comment'    => $request->comment,
+            ]);
+        }
 
         $vendor     = $booking->vendor;
         $avg        = Review::where('vendor_id', $vendor->id)->avg('rating');
@@ -71,6 +87,69 @@ class ReviewController extends Controller
         return response()->json([
             'status' => 'success',
             'review' => $review,
+        ]);
+    }
+
+    // The user's own reviews (the ones THEY wrote) — Profile → Activity → Reviews.
+    public function userReviews(Request $request)
+    {
+        $reviews = Review::where('user_id', $request->user()->id)
+            ->with('vendor:id,business_name,profile_image')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status'  => 'success',
+            'reviews' => $reviews,
+        ]);
+    }
+
+    // User edits their own review (rating and/or comment). Only the author can
+    // edit it, and editing recomputes the vendor's rating average.
+    public function update(Request $request, int $id)
+    {
+        $request->validate([
+            'rating'  => 'sometimes|integer|min:1|max:5',
+            'comment' => 'sometimes|nullable|string',
+        ]);
+
+        $review = Review::where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        $review->update($request->only(['rating', 'comment']));
+        $review->refresh();
+
+        // Rating may have changed → recompute the vendor's average.
+        $avg = Review::where('vendor_id', $review->vendor_id)->avg('rating');
+        $review->vendor->update(['rating_avg' => round($avg, 2)]);
+
+        return response()->json([
+            'status' => 'success',
+            'review' => $review,
+        ]);
+    }
+
+    // User deletes their own review. Soft delete — the row stays in the DB
+    // (deleted_at set) but is hidden everywhere. The vendor's average is
+    // recomputed over the remaining visible reviews.
+    public function destroy(Request $request, int $id)
+    {
+        $review = Review::where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        $vendor = $review->vendor;
+        $review->delete(); // soft delete — keeps the row, sets deleted_at
+
+        // Recompute the average over the still-visible reviews (soft-deleted
+        // ones are excluded automatically). No reviews left → average 0.
+        $avg = Review::where('vendor_id', $vendor->id)->avg('rating');
+        $vendor->update(['rating_avg' => round($avg ?? 0, 2)]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Review deleted',
         ]);
     }
 

@@ -22,4 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/storage/app/haflati-d14da-firebase-adminsdk-fbsvc-13bfc3d73d.json
+# Firebase service-account keys — never commit (secret). Wildcard covers any
+# project's key file regardless of its name.
+/storage/app/*firebase-adminsdk*.json

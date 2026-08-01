@@ -463,7 +463,7 @@ class BookingController extends Controller
                 return false;
             }
 
-            $booking->update(['status' => 'approved']);
+            $booking->update(['status' => 'approved', 'responded_at' => now()]);
 
             // Credit the vendor's payout. The money stays in escrow (pending)
             // until the booking is completed — see WalletController::balances().
@@ -555,7 +555,7 @@ class BookingController extends Controller
 
         // No stock change: a pending booking never decremented stock (stock is
         // only taken at approve), so there is nothing to restore here.
-        $booking->update(['status' => 'declined']);
+        $booking->update(['status' => 'declined', 'responded_at' => now()]);
 
         (new NotificationService())->notifyUser(
             $booking->user,
@@ -783,5 +783,62 @@ class BookingController extends Controller
                 'growth'     => $growth, // percent, can be negative
             ],
         ]);
+    }
+
+    // Vendor's average response time — automatically computed as the average gap
+    // between when a booking was PAID (payment.created_at, the moment it became
+    // visible to the vendor) and when the vendor RESPONDED (responded_at, set on
+    // approve/decline). Returned as a moderated range, never an exact figure.
+    // A vendor who has never responded to a booking is marked as new.
+    public function responseTime(Request $request)
+    {
+        $vendor = $request->user();
+
+        // Only bookings the vendor actually acted on, and that have a verified
+        // payment (so there's a real "paid at" moment to measure from).
+        $bookings = Booking::where('vendor_id', $vendor->id)
+            ->whereNotNull('responded_at')
+            ->whereHas('payment', fn ($query) => $query->where('status', 'verified'))
+            ->with('payment:id,booking_id,created_at')
+            ->get();
+
+        if ($bookings->isEmpty()) {
+            return response()->json([
+                'status'        => 'success',
+                'response_time' => [
+                    'is_new' => true, // no bookings answered yet — app shows "New"
+                    'label'  => null,
+                ],
+            ]);
+        }
+
+        // Average gap in minutes between paid time and vendor response time.
+        $avgMinutes = $bookings->avg(function (Booking $booking) {
+            return $booking->payment->created_at->diffInMinutes($booking->responded_at);
+        });
+
+        return response()->json([
+            'status'        => 'success',
+            'response_time' => [
+                'is_new'          => false,
+                'label'           => $this->responseTimeLabel($avgMinutes),
+                'average_minutes' => (int) round($avgMinutes), // raw value if the app wants it
+                'based_on'        => $bookings->count(),       // how many responses it averages
+            ],
+        ]);
+    }
+
+    // Moderate a raw minute average into a human range, so the app shows
+    // "usually replies in 1-2 hours" instead of "43 minutes".
+    private function responseTimeLabel(float $minutes): string
+    {
+        return match (true) {
+            $minutes < 30      => 'under 30 minutes',
+            $minutes < 60      => '30-60 minutes',
+            $minutes < 120     => '1-2 hours',
+            $minutes < 360     => '2-6 hours',
+            $minutes < 1440    => '6-24 hours',
+            default            => 'over a day',
+        };
     }
 }

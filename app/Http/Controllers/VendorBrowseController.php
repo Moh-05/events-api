@@ -39,7 +39,7 @@ class VendorBrowseController extends Controller
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'city', 'rating_avg',
-                'response_time', 'profile_image', 'latitude', 'longitude',
+                'profile_image', 'latitude', 'longitude',
                 'is_accepting_bookings',
             ])
             ->withMin('products', 'price')

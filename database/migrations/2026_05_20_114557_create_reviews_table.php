@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('vendor_id')->constrained()->cascadeOnDelete();
             $table->tinyInteger('rating')->unsigned(); // 1-5
             $table->text('comment')->nullable();
+            $table->softDeletes(); // deleted reviews are hidden, not removed from the DB
             $table->timestamps();
 
             // one review per booking

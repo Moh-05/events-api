@@ -68,6 +68,20 @@ class UserProfileController extends Controller
     }
 
     // Save / update the device FCM token (the app sends it on login)
+    // Log out: revoke ONLY the token used for this request (other devices stay
+    // logged in). Also clears the device's FCM token so it stops getting pushes.
+    public function logout(Request $request)
+    {
+        $user = $request->user();
+        $user->update(['fcm_token' => null]);
+        $user->currentAccessToken()->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Logged out',
+        ]);
+    }
+
     public function updateFcmToken(Request $request)
     {
         $request->validate(['fcm_token' => 'required|string']);

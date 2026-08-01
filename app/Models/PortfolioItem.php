@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PortfolioItem extends Model
 {
+    // HasFactory only enables PortfolioItem::factory(), used by the local demo
+    // seeder (HaflatiDemoSeeder). No behaviour change — see smart-search.md.
+    use HasFactory;
+
     protected $fillable = [
         'vendor_id',
         'title',

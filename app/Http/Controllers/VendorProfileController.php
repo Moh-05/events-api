@@ -32,11 +32,10 @@ class VendorProfileController extends Controller
             'cover_image'   => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
             'vendor_type'   => 'sometimes|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
             'vendor_style'  => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
-            'response_time' => 'sometimes|in:within_1h,within_2h,within_3h,within_24h',
         ]);
 
         $vendor = $request->user();
-        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style', 'response_time']);
+        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style']);
 
         if ($request->filled('vendor_type')) {
             // Seller categories are order-based; every other (service) category is appointment-based.
@@ -123,6 +122,20 @@ class VendorProfileController extends Controller
         return response()->json([
             'status'                => 'success',
             'is_accepting_bookings' => $vendor->is_accepting_bookings,
+        ]);
+    }
+
+    // Log out: revoke ONLY the token used for this request (other devices stay
+    // logged in). Also clears the device's FCM token so it stops getting pushes.
+    public function logout(Request $request)
+    {
+        $vendor = $request->user();
+        $vendor->update(['fcm_token' => null]);
+        $vendor->currentAccessToken()->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Logged out',
         ]);
     }
 
