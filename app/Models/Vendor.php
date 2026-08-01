@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -10,7 +11,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Vendor extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    // HasFactory only enables Vendor::factory(), used by the local demo seeder
+    // (HaflatiDemoSeeder). It changes no existing behaviour — see smart-search.md.
+    use HasApiTokens, Notifiable, HasFactory;
 
     // Local scope: Vendor::active() returns only non-banned vendors.
     // Used on public/customer-facing queries (browse, search). Admin queries
@@ -36,7 +39,6 @@ class Vendor extends Authenticatable
         'longitude',
         'address',
         'bio',
-        'response_time',
         'rating_avg',
         'is_approved',
         'is_active',

@@ -502,7 +502,7 @@ The vendor app is essentially API-complete. The customer app can auth/book/pay/r
 5. `GET /bookings/{id}` — user booking detail (vendor side already has show()).
 6. Favorites/Saved — `GET /saved`, `POST /saved/{productId}`, `DELETE /saved/{productId}` + `is_saved` flag in product JSON. **Assigned to Amer.** (Design: favorites are on PRODUCTS, not vendors.)
 7. `GET /vendors/{id}/booked-dates` — public mirror of the vendor endpoint (booking calendar + "available on my date" filter).
-8. `POST /logout` + `POST /vendor/logout` — MISSING entirely (revoke current Sanctum token). Profile screen has Log Out.
+8. `POST /logout` + `POST /vendor/logout` — DONE 2026-07-31 (revoke current token + null fcm_token). See the 2026-07-31 UPDATES section.
 9. `GET /my-reviews` — user's own reviews (Profile → Activity shows Bookings/Reviews/Saved).
 
 **NOT building:** review replies (vendor replying to reviews) — decided out 2026-07-15 even though the design shows "Replies."
@@ -666,6 +666,44 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 - Homepage `GET /products` (+ `discount_percent` for Best Offers) still the next customer-app build.
 
 > **IMPORTANT — Home page redesigned (build to the NEW design, not the folder).** The Home screen in `desgin system/` (the static handoff copy) is OUTDATED. The current Home is the redesign Mohamad approved with Claude Design — **5 rails**: (1) **Top Rated Vendors** (vendors) → `GET /vendors?sort=top_rated`; (2) **Best Offers** (items with a discount badge + strikethrough price) → needs `discount_percent`; (3) **Discover Services** (service items, horizontal) → `GET /products?type=service`; (4) **Discover Products** (product items, horizontal) → `GET /products?type=product`; (5) **Recently Added** (items, NEW badge) → `GET /products?sort=newest`. Search is always over items (`GET /products?search=`). The occasion selector at the top only changes Top Rated Vendors + the Explore banner (client-side mapping) — it does NOT affect the item rails. Service vs product = the vendor's `booking_style` (`appointment` = service, `order` = product). Build backend to THIS, not the old Home HTML.
+
+---
+
+## UPDATES — 2026-07-31 (Moh session: logout, auto response-time, availability system, vendor toggle, Firebase fix, API docs)
+
+### 1. Logout — NEW (was missing entirely)
+- `POST /logout` (user) + `POST /vendor/logout` (vendor). Revokes ONLY the current request's Sanctum token (other devices stay logged in) and nulls that account's `fcm_token` so the device stops getting pushes. Returns `{status:success, message:"Logged out"}`.
+
+### 2. Vendor response time — now AUTO-computed (manual enum DROPPED)
+- The old vendor-chosen `response_time` enum (`within_1h`…) was **removed** from the vendors migration, Vendor model, profile-update validation, browse select, and VendorFactory.
+- Replaced by `GET /vendor/response-time`: the **average gap** between when a booking was PAID (`payment.created_at`) and when the vendor RESPONDED (`responded_at`). Returned as a **moderated range** (`label`), never an exact number. 6 buckets: under 30 minutes / 30-60 minutes / 1-2 hours / 2-6 hours / 6-24 hours / over a day. Also returns `average_minutes` + `based_on`. A vendor who never responded → `{is_new:true, label:null}` (app shows "New").
+- **New column `bookings.responded_at`** (timestamp, nullable), set in `approve()` and `decline()`. In BookingController.
+
+### 3. Availability calendar (recap — built this session batch, appointment vendors only)
+- Table `vendor_blocked_dates` (`vendor_id`, `date`, `reason`, unique per vendor+date). Model `VendorBlockedDate`; `Vendor::blockedDates()`.
+- `AvailabilityController`: `GET /vendor/availability` (booked auto + blocked manual, labeled), `POST /vendor/blocked-dates` (block; 409 if the day has a booking), `DELETE /vendor/blocked-dates/{date}` (unblock; 404 if not blocked), public `GET /vendors/{id}/availability` (merged unavailable list). `storeAppointment()` also 409s on a manually-blocked date. Replaced the old read-only `/vendor/booked-dates`.
+- Day-level only; per-service hours belong in the product's `meta`.
+
+### 4. Vendor self online/offline toggle (recap)
+- `vendors.is_accepting_bookings` (bool, default true) — vendor-controlled, SEPARATE from admin ban `is_active` (does not block login). `POST /vendor/availability/toggle`. Offline vendor STILL appears in browse (flag returned in JSON so the app shows "not accepting bookings" + disables booking); `store()` 403s a booking to an offline vendor.
+
+### 5. Double-booking race fix (recap — BUG #16)
+- `bookings.event_day` STORED generated column = `DATE(event_date)` + unique index `(vendor_id, event_day)`; `bookings.old_event_date` preserves the date after cancel/decline via a `Booking::saving` hook that nulls `event_date` to free the slot. try/catch on the create → clean 409.
+
+### 6. Firebase project SWITCHED (notifications now work live)
+- Push notifications were failing because the Flutter app and the backend were on **different Firebase projects**. Fixed by switching the BACKEND to the app's project. Railway `FIREBASE_CREDENTIALS_JSON` now holds the `hafleti-80cf0` service-account JSON (was `haflati-d14da`). Local `.env` `FIREBASE_CREDENTIALS` points to the new key file; `.gitignore` now uses `/storage/app/*firebase-adminsdk*.json` (wildcard) so any key name is ignored.
+- Verified LIVE on production: paying a booking for a vendor with a real device token returns `debug_notifications.vendor.sent = true` (two consecutive live pushes confirmed). User side stays `sent:false / no_device_token` only because test users are curl-created with no device. **The Firebase service-account key is a BACKEND secret — never share it with Flutter; the app uses its own `google-services.json` / `GoogleService-Info.plist` from the SAME project.**
+- Reminder: `debug_notifications` in the payment response is a TESTING field — remove before production (kill list).
+
+### 7. Vendor API docs — full response reference + machine-readable test spec (NEW files, committed `305719f` + this session's logout/response-time additions)
+- `docs/vendor-api.html`: every vendor endpoint now shows all its responses (success + errors) with real example JSON, color-coded by status, bilingual. 44 endpoints fully documented (incl. the new logout + response-time).
+- `docs/vendor-api-testing.md`: a machine-consumable spec for the Flutter dev's Claude session — auth bootstrap, every endpoint's exact request/response, invariants as assertions, and 15 ready-to-run end-to-end test scenarios. Built so his Claude can autonomously verify his integration.
+
+### Still open / deferred
+- `dev` local commits + this batch NOT yet pushed/deployed. When deploying: push dev → merge main → **`migrate:fresh --force` on Railway** (new columns: `responded_at`, dropped `response_time`, plus prior `event_day`/`old_event_date`/`is_accepting_bookings`/`cover_image` and tables `booking_items`/`vendor_blocked_dates`) → re-seed admin (`db:seed --class=AdminSeeder`).
+- Homepage `GET /products` (+ `discount_percent`) still the next customer-app build.
+- PRE-EXISTING gap still open (Mohamad wants to discuss): public `products/reviews/portfolio` endpoints don't gate on `is_approved`/`is_active`.
+- Smart Search groundwork (`smart-search.md`, `HaflatiDemoSeeder`, factories) added — see that file; local-only seeder, never run on Railway.
 
 ---
 

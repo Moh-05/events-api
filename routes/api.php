@@ -51,6 +51,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/fcm-token', [UserProfileController::class, 'updateFcmToken']);
+    Route::post('/logout', [UserProfileController::class, 'logout']);
 
     // Bookings (User)
     Route::get('/bookings', [BookingController::class, 'index']);
@@ -60,6 +61,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Reviews
     Route::post('/reviews', [ReviewController::class, 'store']);
+    Route::get('/my-reviews', [ReviewController::class, 'userReviews']);      // reviews the user wrote
+    Route::post('/reviews/{id}', [ReviewController::class, 'update']);        // edit own review (POST, form-data friendly)
+    Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);     // soft-delete own review
 
     // Payments
     Route::post('/payments/verify', [PaymentController::class, 'verify']);
@@ -85,6 +89,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);
+    Route::post('/vendor/logout', [VendorProfileController::class, 'logout']);
 
     // Products
     Route::get('/vendor/products', [VendorProductController::class, 'getVendorProducts']);
@@ -123,6 +128,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     // Stats (Vendor)
     Route::get('/vendor/stats', [BookingController::class, 'stats']);
     Route::get('/vendor/earnings', [BookingController::class, 'earnings']); // month-over-month growth
+    Route::get('/vendor/response-time', [BookingController::class, 'responseTime']); // auto-computed avg response range
 
     // Wallet (Vendor)
     Route::get('/vendor/wallet', [WalletController::class, 'show']);       // balances + transactions

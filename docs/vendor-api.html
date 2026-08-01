@@ -415,6 +415,21 @@ pre.json .c{color:#5a5470}      /* comment  */
     </div>
   </div>
 
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/logout</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تسجيل خروج: يلغي فقط الـ token المستخدم في هذا الطلب (الأجهزة الأخرى تبقى مسجّلة دخول)، ويمسح الـ FCM token لهذا الجهاز حتى يتوقف عن استقبال الإشعارات.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">تم تسجيل الخروج وإلغاء الـ token الحالي.</span></div>
+<pre class="json">{ <span class="k">"status"</span>: <span class="s">"success"</span>, <span class="k">"message"</span>: <span class="s">"Logged out"</span> }</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════════ 3 · PRODUCTS ═══════════ -->
   <h2 id="products">3 · Products / Services <span style="font-size:14px;color:var(--dim)">— المنتجات / الخدمات</span></h2>
 
@@ -1189,6 +1204,39 @@ pre.json .c{color:#5a5470}      /* comment  */
     <span class="k">"this_month"</span>: <span class="n">1250000</span>,
     <span class="k">"last_month"</span>: <span class="n">1000000</span>,
     <span class="k">"growth"</span>: <span class="n">25</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/response-time</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">متوسط وقت استجابة الـ vendor، محسوب <b>تلقائياً</b>: معدّل الفرق بين وقت دفع الحجز (يصير مرئي للـ vendor) ووقت رد الـ vendor عليه (قبول أو رفض). يُرجَع كـ <b>مدى (range)</b> وليس رقماً دقيقاً. الـ vendor يلي ما رد على أي حجز بعد → <code>is_new: true</code>.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+      <div class="lbl" style="margin-top:12px">Responses</div>
+      <div class="resp">
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">عنده بيانات: <code>label</code> هو المدى المعروض (مثلاً "1-2 hours"). <code>average_minutes</code> القيمة الخام، <code>based_on</code> عدد الحجوزات المحسوب عليها. القيم الممكنة للـ label: under 30 minutes · 30-60 minutes · 1-2 hours · 2-6 hours · 6-24 hours · over a day.</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"response_time"</span>: {
+    <span class="k">"is_new"</span>: <span class="n">false</span>,
+    <span class="k">"label"</span>: <span class="s">"1-2 hours"</span>,
+    <span class="k">"average_minutes"</span>: <span class="n">113</span>,
+    <span class="k">"based_on"</span>: <span class="n">2</span>
+  }
+}</pre>
+        </div>
+        <div class="resp-item">
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">vendor جديد لم يرد على أي حجز بعد → التطبيق يعرض "New".</span></div>
+<pre class="json">{
+  <span class="k">"status"</span>: <span class="s">"success"</span>,
+  <span class="k">"response_time"</span>: {
+    <span class="k">"is_new"</span>: <span class="n">true</span>,
+    <span class="k">"label"</span>: <span class="n">null</span>
   }
 }</pre>
         </div>

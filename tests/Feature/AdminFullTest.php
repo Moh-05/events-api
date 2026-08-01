@@ -255,8 +255,10 @@ class AdminFullTest extends TestCase
             ->deleteJson("/api/admin/reviews/{$review->id}")
             ->assertOk();
 
-        $this->assertDatabaseMissing('reviews', ['id' => $review->id]);
-        $this->assertEquals(0, $v->fresh()->rating_avg); // no reviews left → 0
+        // Reviews are soft-deleted: the row stays in the DB (deleted_at set) but
+        // is hidden from all normal queries and excluded from the rating average.
+        $this->assertSoftDeleted('reviews', ['id' => $review->id]);
+        $this->assertEquals(0, $v->fresh()->rating_avg); // no visible reviews left → 0
     }
 
     public function test_delete_product_and_portfolio(): void
