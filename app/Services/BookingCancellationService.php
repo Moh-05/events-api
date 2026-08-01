@@ -22,7 +22,12 @@ class BookingCancellationService
 
     // Returns a small summary. Safe to call on any booking — a booking that is
     // already finished (completed/cancelled/declined) is left untouched.
-    public function cancelByPlatform(Booking $booking, string $reason, bool $notify = true): array
+    //
+    // $chargeCommission (vendor-requested cancellation): the vendor backed out
+    // of a booking he committed to, so HE bears the platform's commission — it
+    // is charged to his wallet on top of reversing his credit. The customer
+    // still gets 100% back and the platform keeps its cut.
+    public function cancelByPlatform(Booking $booking, string $reason, bool $notify = true, bool $chargeCommission = false): array
     {
         // Idempotency guard: only in-flight bookings can be cancelled.
         if (! in_array($booking->status, ['awaiting_payment', 'pending', 'approved'], true)) {
@@ -34,11 +39,14 @@ class BookingCancellationService
 
         // The customer is owed back everything they paid (full refund). Recorded
         // on the booking so admins have a "refunds due" list to pay out manually.
-        $paid         = (float) Payment::where('booking_id', $booking->id)
-            ->where('status', 'verified')->value('amount_paid');
+        $payment      = Payment::where('booking_id', $booking->id)
+            ->where('status', 'verified')->first();
+        $paid         = (float) ($payment->amount_paid ?? 0);
         $refundAmount = $refundPercent > 0 ? round($paid, 2) : 0.0;
 
-        DB::transaction(function () use ($booking, $wasStatus, $refundAmount) {
+        $commission = $chargeCommission ? round((float) ($payment->commission ?? 0), 2) : 0.0;
+
+        DB::transaction(function () use ($booking, $wasStatus, $refundAmount, $commission) {
             // Only an APPROVED booking has moved money/stock: the vendor was
             // credited and one unit of stock was taken. Reverse both.
             if ($wasStatus === 'approved') {
@@ -48,6 +56,18 @@ class BookingCancellationService
             // awaiting_payment → nothing paid. pending → paid but the vendor was
             // never credited (credit happens on approve), so the platform still
             // holds the money; the refund is handled off-platform (payout API).
+
+            // Vendor-requested cancel: charge the platform's commission to the
+            // vendor's wallet (may push it negative — he owes the platform and
+            // can't withdraw until future earnings cover it).
+            if ($commission > 0) {
+                WalletTransaction::create([
+                    'vendor_id'  => $booking->vendor_id,
+                    'booking_id' => $booking->id,
+                    'type'       => 'commission',
+                    'amount'     => -1 * $commission,
+                ]);
+            }
 
             $booking->update([
                 'status'        => 'cancelled',
@@ -67,11 +87,12 @@ class BookingCancellationService
         }
 
         return [
-            'cancelled'      => true,
-            'from_status'    => $wasStatus,
-            'refund_percent' => $refundPercent,
-            'refund_amount'  => $refundAmount,
-            'booking_id'     => $booking->id,
+            'cancelled'          => true,
+            'from_status'        => $wasStatus,
+            'refund_percent'     => $refundPercent,
+            'refund_amount'      => $refundAmount,
+            'commission_charged' => $commission,
+            'booking_id'         => $booking->id,
         ];
     }
 

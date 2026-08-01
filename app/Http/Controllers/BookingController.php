@@ -6,11 +6,16 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\VendorProduct;
 use App\Models\WalletTransaction;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
+    public function __construct(private NotificationService $notifications)
+    {
+    }
+
     // Customer sends a booking request
     public function store(Request $request)
     {
@@ -348,9 +353,27 @@ class BookingController extends Controller
             ->where('status', 'pending')
             ->firstOrFail();
 
+        // A pending booking is PAID (pay-first flow). Declining it means the
+        // customer is owed everything back — record it so the refund shows up
+        // in the admin's refunds-due list instead of silently vanishing.
+        $paid = (float) Payment::where('booking_id', $booking->id)
+            ->where('status', 'verified')->value('amount_paid');
+
         // No stock change: a pending booking never decremented stock (stock is
         // only taken at approve), so there is nothing to restore here.
-        $booking->update(['status' => 'declined']);
+        $booking->update([
+            'status'        => 'declined',
+            'refund_amount' => $paid > 0 ? round($paid, 2) : null,
+        ]);
+
+        $this->notifications->notifyUser(
+            $booking->user,
+            'Booking declined',
+            $paid > 0
+                ? 'The vendor declined your booking. A full refund is due to you.'
+                : 'The vendor declined your booking.',
+            ['booking_id' => (string) $booking->id]
+        );
 
         return response()->json([
             'status'  => 'success',

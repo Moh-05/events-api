@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haflati — Admin System Reference</title>
+<style>
+:root{
+  --bg:#15131f;--bg2:#1e1b2e;--card:#262236;--card2:#2e2942;
+  --gold:#C9A84C;--gold2:#e6c86a;--text:#E8E4F0;--dim:#9890B0;
+  --green:#4CAF7D;--red:#E05050;--amber:#FCD34D;--blue:#5B9BD5;--purple:#9B7BD4;
+  --border:rgba(201,168,76,.2);--line:rgba(255,255,255,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.65;padding:36px 18px}
+.wrap{max-width:1060px;margin:0 auto}
+h1{color:var(--gold);font-size:32px;letter-spacing:.3px}
+.sub{color:var(--dim);margin:6px 0 26px;font-size:14px}
+h2{color:var(--gold);font-size:22px;margin:38px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+h3{color:var(--text);font-size:16px;margin:20px 0 10px}
+p{color:var(--dim);margin-bottom:12px}
+strong{color:var(--text)}
+code{background:#0f0d18;color:var(--gold2);padding:2px 7px;border-radius:5px;font-family:'Consolas',monospace;font-size:12.5px}
+.lead{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin:18px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:uppercase;letter-spacing:.5px}
+.allow{color:var(--green);font-weight:700}.deny{color:var(--red);font-weight:700}
+
+/* endpoint rows */
+.ep{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:13px 16px;margin:9px 0;display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start}
+.ep .path{font-family:'Consolas',monospace;font-size:13.5px;color:var(--gold2);word-break:break-all}
+.ep .desc{color:var(--dim);font-size:13px;margin-top:3px}
+.ep .desc b{color:var(--text)}
+.q{color:var(--purple);font-family:monospace;font-size:11.5px}
+.m{font-family:monospace;font-size:11px;font-weight:800;padding:3px 0;border-radius:5px;text-align:center;letter-spacing:.5px}
+.get{background:rgba(91,155,213,.16);color:var(--blue)}
+.post{background:rgba(252,211,77,.16);color:var(--amber)}
+.del{background:rgba(224,80,80,.16);color:#ff8a8a}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle}
+.b-super{background:rgba(201,168,76,.18);color:var(--gold2)}
+.b-both{background:rgba(76,175,125,.16);color:var(--green)}
+.b-public{background:rgba(152,144,176,.18);color:var(--dim)}
+.pill{display:inline-block;font-family:monospace;font-size:11px;padding:2px 9px;border-radius:5px;margin:2px 4px 2px 0}
+.p-active{background:rgba(76,175,125,.15);color:var(--green)}
+.p-wind{background:rgba(252,211,77,.15);color:var(--amber)}
+.p-ban{background:rgba(224,80,80,.15);color:#ff8a8a}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.concept{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.concept h3{margin-top:0;color:var(--gold)}
+.flow{font-family:monospace;font-size:12.5px;color:var(--dim);background:#0f0d18;border-radius:8px;padding:12px 14px;white-space:pre-wrap;line-height:1.7}
+.tag{font-size:11px;color:var(--dim)}
+.foot{margin-top:44px;color:#5a5470;font-size:12px;text-align:center;border-top:1px solid var(--line);padding-top:18px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}.ep{grid-template-columns:56px 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Admin System — Full Reference</h1>
+  <div class="sub">Haflati · حفلتي — API + behaviour reference for the admin panel (for the React frontend design). All routes are prefixed with <code>/api</code>.</div>
+
+  <!-- ROLES -->
+  <div class="lead">
+    <h3 style="margin-top:0">Two roles, two layers of auth</h3>
+    <p>Every admin route sits behind <code>auth:admins</code> (a dedicated Sanctum guard). Sensitive routes add a <code>role:</code> layer. Login is throttled to 5 tries/min.</p>
+    <p style="margin-bottom:0">
+      <span class="badge b-super">super_admin</span> full control — bans, money, disputes, moderation, managing admins.<br>
+      <span class="badge b-both">super_admin + support</span> view + KYC only. Support never touches money, bans, or content deletion.
+    </p>
+  </div>
+
+  <!-- PERMISSION MATRIX -->
+  <h2>1 · Permission matrix</h2>
+  <table>
+    <tr><th>Capability</th><th>super_admin</th><th>support</th></tr>
+    <tr><td>Dashboard + all list/detail views</td><td class="allow">ALLOW</td><td class="allow">ALLOW (read-only)</td></tr>
+    <tr><td>Vendor KYC — approve / reject</td><td class="allow">ALLOW</td><td class="allow">ALLOW</td></tr>
+    <tr><td>Ban / unban vendor &amp; user</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Cancel + refund a booking (dispute)</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Delete review / product / portfolio</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Payments, wallets, financial stats</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Refunds-due &amp; withdrawals + mark paid</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Audit log · manage admin accounts</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+  </table>
+
+  <!-- AUTH -->
+  <h2>2 · Authentication</h2>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/login</span> <span class="badge b-public">public</span><div class="desc">Email + password → returns a Sanctum <b>token</b> + admin <code>{id,name,email,role}</code>. Throttled 5/min. 401 on bad credentials.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/logout</span> <span class="badge b-public">any admin</span><div class="desc">Revokes the current access token.</div></div></div>
+
+  <!-- DASHBOARD -->
+  <h2>3 · Dashboard &amp; statistics</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/dashboard</span> <span class="badge b-both">both</span><div class="desc">Headline overview: <code>total_users</code>, vendors (<code>total / approved / pending / banned</code>), bookings (<code>total / active / completed</code>), and profit (<code>profit_today / profit_month / profit_all_time</code>).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/stats/financial</span> <span class="badge b-super">super_admin</span><div class="desc">Full money report. <b>summary</b> (all-time <code>gross_volume</code>, <code>platform_profit</code>, <code>vendor_payouts</code>, <code>transactions</code>) + <b>today / this_month / this_year</b> windows + <b>monthly_trend</b> (last 12 months, zero-filled → ready for a chart).</div></div></div>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="concept">
+      <h3>Money vocabulary</h3>
+      <p style="margin:0"><code>gross_volume</code> — what customers paid.<br><code>platform_profit</code> — the commission (your cut). <br><code>vendor_payouts</code> — what vendors earned.</p>
+    </div>
+    <div class="concept">
+      <h3>Chart-ready</h3>
+      <p style="margin:0"><code>monthly_trend</code> is an array of 12 <code>{month, gross_volume, platform_profit, transactions}</code>, oldest→newest, gaps filled with 0. Feed straight into a bar/line chart.</p>
+    </div>
+  </div>
+
+  <!-- VENDORS -->
+  <h2>4 · Vendors</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?search=</span> (name/business/phone) &nbsp; <span class="q">?is_active=0|1</span></div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/pending</span> <span class="badge b-both">both</span><div class="desc">KYC queue — vendors awaiting approval (<code>is_approved=false</code>).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/{id}</span> <span class="badge b-both">both</span><div class="desc">One vendor + their products. Includes <code>account_status</code> (see §9).</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/approve</span> <span class="badge b-both">both</span><div class="desc">Approve KYC → <code>is_approved=true</code>, clears any rejection reason.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/reject</span> <span class="badge b-both">both</span><div class="desc">Reject KYC with a <b>required</b> <code>reason</code>. Stored on the vendor. Does NOT ban an active vendor — that's separate.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/ban</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Immediate ban.</b> Cancels + refunds ALL in-flight bookings, then fully bans. Optional <code>reason</code>. → <code>account_status: banned</code>. Use for fraud / urgent.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/ban-gradual</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Ban after winding down.</b> Refunds pending bookings, keeps <code>approved</code> ones so the vendor can finish, then auto-bans when the last one is done. → <code>account_status: winding_down</code>.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/unban</span> <span class="badge b-super">super_admin</span><div class="desc">Reinstate a banned / winding-down vendor → <code>account_status: active</code>.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/{id}/wallet</span> <span class="badge b-super">super_admin</span><div class="desc">A vendor's wallet: <code>available_balance</code>, <code>pending_clearance</code>, <code>total_earned</code> + full ledger. For money disputes.</div></div></div>
+
+  <!-- USERS -->
+  <h2>5 · Users</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/users</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?search=</span> (name / phone).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/users/{id}</span> <span class="badge b-both">both</span><div class="desc">One user + their bookings (with vendor &amp; product).</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/users/{id}/toggle</span> <span class="badge b-super">super_admin</span><div class="desc">Ban / unban a user (flips <code>is_active</code>). A banned user can't use the app.</div></div></div>
+
+  <!-- BOOKINGS -->
+  <h2>6 · Bookings &amp; disputes</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/bookings</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?status=</span> <span class="q">?vendor_id=</span> <span class="q">?user_id=</span></div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/bookings/{id}</span> <span class="badge b-both">both</span><div class="desc">Full booking: customer, vendor, product, and <b>payment</b>.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/bookings/{id}/cancel</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Dispute resolution.</b> Cancels ONE booking, refunds the customer <b>100%</b>, reverses the vendor's credit — the vendor's account is untouched. <code>reason</code> required.</div></div></div>
+
+  <!-- MODERATION -->
+  <h2>7 · Content moderation</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/reviews</span> <span class="badge b-both">both</span><div class="desc">Paginated reviews. <span class="q">?vendor_id=</span></div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/reviews/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Delete an abusive review, then recompute the vendor's <code>rating_avg</code>.</div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/products/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Remove an inappropriate product listing (and its images from storage).</div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/portfolio/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Remove an inappropriate portfolio item (and its images).</div></div></div>
+
+  <!-- MONEY OVERSIGHT -->
+  <h2>8 · Money oversight</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/payments</span> <span class="badge b-super">super_admin</span><div class="desc">All incoming payments (with booking → user &amp; vendor).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/refunds-due</span> <span class="badge b-super">super_admin</span><div class="desc">Cancelled bookings that still owe the customer money + <code>total_due</code>. This is the "to-pay-out" worklist.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/refunds/{id}/mark-paid</span> <span class="badge b-super">super_admin</span><div class="desc">After sending the money manually, mark the refund paid → it drops off the list.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/withdrawals</span> <span class="badge b-super">super_admin</span><div class="desc">Vendor withdrawal requests + <code>total_unpaid</code>. <span class="q">?unpaid=1</span> for outstanding only.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/withdrawals/{id}/mark-paid</span> <span class="badge b-super">super_admin</span><div class="desc">Mark a vendor payout as sent.</div></div></div>
+  <p class="tag">⚠️ The actual money send is manual for now — real automated payout waits on the ShamCash payout API. These endpoints give full visibility + tracking today.</p>
+
+  <!-- AUDIT + ADMINS -->
+  <h2>9 · Audit &amp; admin accounts</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/audit-logs</span> <span class="badge b-super">super_admin</span><div class="desc">Every sensitive action, newest first: who (admin), what (action), on what (target), when. Every mutating action is logged.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/admins</span> <span class="badge b-super">super_admin</span><div class="desc">List admin accounts (id, name, email, role, last_login_at).</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/admins</span> <span class="badge b-super">super_admin</span><div class="desc">Create an admin (usually a <code>support</code> account). <code>name,email,password,role</code>.</div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/admins/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Delete an admin. Can't delete your own account.</div></div></div>
+
+  <!-- KEY CONCEPTS -->
+  <h2>10 · Key concepts (behaviour)</h2>
+
+  <h3>Vendor account states</h3>
+  <div class="flow"><span class="pill p-active">active</span> is_active=1               → normal, visible, takes bookings
+<span class="pill p-wind">winding_down</span> is_active=0, winding_down=1 → hidden + no new bookings, but can log in
+                                to FINISH existing approved bookings
+<span class="pill p-ban">banned</span> is_active=0, winding_down=0 → fully blocked
+</div>
+  <p>The API exposes a computed <code>account_status</code> = <code>active | winding_down | banned</code> on every vendor object — use it directly for status badges/filters in the UI.</p>
+
+  <div class="grid2">
+    <div class="concept">
+      <h3>Two ban modes</h3>
+      <div class="flow"><b style="color:#ff8a8a">Immediate</b>  → cancel + refund ALL,
+             ban now. (fraud)
+<b style="color:var(--amber)">Gradual</b>    → refund pending, keep
+             approved, auto-ban when
+             done. (normal removal)</div>
+    </div>
+    <div class="concept">
+      <h3>Escrow (why refunds are safe)</h3>
+      <p style="margin:0">A vendor's earnings stay <b>pending</b> until the booking is <b>completed</b> (service delivered) — not withdrawable before. So if a booking is cancelled/banned before the event, the money is still held and the customer can always be refunded.</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:18px">Refund fairness</h3>
+  <table>
+    <tr><th>Who cancels</th><th>Customer gets back</th></tr>
+    <tr><td>Platform (admin ban / dispute)</td><td class="allow">100% — customer did nothing wrong</td></tr>
+    <tr><td>Customer, within 24h of approval</td><td>100%</td></tr>
+    <tr><td>Customer, 24–72h</td><td>50%</td></tr>
+    <tr><td>Customer, after 72h</td><td>0%</td></tr>
+  </table>
+  <p>The amount owed is stored on the booking (<code>refund_amount</code>, <code>refund_paid_at</code>) so it shows up in <code>/admin/refunds-due</code> until paid.</p>
+
+  <!-- QUICK REFERENCE -->
+  <h2>11 · Quick reference — all endpoints</h2>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Role</th></tr>
+    <tr><td>POST</td><td><code>/admin/login</code></td><td>public</td></tr>
+    <tr><td>POST</td><td><code>/admin/logout</code></td><td>any</td></tr>
+    <tr><td>GET</td><td><code>/admin/dashboard</code></td><td>both</td></tr>
+    <tr><td>GET</td><td><code>/admin/stats/financial</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/vendors</code> · <code>/pending</code> · <code>/{id}</code></td><td>both</td></tr>
+    <tr><td>POST</td><td><code>/admin/vendors/{id}/approve</code> · <code>/reject</code></td><td>both</td></tr>
+    <tr><td>POST</td><td><code>/admin/vendors/{id}/ban</code> · <code>/ban-gradual</code> · <code>/unban</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/vendors/{id}/wallet</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/users</code> · <code>/{id}</code></td><td>both</td></tr>
+    <tr><td>POST</td><td><code>/admin/users/{id}/toggle</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/bookings</code> · <code>/{id}</code></td><td>both</td></tr>
+    <tr><td>POST</td><td><code>/admin/bookings/{id}/cancel</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/reviews</code></td><td>both</td></tr>
+    <tr><td>DELETE</td><td><code>/admin/reviews/{id}</code> · <code>/products/{id}</code> · <code>/portfolio/{id}</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/payments</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/refunds-due</code></td><td>super</td></tr>
+    <tr><td>POST</td><td><code>/admin/refunds/{id}/mark-paid</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/withdrawals</code></td><td>super</td></tr>
+    <tr><td>POST</td><td><code>/admin/withdrawals/{id}/mark-paid</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/audit-logs</code></td><td>super</td></tr>
+    <tr><td>GET/POST/DELETE</td><td><code>/admin/admins</code> · <code>/{id}</code></td><td>super</td></tr>
+  </table>
+
+  <div class="foot">Haflati · Admin module — built &amp; tested (20 feature tests). Generated as a design reference for the React admin panel · 2026</div>
+</div>
+</body>
+</html>

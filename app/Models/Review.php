@@ -32,4 +32,10 @@ class Review extends Model
     {
         return $this->belongsTo(Vendor::class);
     }
+
+    public function reports()
+    {
+        return $this->hasMany(ContentReport::class, 'reportable_id')
+            ->where('reportable_type', 'review');
+    }
 }

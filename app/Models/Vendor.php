@@ -66,8 +66,16 @@ class Vendor extends Authenticatable
     //   active        → normal
     //   winding_down  → banned, but still finishing existing bookings
     //   banned        → fully blocked
-    public function getAccountStatusAttribute(): string
+    public function getAccountStatusAttribute(): ?string
     {
+        // A column-limited select (vendor:id,business_name) doesn't load the
+        // two source flags — computing on their null would fabricate "banned"
+        // for a perfectly active vendor. No data → no status.
+        if (! array_key_exists('is_active', $this->attributes)
+            || ! array_key_exists('winding_down', $this->attributes)) {
+            return null;
+        }
+
         if ($this->is_active) {
             return 'active';
         }

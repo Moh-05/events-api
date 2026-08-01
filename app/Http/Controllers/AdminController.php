@@ -9,9 +9,11 @@ use App\Models\Payment;
 use App\Models\Review;
 use App\Models\VendorProduct;
 use App\Models\PortfolioItem;
+use App\Models\ContentReport;
 use App\Models\WalletTransaction;
 use App\Models\AdminAuditLog;
 use App\Services\BookingCancellationService;
+use App\Services\NotificationService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +23,7 @@ class AdminController extends Controller
     public function __construct(
         private BookingCancellationService $cancellation,
         private WalletService $wallet,
+        private NotificationService $notifications,
     ) {
     }
 
@@ -39,7 +42,7 @@ class AdminController extends Controller
                 'total_users'        => User::count(),
                 'total_vendors'      => Vendor::count(),
                 'approved_vendors'   => Vendor::where('is_approved', true)->count(),
-                'pending_vendors'    => Vendor::where('is_approved', false)->count(),
+                'pending_vendors'    => Vendor::where('is_approved', false)->where('is_active', true)->count(),
                 'banned_vendors'     => Vendor::where('is_active', false)->count(),
                 'total_bookings'     => Booking::count(),
                 'active_bookings'    => Booking::whereIn('status', ['pending', 'approved'])->count(),
@@ -55,10 +58,32 @@ class AdminController extends Controller
     // ── Vendors ──────────────────────────────────────────────────
 
     // All vendors (paginated, searchable) — view: super_admin + support
-    // ?is_active=0|1 to filter, ?search= to match name / business / phone.
+    // ?status=kyc_pending|active|winding_down|banned matches the list's tabs.
+    // ?is_active=0|1 still works. ?search= matches name / business / phone.
     public function vendors(Request $request)
     {
         $query = Vendor::latest();
+
+        // Account-state tabs — a true PARTITION (each vendor matches exactly
+        // one, so the tab counts add up):
+        //   kyc_pending  → not yet approved (and not banned)
+        //   active       → approved and running
+        //   winding_down → banned but finishing existing bookings
+        //   banned       → fully blocked (approved or not)
+        switch ($request->status) {
+            case 'kyc_pending':
+                $query->where('is_approved', false)->where('is_active', true);
+                break;
+            case 'active':
+                $query->where('is_active', true)->where('is_approved', true);
+                break;
+            case 'winding_down':
+                $query->where('is_active', false)->where('winding_down', true);
+                break;
+            case 'banned':
+                $query->where('is_active', false)->where('winding_down', false);
+                break;
+        }
 
         if ($request->filled('is_active')) {
             $query->where('is_active', $request->boolean('is_active'));
@@ -81,17 +106,25 @@ class AdminController extends Controller
     }
 
     // Single vendor detail (for KYC review) — view: super_admin + support
+    // Carries bookings_count + reviews_count for the detail panel's stats.
     public function vendorDetail(int $id)
     {
-        $vendor = Vendor::with('products')->findOrFail($id);
+        $vendor = Vendor::with('products')
+            ->withCount(['bookings', 'reviews'])
+            ->findOrFail($id);
 
         return response()->json(['status' => 'success', 'vendor' => $vendor]);
     }
 
     // Pending KYC (paginated) — view: super_admin + support
+    // Banned vendors are excluded: there is nothing to review on a blocked
+    // account (same rule as the vendors list's kyc_pending tab).
     public function pendingVendors()
     {
-        $vendors = Vendor::where('is_approved', false)->latest()->paginate(20);
+        $vendors = Vendor::where('is_approved', false)
+            ->where('is_active', true)
+            ->latest()
+            ->paginate(20);
 
         return response()->json(['status' => 'success', 'vendors' => $vendors]);
     }
@@ -266,10 +299,15 @@ class AdminController extends Controller
     // ── Users ────────────────────────────────────────────────────
 
     // All users (paginated, searchable) — view: super_admin + support
-    // ?search= matches name / phone.
+    // ?search= matches name / phone. ?is_active=0|1 filters banned/active.
+    // Each row carries bookings_count for the list's "bookings" column.
     public function users(Request $request)
     {
-        $query = User::latest();
+        $query = User::withCount('bookings')->latest();
+
+        if ($request->filled('is_active')) {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
 
         if ($request->filled('search')) {
             $term = $request->search;
@@ -292,23 +330,60 @@ class AdminController extends Controller
         return response()->json(['status' => 'success', 'user' => $user]);
     }
 
-    // Ban / unban a user (toggle is_active) — super_admin ONLY
+    // Ban / unban a user (toggle is_active) — super_admin ONLY.
+    // Banning is a pure LOCK-OUT: bookings and money are settled manually,
+    // case by case, with the existing tools (cancel booking / refunds-due).
+    // Guard rules (so settlement can't be forgotten):
+    //   - PAID active bookings (pending/approved) → ban REFUSED, no override.
+    //     Either let them complete or cancel them first.
+    //   - only unpaid drafts (awaiting_payment) → ban proceeds, but the
+    //     response carries a small warning so the admin knows.
     public function toggleUser(Request $request, int $id)
     {
         $user = User::findOrFail($id);
+
+        $unpaidDrafts = 0;
+
+        if ($user->is_active) { // this call is a BAN
+            $paidActive = Booking::where('user_id', $user->id)
+                ->whereIn('status', ['pending', 'approved'])
+                ->count();
+
+            if ($paidActive > 0) {
+                return response()->json([
+                    'status'          => 'error',
+                    'active_bookings' => $paidActive,
+                    'message'         => "Cannot ban: this user has {$paidActive} paid active booking(s)."
+                        . ' Let them complete, or cancel them (with the refund recorded) first.',
+                ], 422);
+            }
+
+            $unpaidDrafts = Booking::where('user_id', $user->id)
+                ->where('status', 'awaiting_payment')
+                ->count();
+        }
+
         $user->update(['is_active' => !$user->is_active]);
 
         AdminAuditLog::record(
             $request->user()->id,
             $user->is_active ? 'user.unban' : 'user.ban',
             'user',
-            $user->id
+            $user->id,
+            $user->is_active ? [] : ['unpaid_drafts' => $unpaidDrafts]
         );
 
-        return response()->json([
+        $response = [
             'status'    => 'success',
             'is_active' => $user->is_active,
-        ]);
+        ];
+
+        if (! $user->is_active && $unpaidDrafts > 0) {
+            $response['warning'] = "Note: this user had {$unpaidDrafts} unpaid draft booking(s)."
+                . ' Nothing was paid on them; they will simply stay unpaid.';
+        }
+
+        return response()->json($response);
     }
 
     // ── Bookings ─────────────────────────────────────────────────
@@ -326,6 +401,19 @@ class AdminController extends Controller
         }
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
+        }
+
+        // ?search= matches booking id, customer name, or vendor business name.
+        if ($request->filled('search')) {
+            $term = $request->search;
+            $query->where(function ($q) use ($term) {
+                $q->where('id', 'like', "%{$term}%")
+                    ->orWhereHas('user', fn ($u) => $u
+                        ->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%"))
+                    ->orWhereHas('vendor', fn ($v) => $v
+                        ->where('business_name', 'like', "%{$term}%"));
+            });
         }
 
         return response()->json([
@@ -369,6 +457,55 @@ class AdminController extends Controller
             'status'         => 'success',
             'message'        => "Booking cancelled — {$result['refund_percent']}% refund is due to the customer.",
             'refund_percent' => $result['refund_percent'],
+        ]);
+    }
+
+    // Vendor-requested cancellation — super_admin ONLY.
+    // The vendor asked (via support) to back out of a booking he already
+    // APPROVED. The customer did nothing wrong, so:
+    //   - customer gets a 100% refund (recorded in refunds-due)
+    //   - the vendor's escrow credit is reversed AND the platform's commission
+    //     is charged to his wallet — he bears the full cost, the platform
+    //     keeps its cut. His wallet may go negative (owes the platform).
+    // A pending booking doesn't belong here: the vendor can decline it himself.
+    public function cancelVendorRequest(Request $request, int $id)
+    {
+        $request->validate(['reason' => 'sometimes|nullable|string|max:1000']);
+
+        $booking = Booking::findOrFail($id);
+
+        if ($booking->status !== 'approved') {
+            return response()->json([
+                'status'  => 'error',
+                'message' => "Only an approved booking can be cancelled at the vendor's request"
+                    . " (a pending one the vendor can decline himself). This booking is '{$booking->status}'.",
+            ], 422);
+        }
+
+        $reason = $request->input('reason', 'Cancelled at the vendor\'s request');
+        $result = $this->cancellation->cancelByPlatform($booking, $reason, notify: true, chargeCommission: true);
+
+        // Tell the vendor the outcome too (the user was already notified).
+        $this->notifications->notifyVendor(
+            $booking->vendor,
+            'Booking cancelled on your request',
+            "Booking #{$booking->id} was cancelled. The platform commission of {$result['commission_charged']} SYP was charged to your wallet.",
+            ['booking_id' => (string) $booking->id]
+        );
+
+        AdminAuditLog::record($request->user()->id, 'booking.cancel_vendor_request', 'booking', $booking->id, [
+            'reason'             => $reason,
+            'refund_amount'      => $result['refund_amount'],
+            'commission_charged' => $result['commission_charged'],
+            'vendor_id'          => $booking->vendor_id,
+        ]);
+
+        return response()->json([
+            'status'             => 'success',
+            'message'            => "Booking cancelled — {$result['refund_amount']} SYP refund is due to the customer;"
+                . " {$result['commission_charged']} SYP commission was charged to the vendor's wallet.",
+            'refund_amount'      => $result['refund_amount'],
+            'commission_charged' => $result['commission_charged'],
         ]);
     }
 
@@ -450,26 +587,62 @@ class AdminController extends Controller
     // ── Audit log ────────────────────────────────────────────────
     // super_admin ONLY — who did what, when
 
-    public function auditLogs()
+    // ?search= matches the action name or the admin's name.
+    public function auditLogs(Request $request)
     {
-        $logs = AdminAuditLog::with('admin:id,name,email,role')->latest()->paginate(30);
+        $query = AdminAuditLog::with('admin:id,name,email,role')->latest();
 
-        return response()->json(['status' => 'success', 'logs' => $logs]);
+        if ($request->filled('search')) {
+            $term = $request->search;
+            $query->where(function ($q) use ($term) {
+                $q->where('action', 'like', "%{$term}%")
+                    ->orWhereHas('admin', fn ($a) => $a->where('name', 'like', "%{$term}%"));
+            });
+        }
+
+        return response()->json(['status' => 'success', 'logs' => $query->paginate(30)]);
     }
 
     // ── Reviews moderation ───────────────────────────────────────
     // view: super_admin + support ; delete: super_admin ONLY (in routes)
 
     // All reviews (paginated, filterable by vendor) — ?vendor_id=
+    // reports_count > 0 → the FLAGGED badge.
     public function reviews(Request $request)
     {
-        $query = Review::with(['user:id,first_name,last_name', 'vendor:id,business_name'])->latest();
+        $query = Review::with(['user:id,first_name,last_name', 'vendor:id,business_name,is_active,winding_down'])
+            ->withCount(['reports as reports_count' => fn ($q) => $q->where('status', 'pending')])
+            ->latest();
 
         if ($request->filled('vendor_id')) {
             $query->where('vendor_id', $request->vendor_id);
         }
 
         return response()->json(['status' => 'success', 'reviews' => $query->paginate(20)]);
+    }
+
+    // Dismiss the flag on a reported item — the admin looked and the content
+    // is fine. Clears every pending report so the badge disappears.
+    public function dismissReports(Request $request, string $type, int $id)
+    {
+        if (! in_array($type, ['review', 'product', 'portfolio_item'], true)) {
+            return response()->json(['status' => 'error', 'message' => 'Unknown content type'], 422);
+        }
+
+        $cleared = ContentReport::where('reportable_type', $type)
+            ->where('reportable_id', $id)
+            ->where('status', 'pending')
+            ->update(['status' => 'dismissed']);
+
+        if ($cleared === 0) {
+            return response()->json(['status' => 'error', 'message' => 'No pending reports on this item'], 422);
+        }
+
+        AdminAuditLog::record($request->user()->id, 'report.dismiss', $type, $id, [
+            'cleared_reports' => $cleared,
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Reports dismissed', 'cleared' => $cleared]);
     }
 
     // Delete an abusive review, then recompute the vendor's rating average.
@@ -479,6 +652,7 @@ class AdminController extends Controller
         $vendorId = $review->vendor_id;
 
         $review->delete();
+        ContentReport::where('reportable_type', 'review')->where('reportable_id', $id)->delete();
 
         // Keep the vendor's rating_avg honest after removing a review.
         $avg = Review::where('vendor_id', $vendorId)->avg('rating');
@@ -525,16 +699,20 @@ class AdminController extends Controller
     // these endpoints let the admin see what's owed and mark it paid.
 
     // Refunds owed to customers (cancelled bookings not yet paid back).
+    // Excludes waived ones — money the admin officially decided to keep.
     public function refundsDue()
     {
         $bookings = Booking::whereNotNull('refund_amount')
             ->whereNull('refund_paid_at')
+            ->whereNull('refund_waived_at')
             ->with(['user:id,first_name,last_name,phone', 'vendor:id,business_name'])
             ->latest()
             ->paginate(20);
 
         $totalDue = round((float) Booking::whereNotNull('refund_amount')
-            ->whereNull('refund_paid_at')->sum('refund_amount'), 2);
+            ->whereNull('refund_paid_at')
+            ->whereNull('refund_waived_at')
+            ->sum('refund_amount'), 2);
 
         return response()->json([
             'status'         => 'success',
@@ -553,6 +731,10 @@ class AdminController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Refund already marked paid'], 422);
         }
 
+        if ($booking->refund_waived_at) {
+            return response()->json(['status' => 'error', 'message' => 'This refund was waived — it cannot be paid'], 422);
+        }
+
         $booking->update(['refund_paid_at' => now()]);
 
         AdminAuditLog::record($request->user()->id, 'refund.mark_paid', 'booking', $booking->id, [
@@ -560,6 +742,33 @@ class AdminController extends Controller
         ]);
 
         return response()->json(['status' => 'success', 'message' => 'Refund marked as paid']);
+    }
+
+    // Waive a recorded refund — the admin officially decides to KEEP the money
+    // (e.g. fraud). Requires a reason; the decision is audited. This is the
+    // third fate of a recorded refund: paid / waived / still pending.
+    public function waiveRefund(Request $request, int $id)
+    {
+        $request->validate(['reason' => 'required|string|max:1000']);
+
+        $booking = Booking::whereNotNull('refund_amount')->findOrFail($id);
+
+        if ($booking->refund_paid_at) {
+            return response()->json(['status' => 'error', 'message' => 'Refund already paid — it cannot be waived'], 422);
+        }
+
+        if ($booking->refund_waived_at) {
+            return response()->json(['status' => 'error', 'message' => 'Refund already waived'], 422);
+        }
+
+        $booking->update(['refund_waived_at' => now()]);
+
+        AdminAuditLog::record($request->user()->id, 'refund.waive', 'booking', $booking->id, [
+            'amount' => (float) $booking->refund_amount,
+            'reason' => $request->reason,
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Refund waived — the money stays with the platform']);
     }
 
     // Vendor withdrawal requests (money leaving the platform to vendors).
@@ -604,7 +813,41 @@ class AdminController extends Controller
     }
 
     // ── Content moderation ───────────────────────────────────────
-    // super_admin ONLY — remove an inappropriate product/portfolio listing.
+    // Listing (view) — super_admin + support. Deleting — super_admin ONLY.
+    // Lets the admin browse products/portfolio and remove abusive listings.
+
+    // Products for the moderation grid — ?search= (name) , ?vendor_id=
+    // reports_count > 0 → the REPORTED badge.
+    public function products(Request $request)
+    {
+        $query = VendorProduct::with(['vendor:id,business_name,is_active,winding_down', 'images'])
+            ->withCount(['reports as reports_count' => fn ($q) => $q->where('status', 'pending')])
+            ->latest();
+
+        if ($request->filled('vendor_id')) {
+            $query->where('vendor_id', $request->vendor_id);
+        }
+        if ($request->filled('search')) {
+            $query->where('name', 'like', "%{$request->search}%");
+        }
+
+        return response()->json(['status' => 'success', 'products' => $query->paginate(20)]);
+    }
+
+    // Portfolio items for the moderation grid — ?vendor_id=
+    // reports_count > 0 → the REPORTED badge.
+    public function portfolioItems(Request $request)
+    {
+        $query = PortfolioItem::with(['vendor:id,business_name,is_active,winding_down', 'images'])
+            ->withCount(['reports as reports_count' => fn ($q) => $q->where('status', 'pending')])
+            ->latest();
+
+        if ($request->filled('vendor_id')) {
+            $query->where('vendor_id', $request->vendor_id);
+        }
+
+        return response()->json(['status' => 'success', 'portfolio' => $query->paginate(20)]);
+    }
 
     // Delete a product and its images from storage.
     public function deleteProduct(Request $request, int $id)
@@ -616,6 +859,7 @@ class AdminController extends Controller
             Storage::disk('public')->delete($image->image_path);
         }
         $product->delete();
+        ContentReport::where('reportable_type', 'product')->where('reportable_id', $id)->delete();
 
         AdminAuditLog::record($request->user()->id, 'product.delete', 'product', $id, ['vendor_id' => $vendorId]);
 
@@ -632,6 +876,7 @@ class AdminController extends Controller
             Storage::disk('public')->delete($image->image_path);
         }
         $item->delete();
+        ContentReport::where('reportable_type', 'portfolio_item')->where('reportable_id', $id)->delete();
 
         AdminAuditLog::record($request->user()->id, 'portfolio.delete', 'portfolio_item', $id, ['vendor_id' => $vendorId]);
 

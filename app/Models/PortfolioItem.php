@@ -26,4 +26,10 @@ class PortfolioItem extends Model
     {
         return $this->hasOne(PortfolioItemImage::class)->where('is_primary', true);
     }
+
+    public function reports()
+    {
+        return $this->hasMany(ContentReport::class, 'reportable_id')
+            ->where('reportable_type', 'portfolio_item');
+    }
 }

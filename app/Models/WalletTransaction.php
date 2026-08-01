@@ -9,8 +9,8 @@ class WalletTransaction extends Model
     protected $fillable = [
         'vendor_id',
         'booking_id',
-        'type',   // credit | refund | withdrawal
-        'amount', // signed: credit > 0, refund < 0, withdrawal < 0
+        'type',   // credit | refund | withdrawal | commission
+        'amount', // signed: credit > 0, refund/withdrawal/commission < 0
         'paid_at',
     ];
 

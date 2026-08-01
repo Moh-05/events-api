@@ -23,6 +23,7 @@ class Booking extends Model
         'price_agreed',
         'refund_amount',
         'refund_paid_at',
+        'refund_waived_at',
     ];
 
     protected function casts(): array
@@ -32,8 +33,9 @@ class Booking extends Model
             'event_date'     => 'datetime',
             'delivery_date'  => 'datetime',
             'price_agreed'   => 'decimal:2',
-            'refund_amount'  => 'decimal:2',
-            'refund_paid_at' => 'datetime',
+            'refund_amount'    => 'decimal:2',
+            'refund_paid_at'   => 'datetime',
+            'refund_waived_at' => 'datetime',
         ];
     }
 

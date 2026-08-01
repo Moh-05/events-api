@@ -21,7 +21,10 @@ class WalletService
         $cleared = 0;
         $pending = 0;
 
-        foreach ($transactions->whereIn('type', ['credit', 'refund'])->groupBy('booking_id') as $rows) {
+        // commission = the platform's cut charged back to the vendor on a
+        // vendor-requested cancellation (negative, tied to the booking) — it
+        // nets against the booking exactly like a refund row.
+        foreach ($transactions->whereIn('type', ['credit', 'refund', 'commission'])->groupBy('booking_id') as $rows) {
             $net    = (float) $rows->sum('amount');
             $status = $rows->first()->booking?->status;
 
