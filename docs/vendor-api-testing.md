@@ -298,6 +298,10 @@ Vendor sets self online/offline for NEW bookings.
 
 **200:** `{ "status": "success" }` — response never echoes the token.
 
+#### `POST /vendor/logout`
+No body. Revokes ONLY the token used for this request (other devices stay logged in) and nulls this account's `fcm_token`. After calling it, reusing the same token must return **401**.
+**200:** `{ "status": "success", "message": "Logged out" }`
+
 ### 4.2 Products
 
 #### `GET /vendor/products`
@@ -490,6 +494,18 @@ Date wasn't blocked → **404** `{ "status": "error", "message": "This date is n
 **200:** `{ "status": "success", "earnings": { "this_month": 0.0, "last_month": 0.0, "growth": 0.0 } }`
 `growth` = MoM % (can be negative; 100.0 when last month was 0 and this month > 0).
 
+#### `GET /vendor/response-time`
+Auto-computed average of (vendor's `responded_at` − booking's payment `created_at`) over bookings the vendor approved/declined that have a verified payment. Returned as a moderated range, never an exact figure.
+- **200 (has data):**
+```json
+{ "status": "success", "response_time": { "is_new": false, "label": "1-2 hours", "average_minutes": 113, "based_on": 2 } }
+```
+- **200 (new vendor — never responded to any booking):**
+```json
+{ "status": "success", "response_time": { "is_new": true, "label": null } }
+```
+`label` is one of: `under 30 minutes` · `30-60 minutes` · `1-2 hours` · `2-6 hours` · `6-24 hours` · `over a day`. Assert: a brand-new vendor returns `is_new:true`; after a vendor approves/declines at least one paid booking, `is_new:false` and `based_on >= 1`.
+
 ### 4.8 Wallet
 
 #### `GET /vendor/wallet`
@@ -645,6 +661,12 @@ After paying/approving (which generate notifications), vendor `GET /vendor/notif
 
 **S15 — Auth negatives.**
 Call any `/vendor/*` route with no token (but WITH `Accept: application/json`) → **401** `{"message":"Unauthenticated."}`. Call a `/vendor/*` route with a USER token → **401**. Confirm that OMITTING `Accept: application/json` on a 401 case yields HTML/redirect (demonstrates why the header is mandatory) — then always send it.
+
+**S16 — Logout revokes the token.**
+With a valid vendor token, `POST /vendor/logout` → 200 `{"message":"Logged out"}`. Then reuse the SAME token on any `/vendor/*` route → **401** (token was revoked). Log in again (send-otp → verify-otp) to get a fresh token for further tests.
+
+**S17 — Response time (auto-computed).**
+On a brand-new vendor (no bookings answered), `GET /vendor/response-time` → `response_time.is_new:true`, `label:null`. Then run S6 (create+pay a booking) and have the vendor approve or decline it; call again → `is_new:false`, `label` is one of the six range strings, `average_minutes` a positive int, `based_on>=1`.
 
 ---
 
