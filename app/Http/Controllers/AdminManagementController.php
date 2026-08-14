@@ -63,7 +63,7 @@ class AdminManagementController extends Controller
         if ($admin->id === $request->user()->id) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'You cannot delete your own account',
+                'message' => __('messages.cannot_delete_self'),
             ], 422);
         }
 
@@ -71,6 +71,6 @@ class AdminManagementController extends Controller
 
         AdminAuditLog::record($request->user()->id, 'admin.delete', 'admin', $admin->id);
 
-        return response()->json(['status' => 'success', 'message' => 'Admin deleted']);
+        return response()->json(['status' => 'success', 'message' => __('messages.admin_deleted')]);
     }
 }

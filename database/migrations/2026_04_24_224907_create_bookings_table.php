@@ -43,6 +43,10 @@ return new class extends Migration
                 // Shared
                 $table->text('notes')->nullable();
                 $table->decimal('price_agreed', 10, 2)->nullable();
+                // Appointment only: options the customer picked for the single
+                // service (e.g. outfit, package tier), chosen from the product meta.
+                // Orders carry their selections per item (booking_items instead).
+                $table->json('selected_options')->nullable();
 
                 // When the vendor first responded (approved or declined) to a paid
                 // booking. Used to compute the vendor's average response time.

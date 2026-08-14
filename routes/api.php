@@ -6,6 +6,7 @@ use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\VendorProfileController;
 use App\Http\Controllers\VendorProductController;
 use App\Http\Controllers\VendorBrowseController;
+use App\Http\Controllers\ProductBrowseController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
@@ -34,10 +35,12 @@ Route::post('/vendor/complete-registration', [VendorAuthController::class, 'comp
 
 // Public browse
 Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: Home / Explore / Filters
+Route::get('/products', [ProductBrowseController::class, 'index']); // item discovery: Home rails / Filters / search
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);
 Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendorPortfolio']);
 Route::get('/vendors/{vendorId}/availability', [AvailabilityController::class, 'publicAvailability']); // unavailable dates for the calendar
+Route::get('/vendors/{id}', [VendorBrowseController::class, 'show']); // vendor detail header (keep AFTER the sub-resource routes above)
 
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum
@@ -99,6 +102,8 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::get('/vendor/products/{id}', [VendorProductController::class, 'show']);
     Route::post('/vendor/products/{id}', [VendorProductController::class, 'update']);
     Route::delete('/vendor/products/{id}', [VendorProductController::class, 'destroy']);
+    Route::post('/vendor/products/{id}/discount', [VendorProductController::class, 'setDiscount']);     // put on offer
+    Route::delete('/vendor/products/{id}/discount', [VendorProductController::class, 'removeDiscount']); // end offer early
 
     // Portfolio (Vendor)
     Route::get('/vendor/portfolio', [PortfolioController::class, 'index']);

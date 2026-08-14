@@ -25,6 +25,18 @@ This spec covers **vendor endpoints only** (vendor auth, profile, products, port
   - `firstOrFail()` / `findOrFail()` miss (wrong id, or a resource that isn't yours) → **404** `{ "message": "..." }` (Laravel `ModelNotFoundException`).
   - Banned account hitting a protected route → **403** `{ "status": "error", "message": "Your account has been suspended. Please contact support." }`.
 
+### Localization — Arabic / English (what the Flutter app must do)
+
+The API returns human-facing text (success `message`, error `message`, validation `errors`, and push-notification title/body) in **Arabic or English**, chosen by the **`Accept-Language`** request header.
+
+- **Send `Accept-Language: ar` or `Accept-Language: en` on EVERY request.** The app picks it from the user's chosen language, or the phone's native language if they haven't chosen. If the header is missing or anything other than `en`, the API defaults to **Arabic**.
+- Example: `POST /vendor/send-otp` with no `phone` → with `Accept-Language: ar` returns `{"message":"حقل رقم الهاتف مطلوب.", "errors":{"phone":["حقل رقم الهاتف مطلوب."]}}`; with `Accept-Language: en` returns the English equivalent. (The raw JSON escapes Arabic as `\uXXXX` — that is normal; the app decodes it to Arabic automatically.)
+- **Notifications follow the recipient's stored language, not the request header** (a push has no request). The backend remembers each account's language from the `Accept-Language` header on their authenticated requests (column `vendors.language` / `users.language`, default `ar`). So: keep sending the header on normal calls and the vendor's notifications will arrive in that language automatically. No separate "set language" endpoint.
+- **What the app translates itself (NOT the API):** the app must show Arabic labels for enum VALUES — `vendor_type` (`photographer`, `weddingHall`, `dj`, `makeupArtist`, `flowers`, `gifts`, `dresses`, `accessories`, `candles`, `cakes`), `booking_style` (`appointment`/`order`), `status` (`awaiting_payment`, `pending`, `approved`, `declined`, `completed`, `cancelled`), `account_status`. The API always returns the English enum KEY (it's the stable contract used in filters); mapping the key to an Arabic display label is the app's job (use the design system's `ar.json`). Never expect the API to send an Arabic enum value.
+- **User-generated content is never translated:** `business_name`, `bio`, product `name`/`description`, `notes`, `address`, etc. come back exactly as the vendor typed them (usually Arabic already).
+
+**Assertion for the testing agent:** repeat any message-returning call with `Accept-Language: ar` then `Accept-Language: en`; assert the `message`/`errors` text differs between the two (Arabic vs English) for the SAME status code and JSON shape.
+
 ---
 
 ## 1. Auth Bootstrap (do this first)
@@ -563,7 +575,7 @@ Not the caller's / missing → **404** `{ "status": "error", "message": "Notific
 6. **Escrow: money is pending until completed.** On approve, a `credit` wallet transaction is created but counts as `pending_clearance` while the booking is `pending`/`approved`. It moves to `available_balance` only when the booking is `completed` or `cancelled`. Assert wallet numbers before/after complete.
 7. **Commission 15% / payout 85%.** For any verified payment: `commission = round(amount_paid × 0.15, 2)`, `vendor_payout = round(amount_paid × 0.85, 2)`.
 8. **Deposit rule.** Appointment payment = `price × deposit_percent/100` (`deposit_percent` default **20**, not vendor-editable). Order payment = full cart total `Σ(unit_price × quantity)`.
-9. **`toggleAvailability` flips `is_accepting_bookings`.** With no body it toggles; with `{is_accepting_bookings:false}` it sets. An **offline vendor** (`is_accepting_bookings=false`) causes a user `POST /bookings` against them to return **403** "This vendor is currently unavailable". (Offline vendors are also hidden from public browse — out of scope here.)
+9. **`toggleAvailability` flips `is_accepting_bookings`.** With no body it toggles; with `{is_accepting_bookings:false}` it sets. An **offline vendor** (`is_accepting_bookings=false`) causes a user `POST /bookings` against them to return **403** "This vendor is currently unavailable". (Offline vendors STILL appear in public browse — the `is_accepting_bookings` flag is returned so the app shows a "not accepting bookings" banner and disables the booking button.)
 10. **Booking requires approved + active + accepting vendor.** `POST /bookings` returns **403** if the vendor is not `is_approved`, not `is_active`, or not `is_accepting_bookings`.
 11. **Manual block blocks user booking.** After `POST /vendor/blocked-dates` for date D, a user appointment booking with `event_date` on D → **409** "This date is not available".
 12. **Block rejects a booked date.** `POST /vendor/blocked-dates` on a date that already has an active booking → **409** "This date already has a booking".
@@ -668,6 +680,9 @@ With a valid vendor token, `POST /vendor/logout` → 200 `{"message":"Logged out
 **S17 — Response time (auto-computed).**
 On a brand-new vendor (no bookings answered), `GET /vendor/response-time` → `response_time.is_new:true`, `label:null`. Then run S6 (create+pay a booking) and have the vendor approve or decline it; call again → `is_new:false`, `label` is one of the six range strings, `average_minutes` a positive int, `based_on>=1`.
 
+**S18 — Localization (Accept-Language).**
+Take any request that returns a `message` or validation `errors` (e.g. `POST /vendor/send-otp` with no `phone` → 422). Call it once with `Accept-Language: ar` and once with `Accept-Language: en`. Assert: same status code and same JSON shape, but the `message`/`errors` text is Arabic in the first and English in the second. Also assert that enum VALUES in any response (`vendor_type`, `status`, `booking_style`) stay the English key in BOTH languages (they are never translated by the API — the app maps them to Arabic labels).
+
 ---
 
 ## 8. Response field glossary
@@ -679,7 +694,7 @@ On a brand-new vendor (no bookings answered), `GET /vendor/response-time` → `r
 | **`account_status`** | `active` (`is_active=true`), `winding_down` (banned but finishing existing bookings), `banned` (`is_active=false` & not winding down). |
 | **`is_approved`** | KYC approved by admin. New vendors are `false` and cannot receive bookings. |
 | **`is_active`** | Admin ban switch. `false` = banned (blocks login unless winding_down). NOT vendor-controlled. |
-| **`is_accepting_bookings`** | Vendor's own online/offline switch. `false` = hidden from browse + rejects new bookings (403), but still logged in. |
+| **`is_accepting_bookings`** | Vendor's own online/offline switch. `false` = rejects new bookings (403) but still appears in browse (with the flag) and stays logged in. |
 | **`response_time`** | Badge enum: `within_1h`, `within_2h`, `within_3h`, `within_24h`. |
 | **wallet `available_balance`** | Cleared (completed/cancelled) net earnings minus withdrawals — withdrawable now. |
 | **wallet `pending_clearance`** | Escrowed net earnings for `pending`/`approved` bookings — not yet withdrawable. |

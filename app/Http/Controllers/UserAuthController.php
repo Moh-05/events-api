@@ -28,7 +28,7 @@ class UserAuthController extends Controller
         $respData = $response->json();
 
         return response()->json([
-            'message'           => 'OTP sent',
+            'message'           => __('messages.otp_sent'),
             'otp'               => $otp, // remove in production
             'ultramsg_status'   => $response->status(),
             'ultramsg_response' => $respData,
@@ -44,7 +44,7 @@ class UserAuthController extends Controller
 
         $cachedOtp = Cache::get('otp_' . $request->phone);
         if (!$cachedOtp || $cachedOtp != $request->otp) {
-            return response()->json(['message' => 'Invalid OTP'], 400);
+            return response()->json(['message' => __('messages.invalid_otp')], 400);
         }
 
         Cache::forget('otp_' . $request->phone);
@@ -75,7 +75,7 @@ class UserAuthController extends Controller
         ]);
 
         $phone = Cache::get('reg_token_' . $request->registration_token);
-        if (!$phone) return response()->json(['message' => 'Expired'], 403);
+        if (!$phone) return response()->json(['message' => __('messages.expired')], 403);
 
         $user = User::create([
             'phone'      => $phone,

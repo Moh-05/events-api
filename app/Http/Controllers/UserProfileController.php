@@ -63,7 +63,7 @@ class UserProfileController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Profile image removed'
+            'message' => __('messages.profile_image_removed')
         ]);
     }
 
@@ -78,7 +78,7 @@ class UserProfileController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Logged out',
+            'message' => __('messages.logged_out'),
         ]);
     }
 

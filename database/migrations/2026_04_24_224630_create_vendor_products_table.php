@@ -18,6 +18,16 @@ return new class extends Migration
             $table->json('meta')->nullable();
             $table->boolean('is_available')->default(true);
             $table->integer('stock')->nullable(); // stock count for order vendors (cake_shop, store). null = not tracked
+
+            // Discount / offer. The vendor sets a % off an EXISTING item; the item
+            // then shows in "Best Offers" until discount_ends_at, when it auto-reverts.
+            // Haflati's commission is ALWAYS taken on the ORIGINAL price — the vendor
+            // fully carries the discount. discount_last_ended_at powers the 1-week
+            // cooldown before the same item can be discounted again.
+            $table->decimal('discount_percent', 5, 2)->nullable();
+            $table->timestamp('discount_ends_at')->nullable();
+            $table->timestamp('discount_last_ended_at')->nullable();
+
             $table->timestamps();
         });
     }

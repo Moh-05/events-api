@@ -11,11 +11,15 @@ class BookingItem extends Model
         'vendor_product_id',
         'quantity',
         'unit_price',
+        'original_unit_price',
+        'selected_options',
     ];
 
     protected $casts = [
-        'quantity'   => 'integer',
-        'unit_price' => 'decimal:2',
+        'quantity'            => 'integer',
+        'unit_price'          => 'decimal:2',
+        'original_unit_price' => 'decimal:2',
+        'selected_options'    => 'array',
     ];
 
     public function booking()

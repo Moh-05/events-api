@@ -28,7 +28,7 @@ class VendorAuthController extends Controller
         $respData = $response->json();
 
         return response()->json([
-            'message'           => 'OTP sent',
+            'message'           => __('messages.otp_sent'),
             'otp'               => $otp,
             'ultramsg_status'   => $response->status(),
             'ultramsg_response' => $respData,
@@ -44,7 +44,7 @@ class VendorAuthController extends Controller
 
         $cachedOtp = Cache::get('otp_' . $request->phone);
         if (!$cachedOtp || $cachedOtp != $request->otp) {
-            return response()->json(['message' => 'Invalid OTP'], 400);
+            return response()->json(['message' => __('messages.invalid_otp')], 400);
         }
 
         Cache::forget('otp_' . $request->phone);
@@ -57,7 +57,7 @@ class VendorAuthController extends Controller
             if (!$vendor->is_active && !$vendor->winding_down) {
                 return response()->json([
                     'status'  => 'suspended',
-                    'message' => 'Your account has been suspended. Please contact support.',
+                    'message' => __('messages.account_suspended'),
                 ], 403);
             }
 
@@ -90,7 +90,7 @@ class VendorAuthController extends Controller
         ]);
 
         $phone = Cache::get('reg_token_' . $request->registration_token);
-        if (!$phone) return response()->json(['message' => 'Expired'], 403);
+        if (!$phone) return response()->json(['message' => __('messages.expired')], 403);
 
         // Seller categories are order-based; every other (service) category is appointment-based.
         $sellerTypes  = ['flowers', 'gifts', 'dresses', 'accessories', 'candles', 'cakes'];

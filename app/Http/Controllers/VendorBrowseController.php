@@ -31,7 +31,10 @@ class VendorBrowseController extends Controller
         // Customers only ever see approved + active vendors.
         // select   -> card fields only; full profile comes from GET /vendors/{id}
         //             (profile_image feeds the image URL; lat/lng feed map pins)
-        // withMin  -> adds products_min_price  (the "From 180,000 SYP" on cards)
+        // withMin  -> adds products_min_price  = the vendor's cheapest product.
+        //             Home's "Top Rated Vendors" cards show it as "From X SYP"
+        //             (the only place vendors are displayed). Also powers the
+        //             min_price/max_price filters below.
         // withCount-> adds bookings_count      (for the most_booked sort)
         // Offline vendors (is_accepting_bookings = false) still appear in browse —
         // the profile shows a "not accepting bookings" banner and disables booking.
@@ -88,6 +91,34 @@ class VendorBrowseController extends Controller
         return response()->json([
             'status'  => 'success',
             'vendors' => $query->paginate(15)->withQueryString(),
+        ]);
+    }
+
+    // Public vendor detail header — the top of the vendor/service screen. The
+    // sub-lists (products, reviews, portfolio, availability) each have their own
+    // public endpoint; this is just the header stats. Only approved + active
+    // vendors are shown.
+    public function show(int $id)
+    {
+        $vendor = Vendor::where('is_approved', true)
+            ->where('is_active', true)
+            ->select([
+                'id', 'business_name', 'vendor_type', 'vendor_style', 'booking_style',
+                'city', 'bio', 'rating_avg', 'profile_image', 'cover_image',
+                'is_accepting_bookings', 'latitude', 'longitude',
+            ])
+            // No vendor-level price — a vendor has no single price. The prices live
+            // on the individual products/packages listed under the vendor.
+            ->withCount([
+                'reviews',                                          // reviews_count
+                'bookings as events_hosted_count' => fn ($q) =>     // completed bookings
+                    $q->where('status', 'completed'),
+            ])
+            ->findOrFail($id);
+
+        return response()->json([
+            'status' => 'success',
+            'vendor' => $vendor,
         ]);
     }
 

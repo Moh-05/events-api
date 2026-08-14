@@ -104,7 +104,7 @@ class AdminController extends Controller
 
         AdminAuditLog::record($request->user()->id, 'vendor.approve', 'vendor', $vendor->id);
 
-        return response()->json(['status' => 'success', 'message' => 'Vendor approved']);
+        return response()->json(['status' => 'success', 'message' => __('messages.vendor_approved')]);
     }
 
     // Reject KYC — super_admin + support
@@ -128,7 +128,7 @@ class AdminController extends Controller
             ['reason' => $request->reason]
         );
 
-        return response()->json(['status' => 'success', 'message' => 'Vendor KYC rejected']);
+        return response()->json(['status' => 'success', 'message' => __('messages.vendor_kyc_rejected')]);
     }
 
     // Immediate ban — super_admin ONLY.
@@ -141,7 +141,7 @@ class AdminController extends Controller
         $vendor = Vendor::findOrFail($id);
 
         if (! $vendor->is_active && ! $vendor->winding_down) {
-            return response()->json(['status' => 'error', 'message' => 'Vendor is already banned'], 422);
+            return response()->json(['status' => 'error', 'message' => __('messages.vendor_already_banned')], 422);
         }
 
         $reason = $request->input('reason', 'Banned by admin');
@@ -186,7 +186,7 @@ class AdminController extends Controller
         $vendor = Vendor::findOrFail($id);
 
         if (! $vendor->is_active) {
-            return response()->json(['status' => 'error', 'message' => 'Vendor is already banned or winding down'], 422);
+            return response()->json(['status' => 'error', 'message' => __('messages.vendor_already_banned_wind')], 422);
         }
 
         $reason = $request->input('reason', 'Banned by admin (winding down)');
@@ -222,7 +222,7 @@ class AdminController extends Controller
                 'status'           => 'success',
                 'account_status'   => 'banned',
                 'refunded_pending' => $refundedPending,
-                'message'          => 'Vendor had no committed bookings — banned immediately.',
+                'message'          => __('messages.vendor_banned_immediately'),
             ]);
         }
 
@@ -249,7 +249,7 @@ class AdminController extends Controller
         $vendor = Vendor::findOrFail($id);
 
         if ($vendor->is_active) {
-            return response()->json(['status' => 'error', 'message' => 'Vendor is already active'], 422);
+            return response()->json(['status' => 'error', 'message' => __('messages.vendor_already_active')], 422);
         }
 
         $vendor->update(['is_active' => true, 'winding_down' => false]);
@@ -259,7 +259,7 @@ class AdminController extends Controller
         return response()->json([
             'status'         => 'success',
             'account_status' => 'active',
-            'message'        => 'Vendor reinstated.',
+            'message'        => __('messages.vendor_reinstated'),
         ]);
     }
 
@@ -486,7 +486,7 @@ class AdminController extends Controller
 
         AdminAuditLog::record($request->user()->id, 'review.delete', 'review', $id, ['vendor_id' => $vendorId]);
 
-        return response()->json(['status' => 'success', 'message' => 'Review deleted']);
+        return response()->json(['status' => 'success', 'message' => __('messages.review_deleted')]);
     }
 
     // ── Vendor wallet (money oversight) ──────────────────────────
@@ -550,7 +550,7 @@ class AdminController extends Controller
         $booking = Booking::whereNotNull('refund_amount')->findOrFail($id);
 
         if ($booking->refund_paid_at) {
-            return response()->json(['status' => 'error', 'message' => 'Refund already marked paid'], 422);
+            return response()->json(['status' => 'error', 'message' => __('messages.refund_already_paid')], 422);
         }
 
         $booking->update(['refund_paid_at' => now()]);
@@ -559,7 +559,7 @@ class AdminController extends Controller
             'amount' => (float) $booking->refund_amount,
         ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Refund marked as paid']);
+        return response()->json(['status' => 'success', 'message' => __('messages.refund_marked_paid')]);
     }
 
     // Vendor withdrawal requests (money leaving the platform to vendors).
@@ -590,7 +590,7 @@ class AdminController extends Controller
         $withdrawal = WalletTransaction::where('type', 'withdrawal')->findOrFail($id);
 
         if ($withdrawal->paid_at) {
-            return response()->json(['status' => 'error', 'message' => 'Withdrawal already marked paid'], 422);
+            return response()->json(['status' => 'error', 'message' => __('messages.withdrawal_already_paid')], 422);
         }
 
         $withdrawal->update(['paid_at' => now()]);
@@ -600,7 +600,7 @@ class AdminController extends Controller
             'amount'    => (float) abs($withdrawal->amount),
         ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Withdrawal marked as paid']);
+        return response()->json(['status' => 'success', 'message' => __('messages.withdrawal_marked_paid')]);
     }
 
     // ── Content moderation ───────────────────────────────────────
@@ -619,7 +619,7 @@ class AdminController extends Controller
 
         AdminAuditLog::record($request->user()->id, 'product.delete', 'product', $id, ['vendor_id' => $vendorId]);
 
-        return response()->json(['status' => 'success', 'message' => 'Product deleted']);
+        return response()->json(['status' => 'success', 'message' => __('messages.product_deleted')]);
     }
 
     // Delete a portfolio item and its images from storage.
@@ -635,6 +635,6 @@ class AdminController extends Controller
 
         AdminAuditLog::record($request->user()->id, 'portfolio.delete', 'portfolio_item', $id, ['vendor_id' => $vendorId]);
 
-        return response()->json(['status' => 'success', 'message' => 'Portfolio item deleted']);
+        return response()->json(['status' => 'success', 'message' => __('messages.portfolio_item_deleted')]);
     }
 }

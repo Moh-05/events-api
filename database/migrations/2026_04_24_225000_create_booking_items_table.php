@@ -18,7 +18,16 @@ return new class extends Migration
             $table->unsignedInteger('quantity')->default(1);
             // Price snapshot at booking time — a later price change by the
             // vendor must not change what an existing order owes.
+            // unit_price          = what the customer was charged (discounted if on offer)
+            // original_unit_price = the pre-discount price, so commission bills the
+            //                       original (the vendor carries the discount).
             $table->decimal('unit_price', 10, 2)->nullable();
+            $table->decimal('original_unit_price', 10, 2)->nullable();
+            // The options the customer picked for THIS item (e.g. color, size),
+            // chosen from the vendor's product meta. Free-form JSON — the app
+            // decides what's selectable; the backend just stores and relays it so
+            // the vendor sees what to prepare.
+            $table->json('selected_options')->nullable();
             $table->timestamps();
         });
     }

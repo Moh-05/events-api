@@ -37,7 +37,7 @@ class BookingController extends Controller
         if (!$vendor || !$vendor->is_approved || !$vendor->is_active || !$vendor->is_accepting_bookings) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This vendor is currently unavailable',
+                'message' => __('messages.vendor_unavailable'),
             ], 403);
         }
 
@@ -53,13 +53,9 @@ class BookingController extends Controller
         // Rules live in their own file: app/Http/Requests/StoreOrderBookingRequest.php
         $request->validate((new StoreOrderBookingRequest())->rules());
 
-        // Map of product id => total quantity. Grouping by id then summing means
-        // the same product listed twice merges into one line with the combined qty.
-        $quantityByProductId = collect($request->items)
-            ->groupBy('vendor_product_id')
-            ->map(fn ($rows) => $rows->sum(fn ($row) => (int) ($row['quantity'] ?? 1)));
-
-        $products = VendorProduct::findMany($quantityByProductId->keys());
+        $lines          = $this->buildOrderLines($request->items);
+        $qtyByProductId = $lines->groupBy('product_id')->map(fn ($rows) => $rows->sum('quantity'));
+        $products       = VendorProduct::findMany($qtyByProductId->keys())->keyBy('id');
 
         // Every product in the cart must pass every rule.
         foreach ($products as $product) {
@@ -67,7 +63,7 @@ class BookingController extends Controller
             if ($product->vendor_id !== $vendor->id) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'All items must belong to the same vendor',
+                    'message' => __('messages.items_same_vendor'),
                 ], 422);
             }
 
@@ -77,26 +73,26 @@ class BookingController extends Controller
             if ($product->is_available === false) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => "'{$product->name}' is not available",
+                    'message' => __('messages.product_not_available', ['name' => $product->name]),
                 ], 409);
             }
 
             // UX guard: can't ask for more units than are in stock right now.
             // The real oversell defense stays the atomic decrement at approve.
-            if ($product->stock !== null && $quantityByProductId[$product->id] > $product->stock) {
+            if ($product->stock !== null && $qtyByProductId[$product->id] > $product->stock) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => "Only {$product->stock} of '{$product->name}' left in stock",
+                    'message' => __('messages.only_n_in_stock', ['count' => $product->stock, 'name' => $product->name]),
                 ], 409);
             }
         }
 
         // Booking + its item rows are created together or not at all.
-        $booking = DB::transaction(function () use ($request, $vendor, $products, $quantityByProductId) {
+        $booking = DB::transaction(function () use ($request, $vendor, $products, $lines) {
             $booking = Booking::create([
                 'user_id'           => $request->user()->id,
                 'vendor_id'         => $vendor->id,
-                'vendor_product_id' => $products->first()->id, // primary product (kept for existing endpoints)
+                'vendor_product_id' => $lines->first()['product_id'], // primary product (kept for existing endpoints)
                 'booking_style'     => 'order',
                 'event_type'        => $vendor->vendor_type,
                 'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
@@ -106,13 +102,7 @@ class BookingController extends Controller
                 'delivery_address'  => $request->delivery_address,
             ]);
 
-            foreach ($products as $product) {
-                $booking->items()->create([
-                    'vendor_product_id' => $product->id,
-                    'quantity'          => $quantityByProductId[$product->id],
-                    'unit_price'        => $product->price, // price snapshot at booking time
-                ]);
-            }
+            $this->createOrderItems($booking, $products, $lines);
 
             return $booking;
         });
@@ -135,7 +125,7 @@ class BookingController extends Controller
         if ($product->is_available === false) {
             return response()->json([
                 'status'  => 'error',
-                'message' => "'{$product->name}' is not available",
+                'message' => __('messages.product_not_available', ['name' => $product->name]),
             ], 409);
         }
 
@@ -149,7 +139,7 @@ class BookingController extends Controller
             if ($conflict) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'This date is already booked',
+                    'message' => __('messages.date_already_booked'),
                 ], 409);
             }
 
@@ -162,7 +152,7 @@ class BookingController extends Controller
             if ($blocked) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'This date is not available',
+                    'message' => __('messages.date_not_available'),
                 ], 409);
             }
         }
@@ -181,6 +171,7 @@ class BookingController extends Controller
                     'event_type'        => $vendor->vendor_type,
                     'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
                     'notes'             => $request->notes,
+                    'selected_options'  => $request->selected_options, // customer's picks from the product meta
                     'event_date'        => $request->event_date,
                     'event_location'    => $request->event_location,
                     'duration_hours'    => $request->duration_hours,
@@ -188,9 +179,10 @@ class BookingController extends Controller
 
                 // One item row (quantity 1) so orders and appointments read the same.
                 $booking->items()->create([
-                    'vendor_product_id' => $product->id,
-                    'quantity'          => 1,
-                    'unit_price'        => $product->price, // price snapshot at booking time
+                    'vendor_product_id'   => $product->id,
+                    'quantity'            => 1,
+                    'unit_price'          => $product->discounted_price, // discounted if on offer
+                    'original_unit_price' => $product->price,            // pre-discount, for commission
                 ]);
 
                 return $booking;
@@ -198,7 +190,7 @@ class BookingController extends Controller
         } catch (\Illuminate\Database\QueryException $e) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This date is already booked',
+                'message' => __('messages.date_already_booked'),
             ], 409);
         }
 
@@ -259,7 +251,7 @@ class BookingController extends Controller
             if ($conflict) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'This date is already booked',
+                    'message' => __('messages.date_already_booked'),
                 ], 409);
             }
         }
@@ -269,48 +261,37 @@ class BookingController extends Controller
         // that) — new items must be this vendor's, available, and within
         // stock; old rows are swapped out.
         if ($request->has('items')) {
-            // Map of product id => total quantity (same product twice merges).
-            $quantityByProductId = collect($request->items)
-                ->groupBy('vendor_product_id')
-                ->map(fn ($rows) => $rows->sum(fn ($row) => (int) ($row['quantity'] ?? 1)));
-
-            $products = VendorProduct::findMany($quantityByProductId->keys());
+            $lines          = $this->buildOrderLines($request->items);
+            $qtyByProductId = $lines->groupBy('product_id')->map(fn ($rows) => $rows->sum('quantity'));
+            $products       = VendorProduct::findMany($qtyByProductId->keys())->keyBy('id');
 
             foreach ($products as $product) {
                 if ($product->vendor_id !== $booking->vendor_id) {
                     return response()->json([
                         'status'  => 'error',
-                        'message' => 'All items must belong to the same vendor',
+                        'message' => __('messages.items_same_vendor'),
                     ], 422);
                 }
 
                 if ($product->is_available === false) {
                     return response()->json([
                         'status'  => 'error',
-                        'message' => "'{$product->name}' is not available",
+                        'message' => __('messages.product_not_available', ['name' => $product->name]),
                     ], 409);
                 }
 
-                if ($product->stock !== null && $quantityByProductId[$product->id] > $product->stock) {
+                if ($product->stock !== null && $qtyByProductId[$product->id] > $product->stock) {
                     return response()->json([
                         'status'  => 'error',
-                        'message' => "Only {$product->stock} of '{$product->name}' left in stock",
+                        'message' => __('messages.only_n_in_stock', ['count' => $product->stock, 'name' => $product->name]),
                     ], 409);
                 }
             }
 
-            DB::transaction(function () use ($booking, $products, $quantityByProductId) {
+            DB::transaction(function () use ($booking, $products, $lines) {
                 $booking->items()->delete();
-
-                foreach ($products as $product) {
-                    $booking->items()->create([
-                        'vendor_product_id' => $product->id,
-                        'quantity'          => $quantityByProductId[$product->id],
-                        'unit_price'        => $product->price,
-                    ]);
-                }
-
-                $booking->update(['vendor_product_id' => $products->first()->id]);
+                $this->createOrderItems($booking, $products, $lines);
+                $booking->update(['vendor_product_id' => $lines->first()['product_id']]);
             });
         }
 
@@ -348,7 +329,7 @@ class BookingController extends Controller
             $booking->update(['status' => 'cancelled']);
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Booking cancelled',
+                'message' => __('messages.booking_cancelled'),
             ]);
         }
 
@@ -364,16 +345,17 @@ class BookingController extends Controller
                 'refund_amount' => $paid > 0 ? round($paid, 2) : null, // 100% owed to the user
             ]);
 
-            (new NotificationService())->notifyVendor(
+            (new NotificationService())->notifyVendorTrans(
                 $booking->vendor,
-                'Booking Cancelled',
-                "The customer cancelled booking #{$booking->id}.",
+                'messages.notif_cancelled_title',
+                'messages.notif_cancelled_body',
+                ['id' => $booking->id],
                 ['booking_id' => $booking->id]
             );
 
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Booking cancelled — full refund due to the user',
+                'message' => __('messages.booking_cancelled_refund'),
                 'refund'  => ['percent' => 100, 'note' => 'real refund pending ShamCash API'],
             ]);
         }
@@ -419,16 +401,17 @@ class BookingController extends Controller
                 $this->restoreStock($booking);
             });
 
-            (new NotificationService())->notifyVendor(
+            (new NotificationService())->notifyVendorTrans(
                 $booking->vendor,
-                'Booking Cancelled',
-                "The customer cancelled booking #{$booking->id}.",
+                'messages.notif_cancelled_title',
+                'messages.notif_cancelled_body',
+                ['id' => $booking->id],
                 ['booking_id' => $booking->id]
             );
 
             return response()->json([
                 'status'  => 'success',
-                'message' => "Booking cancelled — {$percent}% refund due to the user",
+                'message' => __('messages.cancelled_partial_refund', ['percent' => $percent]),
                 'refund'  => ['percent' => $percent, 'note' => 'real refund pending ShamCash API'],
             ]);
         }
@@ -486,16 +469,17 @@ class BookingController extends Controller
         if (! $approved) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This product is out of stock — cannot approve',
+                'message' => __('messages.out_of_stock_approve'),
             ], 409);
         }
 
         $booking->refresh();
 
-        (new NotificationService())->notifyUser(
+        (new NotificationService())->notifyUserTrans(
             $booking->user,
-            'Booking Approved',
-            "Your booking #{$booking->id} has been approved by the vendor.",
+            'messages.notif_approved_title',
+            'messages.notif_approved_body',
+            ['id' => $booking->id],
             ['booking_id' => $booking->id]
         );
 
@@ -524,17 +508,18 @@ class BookingController extends Controller
         if ($serviceDate && now()->lt($serviceDate)) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'You can only mark this completed on or after the event/delivery date',
+                'message' => __('messages.complete_before_date'),
             ], 422);
         }
 
         $booking->update(['status' => 'completed']);
         $booking->refresh();
 
-        (new NotificationService())->notifyUser(
+        (new NotificationService())->notifyUserTrans(
             $booking->user,
-            'Service Completed',
-            "Your booking #{$booking->id} is complete. Don't forget to leave a review!",
+            'messages.notif_completed_title',
+            'messages.notif_completed_body',
+            ['id' => $booking->id],
             ['booking_id' => $booking->id]
         );
 
@@ -557,10 +542,11 @@ class BookingController extends Controller
         // only taken at approve), so there is nothing to restore here.
         $booking->update(['status' => 'declined', 'responded_at' => now()]);
 
-        (new NotificationService())->notifyUser(
+        (new NotificationService())->notifyUserTrans(
             $booking->user,
-            'Booking Declined',
-            "Your booking #{$booking->id} was declined. Your payment will be refunded.",
+            'messages.notif_declined_title',
+            'messages.notif_declined_body',
+            ['id' => $booking->id],
             ['booking_id' => $booking->id]
         );
 
@@ -571,6 +557,38 @@ class BookingController extends Controller
     }
 
     // Take the ordered stock when a vendor approves: every item is decremented
+    // Turn the raw items[] request into cart lines. Two rows merge into ONE line
+    // only when they share the same product AND the same selected_options — the
+    // same product with different options (white rose vs red rose) stays separate.
+    // Each line: { product_id, quantity, options }.
+    private function buildOrderLines(array $items): \Illuminate\Support\Collection
+    {
+        return collect($items)
+            ->groupBy(fn ($row) => $row['vendor_product_id'] . '|' . json_encode($row['selected_options'] ?? null))
+            ->map(fn ($rows) => [
+                'product_id' => (int) $rows->first()['vendor_product_id'],
+                'quantity'   => $rows->sum(fn ($row) => (int) ($row['quantity'] ?? 1)),
+                'options'    => $rows->first()['selected_options'] ?? null,
+            ])
+            ->values();
+    }
+
+    // Create the booking_items for a set of cart lines (price snapshot + the
+    // customer's per-line selected options). $products is keyed by id.
+    private function createOrderItems(Booking $booking, $products, \Illuminate\Support\Collection $lines): void
+    {
+        foreach ($lines as $line) {
+            $product = $products[$line['product_id']];
+            $booking->items()->create([
+                'vendor_product_id'   => $product->id,
+                'quantity'            => $line['quantity'],
+                'unit_price'          => $product->discounted_price, // what the customer pays (discounted if on offer)
+                'original_unit_price' => $product->price,            // pre-discount, for commission
+                'selected_options'    => $line['options'],          // the customer's picks for this line
+            ]);
+        }
+    }
+
     // by its quantity with an atomic conditional UPDATE (stock >= quantity), so
     // two approvals racing for the last units can't push stock negative —
     // exactly one wins. Returns false the moment any item can't be covered;

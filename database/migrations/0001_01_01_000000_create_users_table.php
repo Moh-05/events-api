@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('address')->nullable();
             $table->string('profile_image')->nullable();
             $table->date('birth_date')->nullable();
+            $table->string('language', 2)->default('ar'); // ar | en — the app's language, used for notifications
             $table->string('fcm_token')->nullable();
             $table->boolean('is_active')->default(true); // false = banned by admin
             $table->rememberToken();

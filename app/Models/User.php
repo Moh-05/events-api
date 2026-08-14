@@ -23,6 +23,7 @@ class User extends Authenticatable
         'longitude',
         'address',
         'fcm_token',
+        'language',
         'is_active',
     ];
 

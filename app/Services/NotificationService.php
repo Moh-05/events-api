@@ -91,6 +91,32 @@ class NotificationService
         return ['sent' => true];
     }
 
+    // Translated notify: pass message KEYS + placeholder params; the title/body
+    // are rendered in the RECIPIENT's own language (users.language / vendors.language),
+    // not the request's — because a push is sent to a specific person's device.
+    public function notifyUserTrans(User $user, string $titleKey, string $bodyKey, array $params = [], array $data = []): array
+    {
+        [$title, $body] = $this->render($user->language, $titleKey, $bodyKey, $params);
+        return $this->notifyUser($user, $title, $body, $data);
+    }
+
+    public function notifyVendorTrans(Vendor $vendor, string $titleKey, string $bodyKey, array $params = [], array $data = []): array
+    {
+        [$title, $body] = $this->render($vendor->language, $titleKey, $bodyKey, $params);
+        return $this->notifyVendor($vendor, $title, $body, $data);
+    }
+
+    // Render a title/body pair in a specific locale without changing the app's
+    // global locale (so it never leaks into the current request's response).
+    private function render(?string $locale, string $titleKey, string $bodyKey, array $params): array
+    {
+        $locale = $locale === 'en' ? 'en' : 'ar';
+        return [
+            __($titleKey, $params, $locale),
+            __($bodyKey, $params, $locale),
+        ];
+    }
+
     public function notifyUser(User $user, string $title, string $body, array $data = []): array
     {
         // Always save to the inbox first (so the bell icon shows history)

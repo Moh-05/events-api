@@ -37,7 +37,7 @@ class NotificationController extends Controller
         if (!$notification) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Notification not found',
+                'message' => __('messages.notification_not_found'),
             ], 404);
         }
 
@@ -61,7 +61,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'All notifications marked as read',
+            'message' => __('messages.all_marked_read'),
         ]);
     }
 

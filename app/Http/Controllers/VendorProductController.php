@@ -245,7 +245,84 @@ class VendorProductController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Product deleted successfully',
+            'message' => __('messages.product_deleted'),
+        ]);
+    }
+
+    // Vendor puts an existing product/service on offer. Rules:
+    //  - percent 1..90, on an item the vendor already owns
+    //  - starts NOW, ends on a date the vendor picks, at most 1 month out
+    //  - can't start a new offer within 1 week of the previous one ending
+    // Haflati's commission is still taken on the ORIGINAL price at payment time
+    // (handled in PaymentController) — the vendor carries the whole discount.
+    public function setDiscount(Request $request, $id)
+    {
+        $request->validate([
+            'discount_percent' => 'required|numeric|min:1|max:90',
+            'ends_at'          => 'required|date|after:now|before_or_equal:' . now()->addMonth()->toDateTimeString(),
+        ]);
+
+        $vendor  = $request->user();
+        $product = VendorProduct::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->firstOrFail();
+
+        // Block a new offer while one is still live.
+        if ($product->is_on_offer) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => __('messages.offer_already_active'),
+            ], 409);
+        }
+
+        // 1-week cooldown after the previous offer ended (anti-abuse: stops a
+        // vendor faking a permanent "discount" off an inflated original price).
+        if ($product->discount_last_ended_at && $product->discount_last_ended_at->gt(now()->subWeek())) {
+            $availableAt = $product->discount_last_ended_at->copy()->addWeek();
+            return response()->json([
+                'status'       => 'error',
+                'message'      => __('messages.offer_cooldown'),
+                'available_at' => $availableAt->toIso8601String(),
+            ], 409);
+        }
+
+        $product->update([
+            'discount_percent' => $request->discount_percent,
+            'discount_ends_at' => $request->ends_at,
+        ]);
+        $product->refresh();
+
+        return response()->json([
+            'status'  => 'success',
+            'product' => $product,
+        ]);
+    }
+
+    // Vendor ends an offer early. Records when it ended so the 1-week cooldown
+    // starts from now (can't instantly re-add).
+    public function removeDiscount(Request $request, $id)
+    {
+        $vendor  = $request->user();
+        $product = VendorProduct::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->firstOrFail();
+
+        if ($product->discount_percent === null) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => __('messages.no_active_offer'),
+            ], 404);
+        }
+
+        $product->update([
+            'discount_percent'       => null,
+            'discount_ends_at'       => null,
+            'discount_last_ended_at' => now(),
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => __('messages.offer_removed'),
         ]);
     }
 }

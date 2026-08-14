@@ -53,7 +53,7 @@ class AvailabilityController extends Controller
         if ($hasBooking) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This date already has a booking',
+                'message' => __('messages.date_has_booking'),
             ], 409);
         }
 
@@ -81,13 +81,13 @@ class AvailabilityController extends Controller
         if ($deleted === 0) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This date is not blocked',
+                'message' => __('messages.date_not_blocked'),
             ], 404);
         }
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Date unblocked',
+            'message' => __('messages.date_unblocked'),
         ]);
     }
 

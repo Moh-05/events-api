@@ -28,7 +28,7 @@ class ReviewController extends Controller
         if (!$booking) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Booking not found',
+                'message' => __('messages.booking_not_found'),
             ], 404);
         }
 
@@ -37,7 +37,7 @@ class ReviewController extends Controller
         if (!in_array($booking->status, ['approved', 'completed'])) {
             return response()->json([
                 'status'  => 'error',
-                'message' => "You can't review a booking with status '{$booking->status}'. It must be completed first (approved is allowed for testing).",
+                'message' => __('messages.cannot_review_status', ['status' => $booking->status]),
             ], 422);
         }
 
@@ -51,7 +51,7 @@ class ReviewController extends Controller
         if ($existing && ! $existing->trashed()) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'You have already reviewed this booking',
+                'message' => __('messages.already_reviewed'),
             ], 409);
         }
 
@@ -77,10 +77,11 @@ class ReviewController extends Controller
         $avg        = Review::where('vendor_id', $vendor->id)->avg('rating');
         $vendor->update(['rating_avg' => round($avg, 2)]);
 
-        (new NotificationService())->notifyVendor(
+        (new NotificationService())->notifyVendorTrans(
             $vendor,
-            'New Review',
-            "You received a {$request->rating}-star review.",
+            'messages.notif_review_title',
+            'messages.notif_review_body',
+            ['rating' => $request->rating],
             ['booking_id' => $booking->id]
         );
 
@@ -149,7 +150,7 @@ class ReviewController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Review deleted',
+            'message' => __('messages.review_deleted'),
         ]);
     }
 

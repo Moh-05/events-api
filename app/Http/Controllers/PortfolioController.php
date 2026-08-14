@@ -160,7 +160,7 @@ class PortfolioController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Portfolio item deleted',
+            'message' => __('messages.portfolio_item_deleted'),
         ]);
     }
 }

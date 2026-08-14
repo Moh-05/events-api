@@ -669,6 +669,37 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 
 ---
 
+## UPDATES — 2026-08-07 (Moh session: Arabic/English localization of all API text)
+
+The whole API now responds in Arabic or English based on the `Accept-Language` header. NOT yet committed/deployed at time of writing — tested locally only.
+
+### How it works
+- **`SetLocale` middleware** (`app/Http/Middleware/SetLocale.php`), appended to the api middleware group in `bootstrap/app.php` → runs on every API request. Reads `Accept-Language`; `en` → English, anything else (or missing) → **Arabic** (default). The Flutter app sends `ar`/`en` (user choice or phone language).
+- It also **persists the language** onto the authenticated account (`users.language` / `vendors.language`, new `string(2)` columns, default `ar`, in `$fillable`) when it changes — so push notifications (which have no request header) go out in each recipient's own language.
+
+### What was translated
+- **All 45 static API `message` strings** moved to `lang/en/messages.php` + `lang/ar/messages.php` (same keys), controllers now use `__('messages.<key>')`. 56 replacements across all controllers.
+- **4 dynamic messages** with placeholders: `product_not_available` (`:name`), `only_n_in_stock` (`:count`,`:name`), `cancelled_partial_refund` (`:percent`), `cannot_review_status` (`:status`).
+- **All 6 notifications** (payment received, new paid booking, approved, completed, declined, review, cancelled) → new `notifyUserTrans()` / `notifyVendorTrans()` in `NotificationService` render title+body in the RECIPIENT's language via `__($key, $params, $locale)` (forces a locale without touching the request's).
+- **Laravel validation** → `lang/ar/validation.php` added (rules + an `attributes` map so field names read naturally, e.g. `phone` → `رقم الهاتف`). `lang/en/` published via `php artisan lang:publish`.
+- **ADMIN messages kept in ENGLISH on purpose** (React dashboard / admins work in English). Keys exist in both files but the `ar` value is English. Translate later if the admin app needs Arabic.
+
+### What is NOT translated by the API (by design)
+- **Enum VALUES** (`vendor_type`, `booking_style`, `status`, `account_status`) always return the English KEY — it's the stable contract used in filters/WHERE. **Flutter maps the key to an Arabic label** (design system's `ar.json`). This is the correct separation; the backend never sends Arabic enum values.
+- **User-generated content** (business_name, bio, product name/description, notes, address) — returned as typed, never translated.
+
+### Verified locally
+- Validation + messages return Arabic under `Accept-Language: ar`, English under `en`. Field names translate (`حقل رقم الهاتف مطلوب.`). Notifications render per-recipient language with placeholders filled. `lang/en` and `lang/ar` messages have identical key sets (62 each). All 20 tests pass.
+
+### Docs updated
+- `docs/vendor-api-testing.md` — new Localization section in §0 + scenario S18 (assert ar vs en text differs, enums stay English).
+
+### Still open on translation
+- The `debug_notifications` field in the payment response is still testing-only (kill before prod) — unaffected by translation.
+- User-facing docs (`user-api.md`, not built yet) will get the same Localization note when created.
+
+---
+
 ## UPDATES — 2026-07-31 (Moh session: logout, auto response-time, availability system, vendor toggle, Firebase fix, API docs)
 
 ### 1. Logout — NEW (was missing entirely)

@@ -54,6 +54,7 @@ return new class extends Migration
             // but stays logged in and manages existing ones. Separate from is_active.
             $table->boolean('is_accepting_bookings')->default(true);
             $table->text('rejection_reason')->nullable(); // why KYC was rejected (shown to vendor)
+            $table->string('language', 2)->default('ar'); // ar | en — the app's language, used for notifications
             $table->string('fcm_token')->nullable();
             $table->timestamps();
         });

@@ -57,7 +57,7 @@ class WalletController extends Controller
         if ($available <= 0) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'No balance available to withdraw yet',
+                'message' => __('messages.no_balance'),
             ], 422);
         }
 
@@ -70,7 +70,7 @@ class WalletController extends Controller
 
         return response()->json([
             'status'            => 'success',
-            'message'           => 'Withdrawal successful (real payout pending ShamCash payout API)',
+            'message'           => __('messages.withdrawal_successful'),
             'amount_withdrawn'  => $available,
             'available_balance' => 0.0,
             'withdrawal'        => $withdrawal,

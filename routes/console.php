@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 // Auto-complete approved bookings one day after their event/delivery date.
 // Requires the scheduler to be running (see Railway cron setup).
 Schedule::command('bookings:auto-complete')->dailyAt('01:00');
+
+// Revert products whose discount period has ended (and start the cooldown).
+// Pricing is already correct via the is_on_offer accessor; this cleans up fields.
+Schedule::command('offers:expire')->hourly();

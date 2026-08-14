@@ -22,6 +22,7 @@ class Booking extends Model
         'delivery_address',
         'notes',
         'price_agreed',
+        'selected_options',
         'responded_at',
         'refund_amount',
         'refund_paid_at',
@@ -30,7 +31,8 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
-            'details'        => 'array',
+            'details'          => 'array',
+            'selected_options' => 'array',
             'event_date'     => 'datetime',
             'delivery_date'   => 'datetime',
             'old_event_date'  => 'datetime',

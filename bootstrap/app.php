@@ -12,6 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Runs on every API request: sets the response language from the
+        // Accept-Language header (ar/en). No per-route wiring needed.
+        $middleware->api(append: [
+            \App\Http\Middleware\SetLocale::class,
+        ]);
+
         $middleware->alias([
             'role'   => \App\Http\Middleware\EnsureAdminRole::class,
             'active' => \App\Http\Middleware\EnsureActive::class,

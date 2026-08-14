@@ -20,6 +20,7 @@ class StoreOrderBookingRequest extends FormRequest
             'items'                     => 'required|array|min:1',
             'items.*.vendor_product_id' => 'required|exists:vendor_products,id',
             'items.*.quantity'          => 'sometimes|integer|min:1',
+            'items.*.selected_options'  => 'sometimes|nullable|array', // customer's picks per item, from the product meta
             'notes'                     => 'sometimes|nullable|string',
             'details'                   => 'sometimes|nullable|array',
             'delivery_date'             => 'sometimes|nullable|date',

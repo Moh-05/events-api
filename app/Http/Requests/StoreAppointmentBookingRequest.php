@@ -19,6 +19,7 @@ class StoreAppointmentBookingRequest extends FormRequest
         return [
             'vendor_product_id' => 'required|exists:vendor_products,id',
             'notes'             => 'sometimes|nullable|string',
+            'selected_options'  => 'sometimes|nullable|array', // customer's picks from the product meta
             'event_date'        => 'required|date|after:now',
             'event_location'    => 'sometimes|nullable|string',
             'duration_hours'    => 'sometimes|nullable|integer',

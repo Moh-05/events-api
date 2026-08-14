@@ -30,7 +30,7 @@ class PaymentController extends Controller
         ) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This booking is already paid',
+                'message' => __('messages.booking_already_paid'),
             ], 409);
         }
 
@@ -43,19 +43,31 @@ class PaymentController extends Controller
         if (!$isTest && Payment::where('transaction_id', $request->transaction_id)->exists()) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'This transaction has already been used',
+                'message' => __('messages.transaction_used'),
             ], 409);
         }
 
         $product = $booking->product;
         $vendor  = $booking->vendor;
 
-        // Appointment: deposit % of the single package price.
-        // Order: full cart total — sum of unit_price × quantity over the item
-        // rows (unit_price is the snapshot taken at booking time).
-        $expectedAmount = $vendor->booking_style === 'appointment'
-            ? round($product->price * ($product->deposit_percent / 100), 2)
-            : round($booking->items->sum(fn ($item) => $item->unit_price * $item->quantity), 2);
+        // Two amounts matter for offers:
+        //   $expectedAmount = what the CUSTOMER pays (discounted, if on offer)
+        //   $originalAmount = the SAME calc on the ORIGINAL price (no discount)
+        // Haflati's commission is always 15% of $originalAmount — the vendor
+        // carries the whole discount, the platform never loses commission.
+        if ($vendor->booking_style === 'appointment') {
+            // Appointment: deposit % of the package price. discounted_price already
+            // reflects a live offer (falls back to price when there's none).
+            $depositFactor   = $product->deposit_percent / 100;
+            $expectedAmount  = round((float) $product->discounted_price * $depositFactor, 2);
+            $originalAmount  = round((float) $product->price * $depositFactor, 2);
+        } else {
+            // Order: full cart total from the price snapshots taken at booking time.
+            // unit_price = the DISCOUNTED price the customer was charged; the item
+            // also stored the original so commission bills the pre-discount total.
+            $expectedAmount = round($booking->items->sum(fn ($item) => $item->unit_price * $item->quantity), 2);
+            $originalAmount = round($booking->items->sum(fn ($item) => ($item->original_unit_price ?? $item->unit_price) * $item->quantity), 2);
+        }
 
         if ($isTest) {
             $result = ['verified' => true, 'sender_name' => 'TEST'];
@@ -80,8 +92,10 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        $commission   = round($expectedAmount * 0.15, 2);
-        $vendorPayout = round($expectedAmount * 0.85, 2);
+        // Commission on the ORIGINAL amount; vendor gets whatever is left of what
+        // the customer actually paid after that commission.
+        $commission   = round($originalAmount * 0.15, 2);
+        $vendorPayout = round($expectedAmount - $commission, 2);
 
         $payment = Payment::create([
             'booking_id'     => $booking->id,
@@ -100,21 +114,22 @@ class PaymentController extends Controller
 
         $notification = new NotificationService();
 
-        $notifyUser   = $notification->notifyUser(
+        $notifyUser   = $notification->notifyUserTrans(
             $user,
-            'Payment Received',
-            'Your payment was confirmed. Your booking is now waiting for vendor approval.'
+            'messages.notif_payment_received_title',
+            'messages.notif_payment_received_body'
         );
 
-        $notifyVendor = $notification->notifyVendor(
+        $notifyVendor = $notification->notifyVendorTrans(
             $vendor,
-            'New Paid Booking',
-            'You have a new paid booking #' . $booking->id . '. Please accept or decline.'
+            'messages.notif_new_booking_title',
+            'messages.notif_new_booking_body',
+            ['id' => $booking->id]
         );
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Payment verified successfully',
+            'message' => __('messages.payment_verified'),
             'booking' => $booking->load(['vendor', 'product', 'items.product']),
             'payment' => $payment,
             'debug_notifications' => [

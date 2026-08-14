@@ -22,7 +22,7 @@ class AdminAuthController extends Controller
         if (!$admin || !Hash::check($request->password, $admin->password)) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Invalid credentials',
+                'message' => __('messages.invalid_credentials'),
             ], 401);
         }
 
@@ -47,7 +47,7 @@ class AdminAuthController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Logged out',
+            'message' => __('messages.logged_out'),
         ]);
     }
 }

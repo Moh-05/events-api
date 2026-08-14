@@ -19,16 +19,50 @@ class VendorProduct extends Model
         'meta',
         'is_available',
         'stock',
+        'discount_percent',
+        'discount_ends_at',
+        'discount_last_ended_at',
     ];
 
     // deposit_percent is intentionally NOT fillable — the deposit is a fixed
     // platform rule (20%), set by the DB default, not editable by vendors.
+    // The discount_* fields ARE fillable, but only the dedicated discount
+    // endpoints ever write them (with validation) — product create/update never
+    // accept them from the request.
     protected $casts = [
         'meta' => 'array',
         'is_available' => 'boolean',
         'price' => 'decimal:2',
         'stock' => 'integer',
+        'discount_percent'       => 'decimal:2',
+        'discount_ends_at'       => 'datetime',
+        'discount_last_ended_at' => 'datetime',
     ];
+
+    // Expose the derived offer fields in every product JSON, so the app can draw
+    // the strikethrough price + "-25%" badge without doing the math itself.
+    protected $appends = ['is_on_offer', 'discounted_price'];
+
+    // An offer is live only while it has a percent AND hasn't expired.
+    public function getIsOnOfferAttribute(): bool
+    {
+        return $this->discount_percent !== null
+            && $this->discount_ends_at !== null
+            && $this->discount_ends_at->isFuture();
+    }
+
+    // Price the customer actually pays. Equals the original when no live offer.
+    public function getDiscountedPriceAttribute(): ?string
+    {
+        if (! $this->is_on_offer) {
+            return $this->price;
+        }
+
+        return number_format(
+            (float) $this->price * (1 - (float) $this->discount_percent / 100),
+            2, '.', ''
+        );
+    }
 
     public function vendor()
     {

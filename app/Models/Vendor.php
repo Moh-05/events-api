@@ -46,6 +46,7 @@ class Vendor extends Authenticatable
         'is_accepting_bookings',
         'rejection_reason',
         'fcm_token',
+        'language',
     ];
 
     protected $hidden = [
