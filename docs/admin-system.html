@@ -41,6 +41,7 @@ th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:upp
 .b-super{background:rgba(201,168,76,.18);color:var(--gold2)}
 .b-both{background:rgba(76,175,125,.16);color:var(--green)}
 .b-public{background:rgba(152,144,176,.18);color:var(--dim)}
+.b-app{background:rgba(91,155,213,.16);color:var(--blue)}
 .pill{display:inline-block;font-family:monospace;font-size:11px;padding:2px 9px;border-radius:5px;margin:2px 4px 2px 0}
 .p-active{background:rgba(76,175,125,.15);color:var(--green)}
 .p-wind{background:rgba(252,211,77,.15);color:var(--amber)}
@@ -50,6 +51,7 @@ th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:upp
 .concept h3{margin-top:0;color:var(--gold)}
 .flow{font-family:monospace;font-size:12.5px;color:var(--dim);background:#0f0d18;border-radius:8px;padding:12px 14px;white-space:pre-wrap;line-height:1.7}
 .tag{font-size:11px;color:var(--dim)}
+.new{display:inline-block;font-size:9.5px;font-weight:800;color:#0f0d18;background:var(--gold2);padding:1px 6px;border-radius:4px;margin-left:8px;vertical-align:middle;letter-spacing:.4px}
 .foot{margin-top:44px;color:#5a5470;font-size:12px;text-align:center;border-top:1px solid var(--line);padding-top:18px}
 @media(max-width:640px){.grid2{grid-template-columns:1fr}.ep{grid-template-columns:56px 1fr}}
 </style>
@@ -58,15 +60,15 @@ th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:upp
 <div class="wrap">
 
   <h1>Admin System — Full Reference</h1>
-  <div class="sub">Haflati · حفلتي — API + behaviour reference for the admin panel (for the React frontend design). All routes are prefixed with <code>/api</code>.</div>
+  <div class="sub">Haflati · حفلتي — complete API + behaviour reference for the admin panel (React). All routes are prefixed with <code>/api</code>. Sections marked <span class="new">NEW</span> were added in the Jul–Aug 2026 build.</div>
 
   <!-- ROLES -->
   <div class="lead">
     <h3 style="margin-top:0">Two roles, two layers of auth</h3>
     <p>Every admin route sits behind <code>auth:admins</code> (a dedicated Sanctum guard). Sensitive routes add a <code>role:</code> layer. Login is throttled to 5 tries/min.</p>
     <p style="margin-bottom:0">
-      <span class="badge b-super">super_admin</span> full control — bans, money, disputes, moderation, managing admins.<br>
-      <span class="badge b-both">super_admin + support</span> view + KYC only. Support never touches money, bans, or content deletion.
+      <span class="badge b-super">super_admin</span> full control — bans, all money, disputes, moderation deletion, managing admins.<br>
+      <span class="badge b-both">super_admin + support</span> everything <em>viewing</em> + KYC + <b>handling support</b>. Support never touches money, bans, content deletion, or dispute/cancel.
     </p>
   </div>
 
@@ -74,30 +76,32 @@ th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:upp
   <h2>1 · Permission matrix</h2>
   <table>
     <tr><th>Capability</th><th>super_admin</th><th>support</th></tr>
-    <tr><td>Dashboard + all list/detail views</td><td class="allow">ALLOW</td><td class="allow">ALLOW (read-only)</td></tr>
+    <tr><td>Dashboard, all list/detail views, moderation browse</td><td class="allow">ALLOW</td><td class="allow">ALLOW (read-only)</td></tr>
     <tr><td>Vendor KYC — approve / reject</td><td class="allow">ALLOW</td><td class="allow">ALLOW</td></tr>
+    <tr><td>Support inbox — reply / resolve tickets &amp; chats</td><td class="allow">ALLOW</td><td class="allow">ALLOW</td></tr>
+    <tr><td>Own notification bell</td><td class="allow">ALLOW</td><td class="allow">ALLOW</td></tr>
     <tr><td>Ban / unban vendor &amp; user</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
-    <tr><td>Cancel + refund a booking (dispute)</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
-    <tr><td>Delete review / product / portfolio</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Cancel + refund a booking (dispute / vendor-request)</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Delete review / product / portfolio · dismiss reports</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
     <tr><td>Payments, wallets, financial stats</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
-    <tr><td>Refunds-due &amp; withdrawals + mark paid</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
+    <tr><td>Refunds (mark-paid / waive) &amp; withdrawals (mark-paid / reject)</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
     <tr><td>Audit log · manage admin accounts</td><td class="allow">ALLOW</td><td class="deny">DENY</td></tr>
   </table>
 
   <!-- AUTH -->
   <h2>2 · Authentication</h2>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/login</span> <span class="badge b-public">public</span><div class="desc">Email + password → returns a Sanctum <b>token</b> + admin <code>{id,name,email,role}</code>. Throttled 5/min. 401 on bad credentials.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/login</span> <span class="badge b-public">public</span><div class="desc">Email + password → returns a Sanctum <b>token</b> + admin <code>{id,name,email,role}</code>. Throttled 5/min. 401 on bad credentials. Updates <code>last_login_at</code>.</div></div></div>
   <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/logout</span> <span class="badge b-public">any admin</span><div class="desc">Revokes the current access token.</div></div></div>
 
   <!-- DASHBOARD -->
   <h2>3 · Dashboard &amp; statistics</h2>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/dashboard</span> <span class="badge b-both">both</span><div class="desc">Headline overview: <code>total_users</code>, vendors (<code>total / approved / pending / banned</code>), bookings (<code>total / active / completed</code>), and profit (<code>profit_today / profit_month / profit_all_time</code>).</div></div></div>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/stats/financial</span> <span class="badge b-super">super_admin</span><div class="desc">Full money report. <b>summary</b> (all-time <code>gross_volume</code>, <code>platform_profit</code>, <code>vendor_payouts</code>, <code>transactions</code>) + <b>today / this_month / this_year</b> windows + <b>monthly_trend</b> (last 12 months, zero-filled → ready for a chart).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/dashboard</span> <span class="badge b-both">both</span><div class="desc"><b>stats</b>: <code>total_users</code>, vendors (<code>total / approved / pending / banned</code>), bookings (<code>total / active / completed</code>), profit (<code>profit_today / profit_month / profit_all_time</code> — gross). <b>nav_badges</b> <span class="new">NEW</span>: live sidebar red-dot counts → <code>pending_vendors</code>, <code>unread_support</code>, <code>reported_content</code>, <code>refunds_due</code>, <code>unpaid_withdrawals</code>.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/stats/financial</span> <span class="badge b-super">super_admin</span><div class="desc">Full money report. <b>summary</b> (all-time gross: <code>gross_volume</code>, <code>platform_profit</code>, <code>vendor_payouts</code>, <code>transactions</code>) · <b>net</b> <span class="new">NEW</span> (honest bottom line — see §12) · <b>today / this_month / this_year</b> · <b>monthly_trend</b> (12 months, zero-filled, chart-ready).</div></div></div>
 
   <div class="grid2" style="margin-top:14px">
     <div class="concept">
-      <h3>Money vocabulary</h3>
-      <p style="margin:0"><code>gross_volume</code> — what customers paid.<br><code>platform_profit</code> — the commission (your cut). <br><code>vendor_payouts</code> — what vendors earned.</p>
+      <h3>Sidebar badges vs the bell</h3>
+      <p style="margin:0"><b>nav_badges</b> = live counts ("how much work is pending, where"). The <b>bell</b> (§4) = an event feed ("what happened, when, click to open"). They complement each other — use badges for red dots, the bell for the dropdown.</p>
     </div>
     <div class="concept">
       <h3>Chart-ready</h3>
@@ -105,55 +109,79 @@ th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:upp
     </div>
   </div>
 
+  <!-- NOTIFICATIONS / BELL -->
+  <h2>4 · Notifications — the bell <span class="new">NEW</span></h2>
+  <p>An <b>event feed</b>: every relevant event drops a notification into the admin's inbox (its own read state per admin). Reuses the shared notifications table (<code>notifiable_type=admin</code>). Available to <b>every</b> admin.</p>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/notifications</span> <span class="badge b-public">any admin</span><div class="desc">This admin's feed (newest first) + <code>unread_count</code>. Each item: <code>title</code>, <code>body</code>, <code>read_at</code>, and <code>data.type</code> = <code>vendor_kyc | support | content_report | withdrawal | refund_due</code> + the target id → deep-link the click.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/notifications/read-all</span> <span class="badge b-public">any admin</span><div class="desc">Mark all of this admin's notifications read.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/notifications/{id}/read</span> <span class="badge b-public">any admin</span><div class="desc">Mark one read. 404 if it isn't this admin's notification.</div></div></div>
+  <p class="tag">Who gets what: KYC + support → both roles · content report / withdrawal / refund-due → super_admin only (targeted at whoever can act). Read state is per-admin.</p>
+
   <!-- VENDORS -->
-  <h2>4 · Vendors</h2>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?search=</span> (name/business/phone) &nbsp; <span class="q">?is_active=0|1</span></div></div></div>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/pending</span> <span class="badge b-both">both</span><div class="desc">KYC queue — vendors awaiting approval (<code>is_approved=false</code>).</div></div></div>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/{id}</span> <span class="badge b-both">both</span><div class="desc">One vendor + their products. Includes <code>account_status</code> (see §9).</div></div></div>
+  <h2>5 · Vendors</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?search=</span> (name/business/phone) &nbsp; <span class="q">?status=kyc_pending|active|winding_down|banned</span> <span class="new">NEW</span> (the four account-state tabs — a true partition) &nbsp; <span class="q">?is_active=0|1</span> (still works).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/pending</span> <span class="badge b-both">both</span><div class="desc">KYC queue — vendors awaiting approval (<code>is_approved=false</code> &amp; not banned).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/{id}</span> <span class="badge b-both">both</span><div class="desc">One vendor + their products, plus <code>bookings_count</code> + <code>reviews_count</code> <span class="new">NEW</span> and <code>account_status</code> (see §12). Wallet is separate ↓.</div></div></div>
   <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/approve</span> <span class="badge b-both">both</span><div class="desc">Approve KYC → <code>is_approved=true</code>, clears any rejection reason.</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/reject</span> <span class="badge b-both">both</span><div class="desc">Reject KYC with a <b>required</b> <code>reason</code>. Stored on the vendor. Does NOT ban an active vendor — that's separate.</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/ban</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Immediate ban.</b> Cancels + refunds ALL in-flight bookings, then fully bans. Optional <code>reason</code>. → <code>account_status: banned</code>. Use for fraud / urgent.</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/ban-gradual</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Ban after winding down.</b> Refunds pending bookings, keeps <code>approved</code> ones so the vendor can finish, then auto-bans when the last one is done. → <code>account_status: winding_down</code>.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/reject</span> <span class="badge b-both">both</span><div class="desc">Reject KYC with a <b>required</b> <code>reason</code>. Does NOT ban an active vendor — banning is separate.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/ban</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Immediate ban (fraud).</b> Cancels + refunds ALL in-flight bookings; on <code>approved</code> ones it also <b>claws the platform commission back from the vendor</b> <span class="new">NEW</span> (see §12). Optional <code>reason</code>. → <code>account_status: banned</code>. Response carries <code>cancelled_bookings</code> + <code>commission_charged</code>.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/ban-gradual</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Ban after winding down.</b> Refunds pending bookings (100%), keeps <code>approved</code> ones so the vendor can finish, auto-bans when the last one is done. No commission clawback. → <code>account_status: winding_down</code>.</div></div></div>
   <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/vendors/{id}/unban</span> <span class="badge b-super">super_admin</span><div class="desc">Reinstate a banned / winding-down vendor → <code>account_status: active</code>.</div></div></div>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/{id}/wallet</span> <span class="badge b-super">super_admin</span><div class="desc">A vendor's wallet: <code>available_balance</code>, <code>pending_clearance</code>, <code>total_earned</code> + full ledger. For money disputes.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/vendors/{id}/wallet</span> <span class="badge b-super">super_admin</span><div class="desc">A vendor's wallet: <code>available_balance</code> (can be <b>negative</b> = owes the platform after a clawback), <code>pending_clearance</code>, <code>total_earned</code> + full ledger.</div></div></div>
 
   <!-- USERS -->
-  <h2>5 · Users</h2>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/users</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?search=</span> (name / phone).</div></div></div>
+  <h2>6 · Users</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/users</span> <span class="badge b-both">both</span><div class="desc">Paginated list + <code>bookings_count</code> per row <span class="new">NEW</span>. <span class="q">?search=</span> (name / phone) &nbsp; <span class="q">?is_active=0|1</span> <span class="new">NEW</span> (Active / Banned tabs).</div></div></div>
   <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/users/{id}</span> <span class="badge b-both">both</span><div class="desc">One user + their bookings (with vendor &amp; product).</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/users/{id}/toggle</span> <span class="badge b-super">super_admin</span><div class="desc">Ban / unban a user (flips <code>is_active</code>). A banned user can't use the app.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/users/{id}/toggle</span> <span class="badge b-super">super_admin</span><div class="desc">Ban / unban a user (flips <code>is_active</code>; a banned user can't use the app). <b>Guarded</b> <span class="new">NEW</span>: refuses (422 + count) if the user has a <b>paid</b> active booking — settle it first. Unpaid-draft-only → succeeds with a <code>warning</code>. Bookings/money are never auto-cancelled here; a ban is a pure lock-out.</div></div></div>
 
   <!-- BOOKINGS -->
-  <h2>6 · Bookings &amp; disputes</h2>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/bookings</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?status=</span> <span class="q">?vendor_id=</span> <span class="q">?user_id=</span></div></div></div>
+  <h2>7 · Bookings &amp; disputes</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/bookings</span> <span class="badge b-both">both</span><div class="desc">Paginated list. <span class="q">?status=</span> <span class="q">?vendor_id=</span> <span class="q">?user_id=</span> <span class="q">?search=</span> <span class="new">NEW</span> (booking id / customer / vendor name).</div></div></div>
   <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/bookings/{id}</span> <span class="badge b-both">both</span><div class="desc">Full booking: customer, vendor, product, and <b>payment</b>.</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/bookings/{id}/cancel</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Dispute resolution.</b> Cancels ONE booking, refunds the customer <b>100%</b>, reverses the vendor's credit — the vendor's account is untouched. <code>reason</code> required.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/bookings/{id}/cancel</span> <span class="badge b-super">super_admin</span><div class="desc"><b>Dispute resolution.</b> Cancels ONE booking, refunds the customer <b>100%</b>, reverses the vendor's credit — vendor account untouched, <b>no</b> commission clawback (fault unclear). <code>reason</code> required.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/bookings/{id}/cancel-vendor-request</span> <span class="badge b-super">super_admin</span><div class="desc"><span class="new">NEW</span> <b>Vendor asked to back out.</b> Only for an <code>approved</code> booking (422 otherwise). Customer refunded 100% <b>and</b> the platform commission is charged to the vendor's wallet (he caused it). Response: <code>refund_amount</code> + <code>commission_charged</code>.</div></div></div>
+
+  <!-- SUPPORT -->
+  <h2>8 · Support (tickets &amp; chats) <span class="new">NEW</span></h2>
+  <p>One inbox for both <b>user tickets</b> and <b>vendor chats</b>. A user opens a ticket; it stays a one-way ticket until an admin replies (the admin decides whether it becomes a conversation). A vendor has one persistent chat. Both roles handle support.</p>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/support</span> <span class="badge b-both">both</span><div class="desc">Inbox. <span class="q">?owner_type=user|vendor</span> <span class="q">?status=open|in_review|resolved</span> <span class="q">?unread=1</span>. Returns <code>counts</code> (per status + total unread) and each thread with <code>owner_name</code>, <code>owner_phone</code>, <code>unread_count</code>.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/support/{id}</span> <span class="badge b-both">both</span><div class="desc">Full thread: all messages + <code>owner</code> + the linked <b>booking</b> context (vendor, product, payment) for user tickets. Opening it marks the owner's messages read.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/support/{id}/messages</span> <span class="badge b-both">both</span><div class="desc">Admin reply (<code>message</code>). On a fresh user ticket this opens the chat → moves it to <code>in_review</code>, sets <code>handled_by</code>, and notifies the owner.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/support/{id}/resolve</span> <span class="badge b-both">both</span><div class="desc">Close the thread (audited, owner notified). A user ticket stays closed (new problem = new ticket); a vendor chat quietly reopens if the vendor writes again.</div></div></div>
+  <p class="tag">Ticket <code>category</code> (user tickets): <code>no_show | payment | behavior | other</code> — routes the admin to the right action (money vs vendor behaviour). The app-side ticket/report endpoints are in §13.</p>
 
   <!-- MODERATION -->
-  <h2>7 · Content moderation</h2>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/reviews</span> <span class="badge b-both">both</span><div class="desc">Paginated reviews. <span class="q">?vendor_id=</span></div></div></div>
-  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/reviews/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Delete an abusive review, then recompute the vendor's <code>rating_avg</code>.</div></div></div>
-  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/products/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Remove an inappropriate product listing (and its images from storage).</div></div></div>
-  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/portfolio/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Remove an inappropriate portfolio item (and its images).</div></div></div>
+  <h2>9 · Content moderation</h2>
+  <p>Three tabs: reviews, products, portfolio. Each list carries <code>reports_count</code> (pending reports) <span class="new">NEW</span> → show the <b>FLAGGED / REPORTED</b> badge when &gt; 0.</p>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/reviews</span> <span class="badge b-both">both</span><div class="desc">Paginated reviews + <code>reports_count</code>. <span class="q">?vendor_id=</span></div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/products</span> <span class="badge b-both">both</span><div class="desc"><span class="new">NEW</span> Products grid for moderation + <code>reports_count</code> + vendor + images. <span class="q">?search=</span> <span class="q">?vendor_id=</span></div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/portfolio</span> <span class="badge b-both">both</span><div class="desc"><span class="new">NEW</span> Portfolio grid for moderation + <code>reports_count</code> + vendor + images. <span class="q">?vendor_id=</span></div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/reviews/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Delete an abusive review, recompute the vendor's <code>rating_avg</code>, and drop its reports.</div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/products/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Remove a product listing (+ its images + its reports).</div></div></div>
+  <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/portfolio/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Remove a portfolio item (+ its images + its reports).</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/reports/{type}/{id}/dismiss</span> <span class="badge b-super">super_admin</span><div class="desc"><span class="new">NEW</span> Clear a <b>false</b> flag without deleting the content. <code>{type}</code> = <code>review|product|portfolio_item</code>. Audited; the badge disappears.</div></div></div>
 
   <!-- MONEY OVERSIGHT -->
-  <h2>8 · Money oversight</h2>
+  <h2>10 · Money oversight</h2>
   <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/payments</span> <span class="badge b-super">super_admin</span><div class="desc">All incoming payments (with booking → user &amp; vendor).</div></div></div>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/refunds-due</span> <span class="badge b-super">super_admin</span><div class="desc">Cancelled bookings that still owe the customer money + <code>total_due</code>. This is the "to-pay-out" worklist.</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/refunds/{id}/mark-paid</span> <span class="badge b-super">super_admin</span><div class="desc">After sending the money manually, mark the refund paid → it drops off the list.</div></div></div>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/withdrawals</span> <span class="badge b-super">super_admin</span><div class="desc">Vendor withdrawal requests + <code>total_unpaid</code>. <span class="q">?unpaid=1</span> for outstanding only.</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/withdrawals/{id}/mark-paid</span> <span class="badge b-super">super_admin</span><div class="desc">Mark a vendor payout as sent.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/refunds-due</span> <span class="badge b-super">super_admin</span><div class="desc">Cancelled/declined bookings that still owe the customer money + <code>total_due</code>. Excludes paid AND waived. The "to-pay-out" worklist.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/refunds/{id}/mark-paid</span> <span class="badge b-super">super_admin</span><div class="desc">After sending the money manually, mark it paid → drops off the list. (Refused if the refund was waived.)</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/refunds/{id}/waive</span> <span class="badge b-super">super_admin</span><div class="desc"><span class="new">NEW</span> Officially <b>keep the money</b> (e.g. fraud) — <code>reason</code> required, audited. The third fate of a refund: <b>paid / waived / still-pending</b>.</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/withdrawals</span> <span class="badge b-super">super_admin</span><div class="desc">Vendor withdrawal requests + <code>total_unpaid</code>. <span class="q">?unpaid=1</span> = outstanding only (excludes paid AND rejected).</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/withdrawals/{id}/mark-paid</span> <span class="badge b-super">super_admin</span><div class="desc">Mark a vendor payout as sent. (Refused if the request was rejected.)</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/withdrawals/{id}/reject</span> <span class="badge b-super">super_admin</span><div class="desc"><span class="new">NEW</span> Reject a suspicious request — <code>reason</code> required. The held amount returns to the vendor's available balance automatically, and it leaves the payout queue.</div></div></div>
   <p class="tag">⚠️ The actual money send is manual for now — real automated payout waits on the ShamCash payout API. These endpoints give full visibility + tracking today.</p>
 
   <!-- AUDIT + ADMINS -->
-  <h2>9 · Audit &amp; admin accounts</h2>
-  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/audit-logs</span> <span class="badge b-super">super_admin</span><div class="desc">Every sensitive action, newest first: who (admin), what (action), on what (target), when. Every mutating action is logged.</div></div></div>
+  <h2>11 · Audit &amp; admin accounts</h2>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/audit-logs</span> <span class="badge b-super">super_admin</span><div class="desc">Every sensitive action, newest first: who (admin), what (action), on what (<code>target_type</code> + <code>target_id</code>), when. <span class="q">?search=</span> (action / admin name).</div></div></div>
   <div class="ep"><div class="m get">GET</div><div><span class="path">/admin/admins</span> <span class="badge b-super">super_admin</span><div class="desc">List admin accounts (id, name, email, role, last_login_at).</div></div></div>
-  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/admins</span> <span class="badge b-super">super_admin</span><div class="desc">Create an admin (usually a <code>support</code> account). <code>name,email,password,role</code>.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/admin/admins</span> <span class="badge b-super">super_admin</span><div class="desc">Create an admin (usually <code>support</code>). <code>name,email,password,role</code>.</div></div></div>
   <div class="ep"><div class="m del">DEL</div><div><span class="path">/admin/admins/{id}</span> <span class="badge b-super">super_admin</span><div class="desc">Delete an admin. Can't delete your own account.</div></div></div>
 
   <!-- KEY CONCEPTS -->
-  <h2>10 · Key concepts (behaviour)</h2>
+  <h2>12 · Key concepts (behaviour)</h2>
 
   <h3>Vendor account states</h3>
   <div class="flow"><span class="pill p-active">active</span> is_active=1               → normal, visible, takes bookings
@@ -161,61 +189,90 @@ th{background:var(--card2);color:var(--gold);font-size:12.5px;text-transform:upp
                                 to FINISH existing approved bookings
 <span class="pill p-ban">banned</span> is_active=0, winding_down=0 → fully blocked
 </div>
-  <p>The API exposes a computed <code>account_status</code> = <code>active | winding_down | banned</code> on every vendor object — use it directly for status badges/filters in the UI.</p>
+  <p>Every vendor object exposes a computed <code>account_status</code> = <code>active | winding_down | banned</code> — use it directly for badges/filters (or the <code>?status=</code> filter on the list).</p>
 
   <div class="grid2">
     <div class="concept">
       <h3>Two ban modes</h3>
-      <div class="flow"><b style="color:#ff8a8a">Immediate</b>  → cancel + refund ALL,
-             ban now. (fraud)
+      <div class="flow"><b style="color:#ff8a8a">Immediate</b>  → cancel + refund ALL;
+             claw commission on
+             approved ones. (fraud)
 <b style="color:var(--amber)">Gradual</b>    → refund pending, keep
              approved, auto-ban when
              done. (normal removal)</div>
     </div>
     <div class="concept">
       <h3>Escrow (why refunds are safe)</h3>
-      <p style="margin:0">A vendor's earnings stay <b>pending</b> until the booking is <b>completed</b> (service delivered) — not withdrawable before. So if a booking is cancelled/banned before the event, the money is still held and the customer can always be refunded.</p>
+      <p style="margin:0">A vendor's earnings stay <b>pending</b> until the booking is <b>completed</b> — not withdrawable before. So if a booking is cancelled/banned before the event, the money is still held and the customer can always be refunded.</p>
     </div>
   </div>
 
-  <h3 style="margin-top:18px">Refund fairness</h3>
+  <h3 style="margin-top:18px">Commission — who bears it on a cancellation <span class="new">NEW</span></h3>
+  <p>A refund returns 100% to the customer. The question is who eats the platform's 15% commission:</p>
+  <table>
+    <tr><th>Cancellation</th><th>Commission</th></tr>
+    <tr><td>Vendor-requested cancel · Fraud ban (approved bookings)</td><td class="deny">charged to the vendor (he caused it) — wallet can go negative</td></tr>
+    <tr><td>Dispute cancel · Gradual ban</td><td>absorbed by the platform (fault unclear / considerate removal)</td></tr>
+  </table>
+
+  <h3 style="margin-top:18px">Gross vs net profit <span class="new">NEW</span></h3>
+  <p><code>stats/financial → net</code>: <code>gross_profit</code> − <code>commission_lost</code> (refunds the platform absorbed) = <code>net_profit</code>. Also <code>refunded_to_customers</code> and <code>commission_reclaimed</code> (clawed back from vendors). The <code>summary</code> block stays gross; <code>net</code> is the honest bottom line.</p>
+
+  <div class="grid2" style="margin-top:8px">
+    <div class="concept">
+      <h3>Refund — three fates</h3>
+      <p style="margin:0">Stored on the booking: <code>refund_amount</code>, <code>refund_paid_at</code>, <code>refund_waived_at</code>.<br><b>Paid</b> (sent) · <b>Waived</b> (kept, e.g. fraud) · <b>Pending</b> (still in refunds-due).</p>
+    </div>
+    <div class="concept">
+      <h3>Support model</h3>
+      <p style="margin:0"><b>User</b> → ticket; can't reply until an admin does. <b>Vendor</b> → one persistent chat. Resolving closes a ticket for good; a vendor chat reopens on a new message.</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:18px">Customer self-cancel — refund tiers</h3>
   <table>
     <tr><th>Who cancels</th><th>Customer gets back</th></tr>
-    <tr><td>Platform (admin ban / dispute)</td><td class="allow">100% — customer did nothing wrong</td></tr>
+    <tr><td>Platform (ban / dispute / vendor-request)</td><td class="allow">100% — customer did nothing wrong</td></tr>
     <tr><td>Customer, within 24h of approval</td><td>100%</td></tr>
     <tr><td>Customer, 24–72h</td><td>50%</td></tr>
     <tr><td>Customer, after 72h</td><td>0%</td></tr>
   </table>
-  <p>The amount owed is stored on the booking (<code>refund_amount</code>, <code>refund_paid_at</code>) so it shows up in <code>/admin/refunds-due</code> until paid.</p>
+
+  <!-- APP-SIDE FEEDERS -->
+  <h2>13 · App-side endpoints that feed the admin <span class="new">NEW</span></h2>
+  <p>These live on the customer / vendor apps (guards <code>auth:sanctum</code> / <code>auth:vendors</code>), not the admin panel — but they create the tickets, reports and requests the admin sees. Listed so the contract is complete.</p>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/support/tickets</span> <span class="badge b-app">user</span><div class="desc">Open a ticket: <code>subject</code>, <code>message</code>, optional <code>booking_id</code> (own) + <code>category</code>. Also: <code>GET /support/tickets</code>, <code>GET /support/tickets/{id}</code>, <code>POST /support/tickets/{id}/messages</code> (only after an admin replied).</div></div></div>
+  <div class="ep"><div class="m get">GET</div><div><span class="path">/vendor/support</span> <span class="badge b-app">vendor</span><div class="desc">The vendor's persistent support chat (auto-created). Send with <code>POST /vendor/support/messages</code>.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/reviews/{id}/report · /products/{id}/report · /portfolio/{id}/report</span> <span class="badge b-app">user</span><div class="desc">Report content (optional <code>reason</code>) → creates a pending report (the moderation badge). Vendors can report an abusive review via <code>/vendor/reviews/{id}/report</code>. Re-reporting is a silent no-op.</div></div></div>
+  <div class="ep"><div class="m post">POST</div><div><span class="path">/vendor/withdraw</span> <span class="badge b-app">vendor</span><div class="desc">Vendor requests a payout of the full available balance → appears in <code>/admin/withdrawals</code> and pings super_admins.</div></div></div>
 
   <!-- QUICK REFERENCE -->
-  <h2>11 · Quick reference — all endpoints</h2>
+  <h2>14 · Quick reference — all admin endpoints</h2>
   <table>
     <tr><th>Method</th><th>Endpoint</th><th>Role</th></tr>
-    <tr><td>POST</td><td><code>/admin/login</code></td><td>public</td></tr>
-    <tr><td>POST</td><td><code>/admin/logout</code></td><td>any</td></tr>
+    <tr><td>POST</td><td><code>/admin/login</code> · <code>/logout</code></td><td>public / any</td></tr>
     <tr><td>GET</td><td><code>/admin/dashboard</code></td><td>both</td></tr>
     <tr><td>GET</td><td><code>/admin/stats/financial</code></td><td>super</td></tr>
-    <tr><td>GET</td><td><code>/admin/vendors</code> · <code>/pending</code> · <code>/{id}</code></td><td>both</td></tr>
+    <tr><td>GET/POST</td><td><code>/admin/notifications</code> · <code>/read-all</code> · <code>/{id}/read</code></td><td>any</td></tr>
+    <tr><td>GET</td><td><code>/admin/vendors</code> · <code>/pending</code> · <code>/{id}</code> · <code>/{id}/wallet</code></td><td>both / super(wallet)</td></tr>
     <tr><td>POST</td><td><code>/admin/vendors/{id}/approve</code> · <code>/reject</code></td><td>both</td></tr>
     <tr><td>POST</td><td><code>/admin/vendors/{id}/ban</code> · <code>/ban-gradual</code> · <code>/unban</code></td><td>super</td></tr>
-    <tr><td>GET</td><td><code>/admin/vendors/{id}/wallet</code></td><td>super</td></tr>
     <tr><td>GET</td><td><code>/admin/users</code> · <code>/{id}</code></td><td>both</td></tr>
     <tr><td>POST</td><td><code>/admin/users/{id}/toggle</code></td><td>super</td></tr>
     <tr><td>GET</td><td><code>/admin/bookings</code> · <code>/{id}</code></td><td>both</td></tr>
-    <tr><td>POST</td><td><code>/admin/bookings/{id}/cancel</code></td><td>super</td></tr>
-    <tr><td>GET</td><td><code>/admin/reviews</code></td><td>both</td></tr>
+    <tr><td>POST</td><td><code>/admin/bookings/{id}/cancel</code> · <code>/cancel-vendor-request</code></td><td>super</td></tr>
+    <tr><td>GET/POST</td><td><code>/admin/support</code> · <code>/{id}</code> · <code>/{id}/messages</code> · <code>/{id}/resolve</code></td><td>both</td></tr>
+    <tr><td>GET</td><td><code>/admin/reviews</code> · <code>/products</code> · <code>/portfolio</code></td><td>both</td></tr>
     <tr><td>DELETE</td><td><code>/admin/reviews/{id}</code> · <code>/products/{id}</code> · <code>/portfolio/{id}</code></td><td>super</td></tr>
-    <tr><td>GET</td><td><code>/admin/payments</code></td><td>super</td></tr>
-    <tr><td>GET</td><td><code>/admin/refunds-due</code></td><td>super</td></tr>
-    <tr><td>POST</td><td><code>/admin/refunds/{id}/mark-paid</code></td><td>super</td></tr>
-    <tr><td>GET</td><td><code>/admin/withdrawals</code></td><td>super</td></tr>
-    <tr><td>POST</td><td><code>/admin/withdrawals/{id}/mark-paid</code></td><td>super</td></tr>
+    <tr><td>POST</td><td><code>/admin/reports/{type}/{id}/dismiss</code></td><td>super</td></tr>
+    <tr><td>GET</td><td><code>/admin/payments</code> · <code>/refunds-due</code> · <code>/withdrawals</code></td><td>super</td></tr>
+    <tr><td>POST</td><td><code>/admin/refunds/{id}/mark-paid</code> · <code>/waive</code></td><td>super</td></tr>
+    <tr><td>POST</td><td><code>/admin/withdrawals/{id}/mark-paid</code> · <code>/reject</code></td><td>super</td></tr>
     <tr><td>GET</td><td><code>/admin/audit-logs</code></td><td>super</td></tr>
     <tr><td>GET/POST/DELETE</td><td><code>/admin/admins</code> · <code>/{id}</code></td><td>super</td></tr>
   </table>
 
-  <div class="foot">Haflati · Admin module — built &amp; tested (20 feature tests). Generated as a design reference for the React admin panel · 2026</div>
+  <div class="foot">Haflati · Admin module — built &amp; tested (20 feature tests + 124 verified assertions across support, reporting, money, ban, bell). Reference for the React admin panel · updated Aug 2026</div>
 </div>
 </body>
 </html>

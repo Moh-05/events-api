@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\StoresImages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class VendorProfileController extends Controller
 {
+    use StoresImages;
+
     public function show(Request $request)
     {
         return response()->json([
@@ -26,12 +29,14 @@ class VendorProfileController extends Controller
             'longitude'     => 'sometimes|numeric|between:-180,180',
             'address'       => 'sometimes|string|max:255',
             'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
+            'cover_image'   => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
             'vendor_type'   => 'sometimes|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
             'vendor_style'  => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
+            'response_time' => 'sometimes|in:within_1h,within_2h,within_3h,within_24h',
         ]);
 
         $vendor = $request->user();
-        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style']);
+        $data   = $request->only(['business_name', 'bio', 'birth_date', 'latitude', 'longitude', 'address', 'vendor_type', 'vendor_style', 'response_time']);
 
         if ($request->filled('vendor_type')) {
             // Seller categories are order-based; every other (service) category is appointment-based.
@@ -41,10 +46,22 @@ class VendorProfileController extends Controller
 
         if ($request->hasFile('profile_image')) {
             if ($vendor->profile_image) {
-                Storage::disk('public')->delete($vendor->profile_image);
+                Storage::disk('supabase')->delete($vendor->profile_image);
             }
-            $data['profile_image'] = $request->file('profile_image')
-                ->store('vendor_images', 'public');
+            $data['profile_image'] = $this->storeImageOrFail(
+                $request->file('profile_image'),
+                'vendor_images'
+            );
+        }
+
+        if ($request->hasFile('cover_image')) {
+            if ($vendor->cover_image) {
+                Storage::disk('supabase')->delete($vendor->cover_image);
+            }
+            $data['cover_image'] = $this->storeImageOrFail(
+                $request->file('cover_image'),
+                'vendor_covers'
+            );
         }
 
         $vendor->update($data);
@@ -60,13 +77,52 @@ class VendorProfileController extends Controller
         $vendor = $request->user();
 
         if ($vendor->profile_image) {
-            Storage::disk('public')->delete($vendor->profile_image);
+            Storage::disk('supabase')->delete($vendor->profile_image);
             $vendor->update(['profile_image' => null]);
         }
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Profile image removed'
+        ]);
+    }
+
+    public function deleteCover(Request $request)
+    {
+        $vendor = $request->user();
+
+        if ($vendor->cover_image) {
+            Storage::disk('supabase')->delete($vendor->cover_image);
+            $vendor->update(['cover_image' => null]);
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Cover image removed'
+        ]);
+    }
+
+    // Vendor sets themselves online / offline for new bookings. Offline = hidden
+    // from browse + can't receive new bookings, but stays logged in and manages
+    // existing ones. Send { is_accepting_bookings: true|false }, or send nothing
+    // to flip the current value.
+    public function toggleAvailability(Request $request)
+    {
+        $request->validate([
+            'is_accepting_bookings' => 'sometimes|boolean',
+        ]);
+
+        $vendor = $request->user();
+
+        $vendor->update([
+            'is_accepting_bookings' => $request->has('is_accepting_bookings')
+                ? $request->boolean('is_accepting_bookings')
+                : ! $vendor->is_accepting_bookings,
+        ]);
+
+        return response()->json([
+            'status'                => 'success',
+            'is_accepting_bookings' => $vendor->is_accepting_bookings,
         ]);
     }
 

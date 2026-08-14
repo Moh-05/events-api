@@ -40,14 +40,26 @@ return new class extends Migration
                 'seller',
             ])->nullable();
             $table->string('profile_image')->nullable();
+            $table->string('cover_image')->nullable();
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
             $table->string('address')->nullable();
             $table->text('bio')->nullable();
+            // Vendor-chosen response-time badge (shown on the detail screen).
+            $table->enum('response_time', [
+                'within_1h',
+                'within_2h',
+                'within_3h',
+                'within_24h',
+            ])->nullable();
             $table->decimal('rating_avg', 3, 2)->default(0);
             $table->boolean('is_approved')->default(false);
-            $table->boolean('is_active')->default(true);          // visible to customers + can take new bookings
+            $table->boolean('is_active')->default(true);          // ADMIN ban switch — false = banned (blocks login). NOT vendor-controlled.
             $table->boolean('winding_down')->default(false);      // banned but still allowed to finish existing bookings
+            // Vendor-controlled "open for bookings" toggle. false = the vendor set
+            // themselves offline: hidden from browse + can't receive new bookings,
+            // but stays logged in and manages existing ones. Separate from is_active.
+            $table->boolean('is_accepting_bookings')->default(true);
             $table->text('rejection_reason')->nullable(); // why KYC was rejected (shown to vendor)
             $table->string('fcm_token')->nullable();
             $table->timestamps();

@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\StoresImages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class UserProfileController extends Controller
 {
+    use StoresImages;
+
     public function show(Request $request)
     {
         return response()->json([
@@ -33,10 +36,12 @@ class UserProfileController extends Controller
 
         if ($request->hasFile('profile_image')) {
             if ($user->profile_image) {
-                Storage::disk('public')->delete($user->profile_image);
+                Storage::disk('supabase')->delete($user->profile_image);
             }
-            $data['profile_image'] = $request->file('profile_image')
-                ->store('profile_images', 'public');
+            $data['profile_image'] = $this->storeImageOrFail(
+                $request->file('profile_image'),
+                'profile_images'
+            );
         }
 
         $user->update($data);
@@ -52,7 +57,7 @@ class UserProfileController extends Controller
         $user = $request->user();
 
         if ($user->profile_image) {
-            Storage::disk('public')->delete($user->profile_image);
+            Storage::disk('supabase')->delete($user->profile_image);
             $user->update(['profile_image' => null]);
         }
 

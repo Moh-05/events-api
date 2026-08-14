@@ -92,6 +92,7 @@ td.ar{direction:rtl;text-align:right}
     <a href="#stats">6 · Stats & Earnings</a>
     <a href="#wallet">7 · Wallet</a>
     <a href="#notifications">8 · Notifications</a>
+    <a href="#portfolio">9 · Portfolio</a>
   </div>
 
   <!-- ═══════════ 1 · AUTH ═══════════ -->
@@ -112,7 +113,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/verify-otp</span><span class="lock">🌐 Public</span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">يتحقق من الـ OTP. إذا الرقم موجود مسبقاً → بيرجّع <code>status: login</code> مع <code>token</code>. إذا جديد → بيرجّع <code>status: new_vendor</code> مع <code>registration_token</code> لإكمال التسجيل.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">يتحقق من الـ OTP. إذا الرقم موجود مسبقاً → بيرجّع <code>status: login</code> مع <code>token</code>. إذا جديد → بيرجّع <code>status: new_vendor</code> مع <code>registration_token</code> لإكمال التسجيل. إذا الحساب محظور → <code>status: suspended</code> (403).</div></div>
       <div class="lbl">Body</div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
@@ -125,7 +126,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/complete-registration</span><span class="lock">🌐 Public</span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">ينشئ حساب الـ vendor الجديد ويرجّع الـ <code>token</code>. يُستدعى فقط لما يكون الرقم جديد (بعد <code>new_vendor</code>).</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">ينشئ حساب الـ vendor الجديد ويرجّع الـ <code>token</code>. يُستدعى فقط لما يكون الرقم جديد (بعد <code>new_vendor</code>). الـ <code>vendor_type</code> بيحدّد الـ <code>booking_style</code> تلقائياً (فئات البيع = order، فئات الخدمات = appointment).</div></div>
       <div class="lbl">Body</div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
@@ -134,6 +135,8 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">last_name</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">حروف فقط، 2–50.</td></tr>
         <tr><td class="field">city</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">المدينة، 2–100.</td></tr>
         <tr><td class="field">birth_date</td><td class="type">date</td><td><span class="tag t-req">required</span></td><td class="ar">تاريخ ميلاد صالح (<code>YYYY-MM-DD</code>) قبل اليوم.</td></tr>
+        <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">الفئة. خدمات: <span class="enum">photographer · makeupArtist · dj · weddingHall</span> · بيع: <span class="enum">flowers · gifts · dresses · accessories · candles · cakes</span></td></tr>
+        <tr><td class="field">vendor_style</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar"><span class="enum">service_provider · seller</span> — حقل مساعد للتطبيق فقط (بدون منطق بالـ backend)، بيرجع مع بيانات الـ vendor.</td></tr>
       </table>
     </div>
   </div>
@@ -150,18 +153,6 @@ td.ar{direction:rtl;text-align:right}
   </div>
 
   <div class="ep">
-    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/profile/type</span><span class="lock">🔒 <b>Token</b></span></div>
-    <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">يحدّد نوع الـ vendor (يُضبط مرة بعد التسجيل). النوع بيحدّد الـ booking_style تلقائياً (<code>cake_shop</code> = order، الباقي = appointment).</div></div>
-      <div class="lbl">Body</div>
-      <table>
-        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
-        <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">واحد من: <span class="enum">wedding_venue · photographer · cake_shop · dj</span></td></tr>
-      </table>
-    </div>
-  </div>
-
-  <div class="ep">
     <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/profile</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يحدّث بيانات البروفايل. كل الحقول اختيارية — أرسل فقط ما تريد تغييره. لرفع صورة بروفايل استخدم <code>multipart/form-data</code>.</div></div>
@@ -174,7 +165,10 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">latitude</td><td class="type">numeric</td><td><span class="tag t-opt">optional</span></td><td class="ar">خط العرض (−90 … 90).</td></tr>
         <tr><td class="field">longitude</td><td class="type">numeric</td><td><span class="tag t-opt">optional</span></td><td class="ar">خط الطول (−180 … 180).</td></tr>
         <tr><td class="field">address</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">العنوان، حتى 255.</td></tr>
+        <tr><td class="field">vendor_type</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">الفئة (نفس قيم complete-registration). يضبط <code>booking_style</code> تلقائياً.</td></tr>
+        <tr><td class="field">vendor_style</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar"><span class="enum">service_provider · seller</span> — حقل مساعد للتطبيق (هون بيختارو الـ vendor). بيرجع مع بيانات الـ vendor عند login/signup.</td></tr>
         <tr><td class="field">profile_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة jpg/jpeg/png، حد أقصى 2MB.</td></tr>
+        <tr><td class="field">cover_image</td><td class="type">file</td><td><span class="tag t-opt">optional</span></td><td class="ar">صورة الغلاف (cover) للبروفايل. jpg/jpeg/png، حد أقصى 2MB. إعادة الرفع تستبدل الصورة القديمة. بيرجع رابطها بحقل <code>cover_image_url</code>.</td></tr>
       </table>
     </div>
   </div>
@@ -183,6 +177,14 @@ td.ar{direction:rtl;text-align:right}
     <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/image</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
       <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة البروفايل الحالية.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/profile/cover</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحذف صورة الغلاف (cover) الحالية. رفع صورة غلاف يتم عبر <code>POST /vendor/profile</code> بحقل <code>cover_image</code>.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -221,7 +223,7 @@ td.ar{direction:rtl;text-align:right}
         <tr><td class="field">name</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">اسم المنتج، حتى 255.</td></tr>
         <tr><td class="field">description</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">الوصف.</td></tr>
         <tr><td class="field">price</td><td class="type">numeric</td><td><span class="tag t-opt">optional</span></td><td class="ar">السعر (≥ 0).</td></tr>
-        <tr><td class="field">stock</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">الكمية (لمتاجر الطلبات مثل cake_shop).</td></tr>
+        <tr><td class="field">stock</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">الكمية (لفئات البيع — <code>booking_style = order</code> مثل cakes / flowers).</td></tr>
         <tr><td class="field">meta</td><td class="type">array</td><td><span class="tag t-opt">optional</span></td><td class="ar">بيانات إضافية حرّة (key/value).</td></tr>
         <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">ترتيب الصورة الرئيسية (افتراضي 0).</td></tr>
       </table>
@@ -304,7 +306,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/bookings</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">كل حجوزات الـ vendor (الأحدث أولاً) مع المنتج المرتبط وبيانات العميل (كائن <code>user</code>: id، first_name، last_name، profile_image).</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -348,7 +350,7 @@ td.ar{direction:rtl;text-align:right}
   <div class="ep">
     <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/bookings/{id}/approve</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor (محجوز 3 أيام).</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">الموافقة على حجز مدفوع (<code>pending</code> → <code>approved</code>). عند الموافقة يُضاف مبلغ العربون لمحفظة الـ vendor لكنه محجوز (pending) حتى يكتمل الحجز (<code>completed</code>)، وعندها يصبح متاحاً للسحب.</div></div>
       <div class="lbl">Path</div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
@@ -385,9 +387,42 @@ td.ar{direction:rtl;text-align:right}
   </div>
 
   <div class="ep">
-    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/booked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/availability/toggle</span><span class="lock">🔒 <b>Token</b></span></div>
     <div class="ep-body">
-      <div class="job"><div class="lbl">Job</div><div class="ar">التواريخ المحجوزة (<code>pending</code> أو <code>approved</code>) لاستخدامها في تعطيل أيام الـ calendar.</div></div>
+      <div class="job"><div class="lbl">Job</div><div class="ar">يبدّل حالة الـ vendor بين متاح / غير متاح لاستقبال الحجوزات. لما يكون <code>is_accepting_bookings = false</code>: يظل ظاهراً في التصفّح لكن صفحته تعرض "غير متاح حالياً لاستقبال الحجوزات" ولا يمكن الحجز منه (403)، ويبقى مسجّل دخوله ويدير حجوزاته الحالية. مختلف تماماً عن <code>is_active</code> (حظر الأدمن).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">is_accepting_bookings</td><td class="type">boolean</td><td><span class="tag t-opt">optional</span></td><td class="ar">القيمة المطلوبة. إذا لم تُرسل، يقلب القيمة الحالية (toggle).</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/availability</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تقويم الـ vendor: <code>booked</code> (تواريخ عليها حجوزات نشطة تلقائياً) و <code>blocked</code> (تواريخ عطّلها الـ vendor يدوياً — كل واحد فيه id و date و reason). لمزوّدي المواعيد فقط.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/blocked-dates</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يعطّل يوماً يدوياً (مثلاً حجز تم خارج التطبيق، أو يوم إجازة). اليوم المعطّل يصير غير متاح للحجز داخل التطبيق. لا يمكن تعطيل يوم عليه حجز أصلاً (409).</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">date</td><td class="type">date</td><td><span class="tag t-req">required</span></td><td class="ar">اليوم المراد تعطيله (اليوم أو بعده).</td></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب اختياري يظهر للـ vendor، حتى 255.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/blocked-dates/{date}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يلغي تعطيل يوم (يرجّعه متاحاً). <code>{date}</code> بصيغة YYYY-MM-DD في الـ URL. 404 إذا اليوم مش معطّل.</div></div>
       <div class="lbl">Body</div><div class="none">No body.</div>
     </div>
   </div>
@@ -434,9 +469,9 @@ td.ar{direction:rtl;text-align:right}
   <h2 id="wallet">7 · Wallet <span style="font-size:14px;color:var(--dim)">— المحفظة</span></h2>
 
   <div class="note-ar ar">
-    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز 3 أيام</b> (فترة استرجاع العميل). بعد 3 أيام يصبح <b>متاحاً للسحب</b>.
+    منطق المحفظة: عند موافقة الـ vendor على حجز، يُضاف مبلغه للمحفظة لكنه <b>محجوز (pending)</b> طالما الحجز قيد التنفيذ (<code>pending</code>/<code>approved</code>)، ويصبح <b>متاحاً للسحب</b> عند اكتمال الحجز (<code>completed</code>) أو إلغائه نهائياً (<code>cancelled</code>).
     <span class="pill">available_balance</span> القابل للسحب الآن ·
-    <span class="pill">pending_clearance</span> محجوز ضمن الـ 3 أيام ·
+    <span class="pill">pending_clearance</span> محجوز حتى يكتمل الحجز ·
     <span class="pill">total_earned</span> الأرباح المؤكدة (بعد خصم الاسترجاعات).
   </div>
 
@@ -487,8 +522,90 @@ td.ar{direction:rtl;text-align:right}
     </div>
   </div>
 
+  <!-- ═══════════ 9 · PORTFOLIO ═══════════ -->
+  <h2 id="portfolio">9 · Portfolio <span style="font-size:14px;color:var(--dim)">— معرض الأعمال</span></h2>
+
+  <div class="note-ar ar">
+    معرض أعمال الـ vendor: كل عنصر (item) إله عنوان ووصف و<b>عدّة صور</b> — صورة رئيسية (<code>is_primary = true</code>) والباقي. نفس فكرة المنتجات بس بدون سعر. الصور تُرفع عبر <code>multipart/form-data</code>.
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/portfolio</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع كل عناصر معرض الـ vendor الحالي مع صورها (الأحدث أولاً).</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/portfolio</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">ينشئ عنصر معرض جديد. الصور <b>مطلوبة</b>. الطلب <code>multipart/form-data</code>.</div></div>
+      <div class="lbl">Body <span style="color:var(--dim);font-weight:400">(multipart/form-data)</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">images[]</td><td class="type">file[]</td><td><span class="tag t-req">required</span></td><td class="ar">صورة واحدة على الأقل، jpg/jpeg/png، حد أقصى 2MB لكل صورة.</td></tr>
+        <tr><td class="field">title</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">عنوان العنصر، حتى 255.</td></tr>
+        <tr><td class="field">description</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">وصف العنصر.</td></tr>
+        <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">ترتيب الصورة الرئيسية (افتراضي 0).</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendor/portfolio/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يرجّع عنصر واحد بكل صوره (شاشة التفاصيل: صورة رئيسية + الباقي). للـ vendor صاحب العنصر فقط.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم العنصر في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/vendor/portfolio/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحدّث العنصر: تعديل العنوان/الوصف، إضافة صور، أو حذف صور موجودة. كل الحقول اختيارية. استخدم <code>multipart/form-data</code> عند إرسال صور.</div></div>
+      <div class="lbl">Path & Body <span style="color:var(--dim);font-weight:400">(multipart/form-data if images)</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم العنصر في الـ URL.</td></tr>
+        <tr><td class="field">title / description</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">أرسل فقط ما تريد تعديله.</td></tr>
+        <tr><td class="field">images[]</td><td class="type">file[]</td><td><span class="tag t-opt">optional</span></td><td class="ar">صور جديدة تُضاف للعنصر.</td></tr>
+        <tr><td class="field">delete_image_ids[]</td><td class="type">integer[]</td><td><span class="tag t-opt">optional</span></td><td class="ar">أرقام الصور المراد حذفها.</td></tr>
+        <tr><td class="field">primary_image_index</td><td class="type">integer</td><td><span class="tag t-opt">optional</span></td><td class="ar">تحديد الصورة الرئيسية بين الصور الجديدة المرفوعة.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/vendor/portfolio/{id}</span><span class="lock">🔒 <b>Token</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يحذف العنصر وكل صوره.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{id}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم العنصر في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/vendors/{vendorId}/portfolio</span><span class="lock">🌐 Public</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">عام (بدون token): يرجّع معرض أعمال أي vendor مع الصور — للعرض في تطبيق العميل.</div></div>
+      <div class="lbl">Path</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">{vendorId}</td><td class="type">integer</td><td><span class="tag t-req">required</span></td><td class="ar">رقم الـ vendor في الـ URL.</td></tr>
+      </table>
+    </div>
+  </div>
+
   <div class="foot">
-    Haflati · Vendor App API Reference · for the Flutter team · generated 2026-06-15<br>
+    Haflati · Vendor App API Reference · for the Flutter team · generated 2026-06-27<br>
     Base: <span class="mono">https://events-api-production-138b.up.railway.app/api</span>
   </div>
 

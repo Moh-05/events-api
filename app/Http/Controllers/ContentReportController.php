@@ -6,6 +6,7 @@ use App\Models\ContentReport;
 use App\Models\PortfolioItem;
 use App\Models\Review;
 use App\Models\VendorProduct;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 // "Report this content" from the apps. Creates the pending flag that shows
@@ -13,6 +14,10 @@ use Illuminate\Http\Request;
 // Reporting twice is a silent no-op (unique per reporter + item).
 class ContentReportController extends Controller
 {
+    public function __construct(private NotificationService $notifications)
+    {
+    }
+
     public function reportReview(Request $request, int $id)
     {
         Review::findOrFail($id);
@@ -50,6 +55,17 @@ class ContentReportController extends Controller
             ],
             ['reason' => $data['reason'] ?? null]
         );
+
+        // Only ping the moderators on a genuinely NEW report (dup re-report is
+        // a no-op). Content moderation (delete/dismiss) is super_admin-only.
+        if ($report->wasRecentlyCreated) {
+            $this->notifications->notifyAdmins(
+                ['super_admin'],
+                'Content reported',
+                "A {$type} was reported and needs review.",
+                ['type' => 'content_report', 'reportable_type' => $type, 'reportable_id' => (string) $id]
+            );
+        }
 
         return response()->json([
             'status'  => 'success',

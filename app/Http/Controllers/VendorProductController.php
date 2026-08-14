@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\Concerns\StoresImages;
 use App\Models\Vendor;
 use App\Models\VendorProduct;
 use Illuminate\Support\Facades\Storage;
 
 class VendorProductController extends Controller
 {
+    use StoresImages;
+
     // Get all products across all vendors
     public function index()
     {
@@ -89,7 +92,7 @@ class VendorProductController extends Controller
         if ($request->hasFile('images')) {
             $primaryIndex = (int) ($request->primary_image_index ?? 0);
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('product_images', 'public');
+                $path = $this->storeImageOrFail($image, 'product_images');
 
                 $product->images()->create([
                     'image_path' => $path,
@@ -158,7 +161,7 @@ class VendorProductController extends Controller
                 ->get();
 
             foreach ($imagesToDelete as $image) {
-                Storage::disk('public')->delete($image->image_path);
+                Storage::disk('supabase')->delete($image->image_path);
                 $image->delete();
             }
         }
@@ -168,7 +171,7 @@ class VendorProductController extends Controller
             $primaryIndex = $request->primary_image_index ?? null;
 
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('product_images', 'public');
+                $path = $this->storeImageOrFail($image, 'product_images');
 
                 $product->images()->create([
                     'image_path' => $path,
@@ -235,7 +238,7 @@ class VendorProductController extends Controller
             ->firstOrFail();
 
         foreach ($product->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            Storage::disk('supabase')->delete($image->image_path);
         }
 
         $product->delete();

@@ -17,9 +17,11 @@ class SavedItemController extends Controller
             ->whereHas('product.vendor', fn ($q) => $q->where('is_active', true))
             ->with([
                 'product.images',
-                // is_active + winding_down are needed by the appended
-                // account_status attribute — omitting them makes it read "banned".
-                'product.vendor:id,business_name,profile_image,vendor_type,booking_style,is_active,winding_down',
+                // The Vendor model appends account_status (needs is_active +
+                // winding_down) and cover_image_url (needs cover_image); a
+                // column-limited select must carry those source columns, or the
+                // appended attributes silently compute on null (wrong data).
+                'product.vendor:id,business_name,profile_image,cover_image,vendor_type,booking_style,is_active,winding_down',
             ])
             ->latest()
             ->get();

@@ -10,12 +10,14 @@ use App\Models\Review;
 use App\Models\VendorProduct;
 use App\Models\PortfolioItem;
 use App\Models\ContentReport;
+use App\Models\SupportThread;
 use App\Models\WalletTransaction;
 use App\Models\AdminAuditLog;
 use App\Services\BookingCancellationService;
 use App\Services\NotificationService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
@@ -51,6 +53,26 @@ class AdminController extends Controller
                 'profit_month'       => $profit(Payment::whereYear('created_at', now()->year)
                     ->whereMonth('created_at', now()->month)),
                 'profit_all_time'    => $profit(Payment::query()),
+            ],
+            // Sidebar red-dot counts — each is "things needing the admin's
+            // attention right now" for that nav item.
+            'nav_badges' => [
+                // Vendors — KYC waiting for review
+                'pending_vendors'    => Vendor::where('is_approved', false)->where('is_active', true)->count(),
+                // Complaints/Support — threads with an unread message from the
+                // user/vendor (what the admin still has to answer)
+                'unread_support'     => SupportThread::whereHas('messages', fn ($q) => $q
+                    ->where('sender_type', '!=', 'admin')->whereNull('read_at'))->count(),
+                // Moderation — distinct pieces of content with a pending report
+                'reported_content'   => ContentReport::where('status', 'pending')
+                    ->get(['reportable_type', 'reportable_id'])
+                    ->map(fn ($r) => $r->reportable_type . '-' . $r->reportable_id)
+                    ->unique()->count(),
+                // Money — refunds still owed + withdrawals still to pay out
+                'refunds_due'        => Booking::whereNotNull('refund_amount')
+                    ->whereNull('refund_paid_at')->whereNull('refund_waived_at')->count(),
+                'unpaid_withdrawals' => WalletTransaction::where('type', 'withdrawal')
+                    ->whereNull('paid_at')->whereNull('rejected_at')->count(),
             ],
         ]);
     }
@@ -184,12 +206,25 @@ class AdminController extends Controller
             ->whereIn('status', ['awaiting_payment', 'pending', 'approved'])
             ->get();
 
-        $cancelled = 0;
+        // Fraud ban: the vendor bears the platform's commission on every booking
+        // they were committed to (approved = already credited), exactly like a
+        // vendor-requested cancel — a fraudster shouldn't get off lighter than a
+        // vendor who politely asked to cancel. Pending/awaiting_payment carry no
+        // vendor credit yet, so there is nothing to claw back there.
+        $cancelled         = 0;
+        $commissionCharged = 0.0;
         foreach ($active as $booking) {
-            if ($this->cancellation->cancelByPlatform($booking, $reason)['cancelled']) {
+            $result = $this->cancellation->cancelByPlatform(
+                $booking,
+                $reason,
+                chargeCommission: $booking->status === 'approved'
+            );
+            if ($result['cancelled']) {
                 $cancelled++;
+                $commissionCharged += $result['commission_charged'];
             }
         }
+        $commissionCharged = round($commissionCharged, 2);
 
         $vendor->update(['is_active' => false, 'winding_down' => false]);
 
@@ -197,12 +232,14 @@ class AdminController extends Controller
             'mode'               => 'immediate',
             'reason'             => $reason,
             'cancelled_bookings' => $cancelled,
+            'commission_charged' => $commissionCharged,
         ]);
 
         return response()->json([
             'status'             => 'success',
             'account_status'     => 'banned',
             'cancelled_bookings' => $cancelled,
+            'commission_charged' => $commissionCharged,
             'message'            => "Vendor banned. {$cancelled} active booking(s) cancelled — refunds are due to the customers.",
         ]);
     }
@@ -522,15 +559,20 @@ class AdminController extends Controller
     // ── Financial statistics ─────────────────────────────────────
     // super_admin ONLY (money). Full income/profit picture.
     //   gross_volume    = what customers paid (amount_paid)
-    //   platform_profit = the platform's cut (commission)  ← our profit
+    //   platform_profit = the platform's GROSS cut (commission)
     //   vendor_payouts  = what vendors earned (vendor_payout)
+    // `net` shows the HONEST bottom line — gross commission minus the
+    // commission we actually lost on refunded bookings (see netProfit()).
     // All figures use verified payments only.
     public function financials()
     {
+        $summary = $this->paymentTotals(Payment::query());
+
         return response()->json([
             'status'        => 'success',
             'currency'      => 'SYP',
-            'summary'       => $this->paymentTotals(Payment::query()),
+            'summary'       => $summary,
+            'net'           => $this->netProfit($summary['platform_profit']),
             'today'         => $this->paymentTotals(Payment::whereDate('created_at', today())),
             'this_month'    => $this->paymentTotals(
                 Payment::whereYear('created_at', now()->year)->whereMonth('created_at', now()->month)
@@ -538,6 +580,48 @@ class AdminController extends Controller
             'this_year'     => $this->paymentTotals(Payment::whereYear('created_at', now()->year)),
             'monthly_trend' => $this->monthlyTrend(),
         ]);
+    }
+
+    // The bottom-line profit picture (all-time). A cancelled booking's
+    // commission is only truly LOST when the customer is refunded AND we
+    // didn't recover it from the vendor:
+    //   - vendor-fault cancel/ban → commission clawed back from the vendor
+    //     (a `commission` wallet row exists) → we KEPT it, not lost.
+    //   - refund waived (kept the money, e.g. fraud) → not lost either.
+    //   - dispute / gradual ban (platform absorbs) → genuinely LOST.
+    // net_profit = gross commission − commission_lost.
+    private function netProfit(float $grossCommission): array
+    {
+        // Commission on refunded bookings we absorbed (no clawback, not waived).
+        $commissionLost = (float) Payment::query()
+            ->where('payments.status', 'verified')
+            ->join('bookings', 'bookings.id', '=', 'payments.booking_id')
+            ->where('bookings.status', 'cancelled')
+            ->whereNotNull('bookings.refund_amount')
+            ->whereNull('bookings.refund_waived_at')
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('wallet_transactions')
+                    ->whereColumn('wallet_transactions.booking_id', 'payments.booking_id')
+                    ->where('wallet_transactions.type', 'commission');
+            })
+            ->sum('payments.commission');
+
+        // Commission we recovered from vendors (clawbacks) — kept as profit.
+        $commissionReclaimed = abs((float) WalletTransaction::where('type', 'commission')->sum('amount'));
+
+        // Money owed/returned to customers (excludes waived — that money stays).
+        $refunded = (float) Booking::whereNotNull('refund_amount')
+            ->whereNull('refund_waived_at')
+            ->sum('refund_amount');
+
+        return [
+            'gross_profit'          => round($grossCommission, 2),
+            'refunded_to_customers' => round($refunded, 2),
+            'commission_lost'       => round($commissionLost, 2),       // refunds we absorbed
+            'commission_reclaimed'  => round($commissionReclaimed, 2),  // clawed back from vendors
+            'net_profit'            => round($grossCommission - $commissionLost, 2),
+        ];
     }
 
     // Aggregate a payments query into the four money figures.
@@ -779,11 +863,12 @@ class AdminController extends Controller
             ->latest();
 
         if ($request->filled('unpaid')) {
-            $query->whereNull('paid_at'); // ?unpaid=1 → only outstanding payouts
+            // outstanding payouts = not paid AND not rejected
+            $query->whereNull('paid_at')->whereNull('rejected_at');
         }
 
         $totalUnpaid = round((float) abs(WalletTransaction::where('type', 'withdrawal')
-            ->whereNull('paid_at')->sum('amount')), 2);
+            ->whereNull('paid_at')->whereNull('rejected_at')->sum('amount')), 2);
 
         return response()->json([
             'status'        => 'success',
@@ -801,6 +886,9 @@ class AdminController extends Controller
         if ($withdrawal->paid_at) {
             return response()->json(['status' => 'error', 'message' => 'Withdrawal already marked paid'], 422);
         }
+        if ($withdrawal->rejected_at) {
+            return response()->json(['status' => 'error', 'message' => 'This withdrawal was rejected — it cannot be paid'], 422);
+        }
 
         $withdrawal->update(['paid_at' => now()]);
 
@@ -810,6 +898,37 @@ class AdminController extends Controller
         ]);
 
         return response()->json(['status' => 'success', 'message' => 'Withdrawal marked as paid']);
+    }
+
+    // Reject a withdrawal request (fraud / suspicious, or the vendor's wallet went
+    // negative after a commission clawback). The held amount returns to the
+    // vendor's available balance automatically (WalletService ignores rejected
+    // withdrawals). The vendor can request a fresh withdrawal later.
+    public function rejectWithdrawal(Request $request, int $id)
+    {
+        $request->validate(['reason' => 'required|string|max:1000']);
+
+        $withdrawal = WalletTransaction::where('type', 'withdrawal')->findOrFail($id);
+
+        if ($withdrawal->paid_at) {
+            return response()->json(['status' => 'error', 'message' => 'Withdrawal already paid — it cannot be rejected'], 422);
+        }
+        if ($withdrawal->rejected_at) {
+            return response()->json(['status' => 'error', 'message' => 'Withdrawal already rejected'], 422);
+        }
+
+        $withdrawal->update(['rejected_at' => now()]);
+
+        AdminAuditLog::record($request->user()->id, 'withdrawal.reject', 'wallet_transaction', $withdrawal->id, [
+            'vendor_id' => $withdrawal->vendor_id,
+            'amount'    => (float) abs($withdrawal->amount),
+            'reason'    => $request->reason,
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Withdrawal rejected — the amount is back in the vendor\'s available balance.',
+        ]);
     }
 
     // ── Content moderation ───────────────────────────────────────

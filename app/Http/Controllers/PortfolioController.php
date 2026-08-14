@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\StoresImages;
 use App\Models\PortfolioItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class PortfolioController extends Controller
 {
+    use StoresImages;
+
     // Vendor's own portfolio (auth:vendors)
     public function index(Request $request)
     {
@@ -72,7 +75,7 @@ class PortfolioController extends Controller
         if ($request->hasFile('images')) {
             $primaryIndex = (int) ($request->primary_image_index ?? 0);
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('portfolio_images', 'public');
+                $path = $this->storeImageOrFail($image, 'portfolio_images');
 
                 $item->images()->create([
                     'image_path' => $path,
@@ -115,7 +118,7 @@ class PortfolioController extends Controller
                 ->get();
 
             foreach ($imagesToDelete as $image) {
-                Storage::disk('public')->delete($image->image_path);
+                Storage::disk('supabase')->delete($image->image_path);
                 $image->delete();
             }
         }
@@ -125,7 +128,7 @@ class PortfolioController extends Controller
             $primaryIndex = $request->primary_image_index ?? null;
 
             foreach ($request->file('images') as $index => $image) {
-                $path = $image->store('portfolio_images', 'public');
+                $path = $this->storeImageOrFail($image, 'portfolio_images');
 
                 $item->images()->create([
                     'image_path' => $path,
@@ -150,7 +153,7 @@ class PortfolioController extends Controller
             ->firstOrFail();
 
         foreach ($item->images as $image) {
-            Storage::disk('public')->delete($image->image_path);
+            Storage::disk('supabase')->delete($image->image_path);
         }
 
         $item->delete();

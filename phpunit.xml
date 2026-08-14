@@ -32,5 +32,14 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Dummy Supabase (S3) config: the Vendor image-URL accessors build an
+             S3 client on every serialize; these let it construct offline so
+             tests don't need live storage credentials. -->
+        <env name="SUPABASE_S3_ACCESS_KEY_ID" value="testing"/>
+        <env name="SUPABASE_S3_SECRET_ACCESS_KEY" value="testing"/>
+        <env name="SUPABASE_S3_REGION" value="us-east-1"/>
+        <env name="SUPABASE_S3_BUCKET" value="testing"/>
+        <env name="SUPABASE_S3_ENDPOINT" value="http://127.0.0.1:54321/storage/v1/s3"/>
+        <env name="SUPABASE_PUBLIC_URL" value="http://127.0.0.1:54321/storage/v1/object/public"/>
     </php>
 </phpunit>

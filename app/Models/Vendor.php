@@ -5,11 +5,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class Vendor extends Authenticatable
 {
     use HasApiTokens, Notifiable;
+
+    // A freshly registered vendor is is_approved=false → it lands in the KYC
+    // queue. Ping the reviewers (both roles do KYC) via the admin bell. Hooked
+    // on the model so the vendor registration flow stays untouched.
+    protected static function booted(): void
+    {
+        static::created(function (Vendor $vendor): void {
+            if (! $vendor->is_approved) {
+                app(\App\Services\NotificationService::class)->notifyAdmins(
+                    ['super_admin', 'support'],
+                    'New vendor awaiting KYC',
+                    trim(($vendor->business_name ?: "{$vendor->first_name} {$vendor->last_name}"))
+                        . ' registered and needs review.',
+                    ['type' => 'vendor_kyc', 'vendor_id' => (string) $vendor->id]
+                );
+            }
+        });
+    }
 
     // Local scope: Vendor::active() returns only non-banned vendors.
     // Used on public/customer-facing queries (browse, search). Admin queries
@@ -30,31 +49,54 @@ class Vendor extends Authenticatable
         'booking_style',
         'vendor_style',
         'profile_image',
+        'cover_image',
         'latitude',
         'longitude',
         'address',
         'bio',
+        'response_time',
         'rating_avg',
         'is_approved',
         'is_active',
         'winding_down',
+        'is_accepting_bookings',
         'rejection_reason',
         'fcm_token',
     ];
 
     protected $hidden = [
         'remember_token',
+        'fcm_token', // device token — never exposed in any API response
     ];
 
-    // Expose the readable account state in API responses.
-    protected $appends = ['account_status'];
+    // profile_image_url -> full public URL, used by the app directly.
+    // cover_image_url   -> full public URL of the cover, used by the app directly.
+    // account_status    -> readable account state for API responses.
+    protected $appends = ['profile_image_url', 'cover_image_url', 'account_status'];
+
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('supabase');
+
+        return $this->profile_image ? $disk->url($this->profile_image) : null;
+    }
+
+    public function getCoverImageUrlAttribute(): ?string
+    {
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('supabase');
+
+        return $this->cover_image ? $disk->url($this->cover_image) : null;
+    }
 
     protected function casts(): array
     {
         return [
-            'is_approved'  => 'boolean',
-            'is_active'    => 'boolean',
-            'winding_down' => 'boolean',
+            'is_approved'           => 'boolean',
+            'is_active'             => 'boolean',
+            'winding_down'          => 'boolean',
+            'is_accepting_bookings' => 'boolean',
             'rating_avg'   => 'decimal:2',
             'birth_date'   => 'date',
             'latitude'     => 'decimal:8',
@@ -122,5 +164,10 @@ class Vendor extends Authenticatable
     public function portfolioItems()
     {
         return $this->hasMany(PortfolioItem::class);
+    }
+
+    public function blockedDates()
+    {
+        return $this->hasMany(VendorBlockedDate::class);
     }
 }

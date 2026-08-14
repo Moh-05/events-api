@@ -16,7 +16,12 @@ class WalletService
     // Pass transactions that already have `booking:id,status` loaded.
     public function balances(Collection $transactions): array
     {
-        $withdrawn = (float) $transactions->where('type', 'withdrawal')->sum('amount'); // negative
+        // A REJECTED withdrawal doesn't count — the held amount returns to
+        // available (the admin declined to pay it out).
+        $withdrawn = (float) $transactions
+            ->where('type', 'withdrawal')
+            ->whereNull('rejected_at')
+            ->sum('amount'); // negative
 
         $cleared = 0;
         $pending = 0;

@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\WalletTransaction;
+use App\Services\NotificationService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 
 class WalletController extends Controller
 {
-    public function __construct(private WalletService $wallet)
-    {
+    public function __construct(
+        private WalletService $wallet,
+        private NotificationService $notifications,
+    ) {
     }
 
     // Vendor wallet — balances + transaction history
@@ -67,6 +70,15 @@ class WalletController extends Controller
             'type'       => 'withdrawal',
             'amount'     => -1 * $available,
         ]);
+
+        // Money leaving the platform is paid out manually → tell super_admins.
+        $this->notifications->notifyAdmins(
+            ['super_admin'],
+            'New withdrawal request',
+            trim($vendor->business_name ?: "{$vendor->first_name} {$vendor->last_name}")
+                . " requested a payout of {$available} SYP.",
+            ['type' => 'withdrawal', 'withdrawal_id' => (string) $withdrawal->id, 'vendor_id' => (string) $vendor->id]
+        );
 
         return response()->json([
             'status'            => 'success',

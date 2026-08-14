@@ -60,6 +60,24 @@ return [
             'report' => false,
         ],
 
+        // Supabase Storage (S3-compatible). Images live here so they survive
+        // deploys (Railway's container disk is wiped on every deploy).
+        // SUPABASE_PUBLIC_URL is the public bucket URL used to build the links
+        // the app returns; SUPABASE_S3_ENDPOINT is the API endpoint used for
+        // uploads/deletes. The bucket must be set to "public" in Supabase.
+        'supabase' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_S3_ACCESS_KEY_ID'),
+            'secret' => env('SUPABASE_S3_SECRET_ACCESS_KEY'),
+            'region' => env('SUPABASE_S3_REGION'),
+            'bucket' => env('SUPABASE_S3_BUCKET'),
+            'url' => env('SUPABASE_PUBLIC_URL'),
+            'endpoint' => env('SUPABASE_S3_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

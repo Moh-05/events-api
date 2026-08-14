@@ -5,6 +5,8 @@ use App\Http\Controllers\UserAuthController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\VendorProfileController;
 use App\Http\Controllers\VendorProductController;
+use App\Http\Controllers\VendorBrowseController;
+use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\PaymentController;
@@ -18,6 +20,7 @@ use App\Http\Controllers\ContentReportController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PortfolioController;
 use App\Http\Controllers\SavedItemController;
+use App\Http\Controllers\ChatController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -35,9 +38,11 @@ Route::post('/vendor/verify-otp', [VendorAuthController::class, 'verifyOtp']);
 Route::post('/vendor/complete-registration', [VendorAuthController::class, 'completeRegistration']);
 
 // Public browse
+Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: Home / Explore / Filters
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);
 Route::get('/vendors/{vendorId}/portfolio', [PortfolioController::class, 'vendorPortfolio']);
+Route::get('/vendors/{vendorId}/availability', [AvailabilityController::class, 'publicAvailability']); // unavailable dates for the calendar
 
 // ─────────────────────────────────────────────
 // User Protected Routes — auth:sanctum
@@ -86,6 +91,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/reviews/{id}/report', [ContentReportController::class, 'reportReview']);
     Route::post('/products/{id}/report', [ContentReportController::class, 'reportProduct']);
     Route::post('/portfolio/{id}/report', [ContentReportController::class, 'reportPortfolio']);
+
+    // Chat with vendors (only after paying for a booking with them)
+    Route::get('/conversations', [ChatController::class, 'index']);
+    Route::post('/conversations/vendor/{vendorId}', [ChatController::class, 'openWithVendor']); // open/create — the gate
+    Route::get('/conversations/{id}/messages', [ChatController::class, 'messages']);            // ?after={id} for polling
+    Route::post('/conversations/{id}/messages', [ChatController::class, 'send']);
+    Route::post('/conversations/{id}/read', [ChatController::class, 'markRead']);
 });
 
 
@@ -98,6 +110,8 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::get('/vendor/profile', [VendorProfileController::class, 'show']);
     Route::post('/vendor/profile', [VendorProfileController::class, 'update']);
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
+    Route::delete('/vendor/profile/cover', [VendorProfileController::class, 'deleteCover']);
+    Route::post('/vendor/availability/toggle', [VendorProfileController::class, 'toggleAvailability']); // online/offline for new bookings
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);
@@ -127,7 +141,10 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::post('/vendor/bookings/{id}/approve', [BookingController::class, 'approve']);
     Route::post('/vendor/bookings/{id}/decline', [BookingController::class, 'decline']);
     Route::post('/vendor/bookings/{id}/complete', [BookingController::class, 'complete']);
-    Route::get('/vendor/booked-dates', [BookingController::class, 'bookedDates']);
+    // Availability calendar (appointment vendors): booked (auto) + blocked (manual)
+    Route::get('/vendor/availability', [AvailabilityController::class, 'vendorAvailability']);
+    Route::post('/vendor/blocked-dates', [AvailabilityController::class, 'block']);
+    Route::delete('/vendor/blocked-dates/{date}', [AvailabilityController::class, 'unblock']);
 
     // Reviews (Vendor)
     Route::get('/vendor/reviews', [ReviewController::class, 'myReviews']);
@@ -150,6 +167,13 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::get('/vendor/support', [SupportController::class, 'vendorThread']);
     Route::post('/vendor/support/messages', [SupportController::class, 'vendorSend']);
 
+    // Chat with customers (same ChatController — the caller is resolved from the
+    // guard; the vendor has no "open" route, the user always initiates)
+    Route::get('/vendor/conversations', [ChatController::class, 'index']);
+    Route::get('/vendor/conversations/{id}/messages', [ChatController::class, 'messages']); // ?after={id} for polling
+    Route::post('/vendor/conversations/{id}/messages', [ChatController::class, 'send']);
+    Route::post('/vendor/conversations/{id}/read', [ChatController::class, 'markRead']);
+
     // Report an abusive review (on the vendor's own profile or elsewhere)
     Route::post('/vendor/reviews/{id}/report', [ContentReportController::class, 'reportReview']);
 });
@@ -164,6 +188,12 @@ Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('
 Route::middleware('auth:admins')->group(function () {
 
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+
+    // Admin bell — event feed, per-admin read state (every admin has one).
+    // Reuses NotificationController (owner() detects the admin guard).
+    Route::get('/admin/notifications', [NotificationController::class, 'index']);
+    Route::post('/admin/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::post('/admin/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
     // ── View + KYC — super_admin AND support (read-only + approve/reject KYC) ──
     Route::middleware('role:super_admin,support')->group(function () {
@@ -232,6 +262,7 @@ Route::middleware('auth:admins')->group(function () {
         // Vendor withdrawal payouts
         Route::get('/admin/withdrawals', [AdminController::class, 'withdrawals']);          // ?unpaid=1
         Route::post('/admin/withdrawals/{id}/mark-paid', [AdminController::class, 'markWithdrawalPaid']);
+        Route::post('/admin/withdrawals/{id}/reject', [AdminController::class, 'rejectWithdrawal']); // refunds the held amount back to the wallet
 
         Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
 

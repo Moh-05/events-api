@@ -34,25 +34,38 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        // prevent reuse of the same transaction
-        if (Payment::where('transaction_id', $request->transaction_id)->exists()) {
+        // TEST bypass: transaction_id "0000" skips ShamCash verification and can
+        // be reused across bookings, so we can test the full pay flow without a
+        // real transfer. Remove before production.
+        $isTest = $request->transaction_id === '0000';
+
+        // prevent reuse of the same transaction (the test id is exempt)
+        if (!$isTest && Payment::where('transaction_id', $request->transaction_id)->exists()) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'This transaction has already been used',
             ], 409);
         }
 
-        $product       = $booking->product;
-        $vendor        = $booking->vendor;
+        $product = $booking->product;
+        $vendor  = $booking->vendor;
+
+        // Appointment: deposit % of the single package price.
+        // Order: full cart total — sum of unit_price × quantity over the item
+        // rows (unit_price is the snapshot taken at booking time).
         $expectedAmount = $vendor->booking_style === 'appointment'
             ? round($product->price * ($product->deposit_percent / 100), 2)
-            : $product->price;
+            : round($booking->items->sum(fn ($item) => $item->unit_price * $item->quantity), 2);
 
-        $shamCash = new ShamCashService();
-        $result   = $shamCash->verifyTransaction(
-            $request->transaction_id,
-            $expectedAmount
-        );
+        if ($isTest) {
+            $result = ['verified' => true, 'sender_name' => 'TEST'];
+        } else {
+            $shamCash = new ShamCashService();
+            $result   = $shamCash->verifyTransaction(
+                $request->transaction_id,
+                $expectedAmount
+            );
+        }
 
         if (!$result['verified']) {
             return response()->json([
@@ -76,7 +89,7 @@ class PaymentController extends Controller
             'commission'     => $commission,
             'vendor_payout'  => $vendorPayout,
             'currency'       => 'SYP',
-            'transaction_id' => $request->transaction_id,
+            'transaction_id' => $isTest ? '0000-' . $booking->id : $request->transaction_id,
             'sender_name'    => $result['sender_name'],
             'status'         => 'verified',
         ]);
@@ -89,20 +102,20 @@ class PaymentController extends Controller
 
         $notifyUser   = $notification->notifyUser(
             $user,
-            'Payment Received ✅',
+            'Payment Received',
             'Your payment was confirmed. Your booking is now waiting for vendor approval.'
         );
 
         $notifyVendor = $notification->notifyVendor(
             $vendor,
-            'New Paid Booking 🔔',
+            'New Paid Booking',
             'You have a new paid booking #' . $booking->id . '. Please accept or decline.'
         );
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Payment verified successfully',
-            'booking' => $booking->load(['vendor', 'product']),
+            'booking' => $booking->load(['vendor', 'product', 'items.product']),
             'payment' => $payment,
             'debug_notifications' => [
                 'user'   => $notifyUser,

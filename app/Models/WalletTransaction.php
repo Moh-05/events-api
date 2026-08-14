@@ -12,11 +12,13 @@ class WalletTransaction extends Model
         'type',   // credit | refund | withdrawal | commission
         'amount', // signed: credit > 0, refund/withdrawal/commission < 0
         'paid_at',
+        'rejected_at',
     ];
 
     protected $casts = [
-        'amount'  => 'decimal:2',
-        'paid_at' => 'datetime',
+        'amount'      => 'decimal:2',
+        'paid_at'     => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function vendor()

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\SupportMessage;
 use App\Models\SupportThread;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 // Support conversations with the admin team, from the customer/vendor side.
@@ -18,6 +19,21 @@ use Illuminate\Http\Request;
 //            if an admin resolved it, a new vendor message reopens it.
 class SupportController extends Controller
 {
+    public function __construct(private NotificationService $notifications)
+    {
+    }
+
+    // Ping the support team's bell (both roles handle support).
+    private function pingAdmins(string $title, string $body, SupportThread $thread): void
+    {
+        $this->notifications->notifyAdmins(
+            ['super_admin', 'support'],
+            $title,
+            $body,
+            ['type' => 'support', 'thread_id' => (string) $thread->id]
+        );
+    }
+
     // ── User: tickets ────────────────────────────────────────────
 
     // Open a ticket (creates the thread + its first message).
@@ -59,6 +75,12 @@ class SupportController extends Controller
             'sender_id'   => $user->id,
             'body'        => $data['message'],
         ]);
+
+        $this->pingAdmins(
+            'New support ticket',
+            trim("{$user->first_name} {$user->last_name}") . ': ' . $thread->subject,
+            $thread
+        );
 
         return response()->json([
             'status'  => 'success',
@@ -134,6 +156,8 @@ class SupportController extends Controller
 
         $thread->update(['last_message_at' => now()]);
 
+        $this->pingAdmins('New reply on a support ticket', 'A customer replied to their ticket.', $thread);
+
         return response()->json(['status' => 'success', 'sent' => $message], 201);
     }
 
@@ -174,6 +198,8 @@ class SupportController extends Controller
 
         $thread->last_message_at = now();
         $thread->save();
+
+        $this->pingAdmins('New vendor support message', 'A vendor sent a message to support.', $thread);
 
         return response()->json(['status' => 'success', 'sent' => $message], 201);
     }
