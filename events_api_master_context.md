@@ -1037,6 +1037,49 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 
 ---
 
+## ⭐ UPDATES — 2026-08-14/15 (Moh + Amer: BIG batch — offers, discovery, chat, merge, all DEPLOYED)
+
+> **READ THIS FIRST — current state of the whole project.** Everything below is
+> COMMITTED and LIVE on production (`main` = `origin/main` = deployed on Railway).
+> Production DB was reset with `migrate:fresh` during deploy — it is EMPTY (teams
+> create their own test data via the API). Admin reseeded: `admin@haflati.com` / `0000`.
+
+### Git / branch state
+- **We are on `main`.** `main`, `origin/main`, and `dev` are all aligned (this session did the reconcile). Latest commit: chat-approval-gate + decline-reason.
+- **The big merge happened:** Amer's `origin/admin-complete` (chat, favorites/saved, support system, content reporting, vendor-requested cancel) was merged into our work. Conflicts (.gitignore, Booking model casts, BookingController decline, master context) were resolved KEEPING BOTH sides. All 20 tests pass after merge.
+- Deploy flow used all session: commit → `git push origin main` (auto-deploys) → wait ~100s → `railway ssh --service events-api "php artisan migrate:fresh --force"` → reseed admin. Railway link drops per-machine: `railway link --project distinguished-imagination --environment production --service events-api` before any `railway ssh`.
+
+### What WE (Moh) built this session — all live
+1. **Offers / discounts (`vendor_products`):** vendor sets `discount_percent` on an EXISTING item, `discount_ends_at` (max 1 month), starts now. 1-week cooldown after an offer ends (`discount_last_ended_at`). Auto-revert: the `is_on_offer`/`discounted_price` accessors treat a past end date as no-offer instantly; `offers:expire` scheduled command (hourly, in `routes/console.php`) cleans up fields + stamps the cooldown. **Commission ALWAYS on the ORIGINAL price** — the vendor fully carries the discount; verified: 100 item, 25% off, 20% deposit → customer pays 15, commission 3 (on original 20), payout 12. Endpoints: `POST /vendor/products/{id}/discount`, `DELETE /vendor/products/{id}/discount`.
+2. **Vendor hide/show product:** `POST /vendor/products/{id}/toggle-hidden` — new `is_hidden` column, SEPARATE from `is_available` (stock-controlled) so they never conflict. Hidden = gone from `GET /products`, public vendor search, and booking (409); still visible in the vendor's own `GET /vendor/products`. A product shows to customers only when `is_available=true AND is_hidden=false`.
+3. **Booking selected_options (product meta picks):** the customer's chosen options from the product meta are saved — per BOOKING for appointments (`bookings.selected_options`), per ITEM for orders (`booking_items.selected_options`). Free-form JSON (Flutter validates against meta, backend just stores/relays). Same product + DIFFERENT options = separate cart lines; same options merge. Shared helpers `buildOrderLines()` / `createOrderItems()` used by store + update.
+4. **`GET /products` — the ONE discovery endpoint** (new `ProductBrowseController`). Powers ALL Home item rails + the Filter screen + search: `?type=service|product` · `?category=` · `?on_offer=1` · `?min_price=&max_price=` · `?min_rating=` · `?search=` · `?sort=newest|top_rated|price_low|price_high|most_booked|nearest` (`lat`/`lng` for nearest). Returns each item + its vendor mini-object + primary image + `is_on_offer`/`discounted_price`. Leak-safe: only approved+active vendors' available, non-hidden items.
+5. **`GET /vendors/{id}` — vendor detail header** (in VendorBrowseController). Returns rating_avg, reviews_count, events_hosted_count (completed bookings), bio, city, images, is_accepting_bookings. NO from_price here (prices live on the products below). `products_min_price` ("From X") stays only on the `GET /vendors` browse cards — the ONLY place vendors are displayed (Home "Top Rated Vendors").
+6. **`GET /vendors/{id}` + `GET /products`** together fully serve the Home page: Top Rated Vendors + Best Offers + Discover Services + Discover Products + Recently Added + search + vendor profile on tap.
+7. **Arabic/English localization (from 2026-08-07 session, now deployed):** `SetLocale` middleware reads `Accept-Language` (ar/en, default ar); all 45 messages + validation in `lang/ar` + `lang/en`; per-recipient notification language via `users.language`/`vendors.language`. Enum VALUES stay English keys (Flutter maps to Arabic labels). Admin messages kept English.
+8. **Chat rule changes (on top of Amer's chat):** (a) chat now opens once the vendor **APPROVES** a paid booking (was: just paid) — `ChatController::hasPaidBooking` checks status `approved`/`completed` + verified payment; (b) the VENDOR can also start a chat: `POST /vendor/conversations/user/{userId}` (mirror of the user's open, same gate, `firstOrCreate` so no duplicate thread); (c) **decline with reason:** `POST /vendor/bookings/{id}/decline` accepts optional `reason` (free text ≤255) — if given it's the customer's decline-notification body VERBATIM (not translated), else the default translated message.
+
+### What AMER built (merged in, live)
+- **User↔vendor chat** (backend-owned MySQL, NOT Firestore — supersedes the old Firestore plan): `conversations` + `messages` tables; `GET /conversations`, `POST /conversations/vendor/{id}` (user opens), `GET/POST /conversations/{id}/messages` (poll with `?after=`), `POST /conversations/{id}/read`; vendor side under `/vendor/conversations/*`. FCM push to the other side per message (push-only, no inbox row).
+- **Favorites/Saved:** `saved_items` table + `SavedItemController` (was assigned to Amer, now done).
+- **Support system** (vendor↔admin + user tickets): `support_threads`/`support_messages`, `SupportController`, `AdminSupportController`.
+- **Content reporting:** `content_reports` table + `ContentReportController` (report a product/review), admin `dismissReports`.
+- **Admin additions:** vendor-requested cancel of an approved booking (`/admin/bookings/{id}/cancel-vendor-request`), user-ban guard, refund-waive (`bookings.refund_waived_at`), commission-type + rejected-at on wallet transactions.
+
+### What's LEFT (roughly 5%)
+- **`GET /vendors/nearby`** — the Explore MAP (vendors as pins, Haversine already exists in VendorBrowseController). The last real feature endpoint. NOT built yet.
+- **`GET /categories`** — the 10 category tiles + counts, OR hardcode in Flutter (undecided).
+- **Smart Search (FastAPI)** — separate repo/service, Moh+Amer's final learning sprint. Groundwork in this repo: `smart-search.md`, `HaflatiDemoSeeder` (LOCAL ONLY), factories.
+- **Pre-launch kill list** (do LAST, before real launch — kept ON now for testing): `0000` payment bypass · OTP in auth responses · `debug_notifications` in payment response · set `APP_DEBUG=false` on Railway · renew UltraMsg · **rotate the leaked Supabase S3 key**.
+- Open-for-discussion (pre-existing): public `products/reviews/portfolio` endpoints don't gate on `is_approved`/`is_active` (Mohamad wants to discuss before fixing).
+
+### For the Flutter team (what to send them)
+- **Translation:** send `Accept-Language: ar|en` on every request; map enum keys to Arabic labels app-side (`ar.json`); user-typed content is never translated.
+- New endpoints they can use: `GET /products` (all Home rails + filters + search), `GET /vendors/{id}` (profile), `POST /vendor/products/{id}/discount` + `/toggle-hidden`, chat (`/conversations/*`, vendor `/vendor/conversations/user/{id}`), decline-with-reason.
+- `docs/vendor-api-testing.md` updated with discount/toggle-hidden/localization + scenarios S18–S20.
+
+---
+
 ## UPDATES — 2026-08-07 (Moh session: Arabic/English localization of all API text)
 
 The whole API now responds in Arabic or English based on the `Accept-Language` header. NOT yet committed/deployed at time of writing — tested locally only.

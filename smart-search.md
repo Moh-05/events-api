@@ -63,8 +63,12 @@ Already appended to this repo's `README.md`. Repeated because it is the one rule
 that matters:
 
 ```
-vendors.is_active = 1 AND vendors.is_approved = 1 AND vendor_products.is_available = 1
+vendors.is_active = 1 AND vendors.is_approved = 1
+  AND vendor_products.is_available = 1 AND vendor_products.is_hidden = 0
 ```
+
+(`is_hidden` was added 2026-08: the vendor's manual hide, separate from the
+stock-driven `is_available`. Both must be excluded.)
 
 **`Vendor::scopeActive()` checks `is_active` ONLY.** No scope, middleware or
 helper adds `is_approved` — `EnsureActive` also only covers `is_active`. Write
@@ -192,11 +196,14 @@ The app must never crash because of the AI layer.
 
 Env vars needed here: `SMART_SEARCH_URL`, `SMART_SEARCH_KEY`.
 
-### 4. A known bug to fix — `VendorProductController::searchVendorProducts`
+### 4. Partial-leak note — `VendorProductController::searchVendorProducts`
 
-Verified on `dev`: it filters the vendor with `Vendor::active()` but returns
-products **regardless of `is_available`**. Hidden products are publicly visible
-through that endpoint right now. Scheduled for the leak-audit day.
+It filters the vendor with `Vendor::active()` and (as of 2026-08) also excludes
+`is_hidden = 1` products. It STILL returns products **regardless of `is_available`**
+— i.e. a sold-out product can appear through that endpoint. Low priority (a
+sold-out item showing is far less bad than a banned vendor's), but add
+`is_available = 1` there on the leak-audit day for full consistency with the
+visibility rule above.
 
 ---
 

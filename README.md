@@ -68,14 +68,16 @@ lines are copied in the `haflati-ai-search` README (the FastAPI smart-search
 service). Never invent a different filter in either repo.
 
 ```
-vendors.is_active = 1 AND vendors.is_approved = 1 AND vendor_products.is_available = 1
+vendors.is_active = 1 AND vendors.is_approved = 1
+  AND vendor_products.is_available = 1 AND vendor_products.is_hidden = 0
 ```
 
-| Flag           | Table             | Who sets it               | Meaning                      |
-| -------------- | ----------------- | ------------------------- | ---------------------------- |
-| `is_approved`  | `vendors`         | Admin, at KYC             | Verified as a real business  |
-| `is_active`    | `vendors`         | Admin, at ban             | Not banned                   |
-| `is_available` | `vendor_products` | The system, automatically | This item can be ordered now |
+| Flag           | Table             | Who sets it               | Meaning                        |
+| -------------- | ----------------- | ------------------------- | ------------------------------ |
+| `is_approved`  | `vendors`         | Admin, at KYC             | Verified as a real business    |
+| `is_active`    | `vendors`         | Admin, at ban             | Not banned                     |
+| `is_available` | `vendor_products` | The system, automatically | In stock / orderable now       |
+| `is_hidden`    | `vendor_products` | The VENDOR, manually      | Vendor hid it — hide from all  |
 
 **`Vendor::scopeActive()` checks `is_active` ONLY — it does not check
 `is_approved`.** There is no scope, middleware, or helper that adds
@@ -91,7 +93,8 @@ Notes:
 - `winding_down` vendors need no separate check — they already have
   `is_active = 0`.
 - `is_available` is auto-toggled by stock (false at 0, true again when a booking
-  is cancelled and stock returns).
+  is cancelled and stock returns). `is_hidden` is the VENDOR's manual hide,
+  independent of stock — both must be respected (visible = available AND not hidden).
 - A `product` result inherits its vendor's flags: a bouquet that is
   `is_available = 1` whose shop was banned must still disappear. Apply the rule
   to the joined row, not to one table.
