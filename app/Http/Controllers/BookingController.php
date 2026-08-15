@@ -536,6 +536,12 @@ class BookingController extends Controller
     // Vendor declines a booking
     public function decline(Request $request, int $id)
     {
+        // Optional free-text reason the vendor types; sent to the customer as the
+        // notification body. Not translated — it's whatever the vendor wrote.
+        $request->validate([
+            'reason' => 'sometimes|nullable|string|max:255',
+        ]);
+
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
             ->where('vendor_id', $vendor->id)
@@ -558,15 +564,28 @@ class BookingController extends Controller
             'refund_amount' => $paid > 0 ? round($paid, 2) : null,
         ]);
 
-        // One translated decline notification to the customer (Arabic/English by
-        // their language). :id fills the booking number.
-        (new NotificationService())->notifyUserTrans(
-            $booking->user,
-            'messages.notif_declined_title',
-            'messages.notif_declined_body',
-            ['id' => $booking->id],
-            ['booking_id' => $booking->id]
-        );
+        // Decline notification to the customer. If the vendor typed a reason, that
+        // exact text is the notification body (free text, not translated). The
+        // title stays translated in the customer's language. No reason -> the
+        // default translated "declined" message.
+        $notifier = new NotificationService();
+        if ($request->filled('reason')) {
+            $title = __('messages.notif_declined_title', [], $booking->user->language ?? 'ar');
+            $notifier->notifyUser(
+                $booking->user,
+                $title,
+                $request->reason,               // the vendor's own words
+                ['booking_id' => $booking->id]
+            );
+        } else {
+            $notifier->notifyUserTrans(
+                $booking->user,
+                'messages.notif_declined_title',
+                'messages.notif_declined_body',
+                ['id' => $booking->id],
+                ['booking_id' => $booking->id]
+            );
+        }
 
         // A declined PAID booking creates a refund the admin must pay out.
         if ($paid > 0) {

@@ -13,8 +13,8 @@ use Illuminate\Support\Str;
 
 // WhatsApp-style chat between a user and a vendor. One conversation per pair.
 // The SAME controller serves both sides: the caller (user or vendor) is resolved
-// from the auth guard, exactly like NotificationController does. The gate — you
-// can only chat a vendor you have PAID — lives in openWithVendor().
+// from the auth guard, exactly like NotificationController does. The gate — chat
+// opens once the vendor has APPROVED a paid booking — lives in hasPaidBooking().
 class ChatController extends Controller
 {
     // List the caller's conversations, most recent activity first (the chat list).
@@ -59,7 +59,7 @@ class ChatController extends Controller
         if (! $this->hasPaidBooking($userId, $vendor->id)) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'You can chat a vendor only after paying for a booking with them.',
+                'message' => 'You can chat a vendor only after they approve a booking with you.',
             ], 403);
         }
 
@@ -92,7 +92,7 @@ class ChatController extends Controller
         if (! $this->hasPaidBooking($user->id, $vendorId)) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'You can chat a customer only after they have paid for a booking with you.',
+                'message' => 'You can chat a customer only after you approve their booking.',
             ], 403);
         }
 
@@ -192,12 +192,14 @@ class ChatController extends Controller
             : ['user', $caller->id];
     }
 
-    // The gate: does the user have at least one booking with this vendor that was
-    // actually paid (a 'verified' payment)? An unpaid draft never unlocks chat.
+    // The gate: does the user have at least one booking with this vendor that the
+    // vendor has APPROVED (and which was paid — approval only happens on a paid
+    // booking)? Chat opens once the vendor accepts the booking, not before.
     private function hasPaidBooking(int $userId, int $vendorId): bool
     {
         return Booking::where('user_id', $userId)
             ->where('vendor_id', $vendorId)
+            ->whereIn('status', ['approved', 'completed']) // approved (or later completed)
             ->whereHas('payment', fn ($q) => $q->where('status', 'verified'))
             ->exists();
     }
