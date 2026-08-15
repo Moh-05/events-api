@@ -760,7 +760,11 @@ class BookingController extends Controller
 
         $bookings = Booking::where('vendor_id', $vendor->id);
 
-        $totalEarnings = Payment::whereHas('booking', fn($q) => $q->where('vendor_id', $vendor->id))
+        // Earnings only from bookings the vendor accepted (approved/completed) —
+        // a paid-but-unapproved (pending) booking is not earned yet.
+        $totalEarnings = Payment::whereHas('booking', fn($q) => $q
+                ->where('vendor_id', $vendor->id)
+                ->whereIn('status', ['approved', 'completed']))
             ->where('status', 'verified')
             ->sum('vendor_payout');
 
@@ -823,8 +827,13 @@ class BookingController extends Controller
         $startThisMonth = now()->startOfMonth();
         $startLastMonth = now()->subMonth()->startOfMonth();
 
-        // Sum vendor_payout from verified payments for this vendor's bookings
-        $base = Payment::whereHas('booking', fn($q) => $q->where('vendor_id', $vendor->id))
+        // Sum vendor_payout from verified payments — but ONLY for bookings the
+        // vendor has actually accepted (approved) or finished (completed). A
+        // 'pending' booking is paid but not yet approved, so that money is NOT
+        // the vendor's earnings yet (it matches the wallet: credited on approve).
+        $base = Payment::whereHas('booking', fn($q) => $q
+                ->where('vendor_id', $vendor->id)
+                ->whereIn('status', ['approved', 'completed']))
             ->where('status', 'verified');
 
         $thisMonth = (float) (clone $base)
