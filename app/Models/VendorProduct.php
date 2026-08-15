@@ -83,4 +83,10 @@ class VendorProduct extends Model
     {
         return $this->hasMany(Booking::class, 'vendor_product_id');
     }
+
+    public function reports()
+    {
+        return $this->hasMany(ContentReport::class, 'reportable_id')
+            ->where('reportable_type', 'product');
+    }
 }

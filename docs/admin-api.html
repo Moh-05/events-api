@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haflati — Admin Panel API Reference</title>
+<style>
+:root{
+  --bg:#14121d;--bg2:#1c1930;--card:#221f33;--card2:#2a2640;
+  --gold:#C9A84C;--gold2:#e6c876;--text:#ECE9F4;--dim:#9b93b4;--line:rgba(201,168,76,.18);
+  --get:#4CAF7D;--post:#4C8FAF;--del:#E0606A;--req:#E0a04c;--opt:#7d76a0;
+  --code:#0e0c16;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.65;padding:36px 18px}
+.wrap{max-width:1040px;margin:0 auto}
+h1{color:var(--gold);font-size:30px;margin-bottom:4px;letter-spacing:.3px}
+.sub{color:var(--dim);font-size:14px;margin-bottom:26px}
+h2{color:var(--gold2);font-size:21px;margin:40px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.ar{direction:rtl;text-align:right;font-family:'Segoe UI',Tahoma,'Arial',sans-serif}
+code,.mono{font-family:'Consolas','Courier New',monospace}
+code{background:var(--code);color:var(--gold2);padding:2px 7px;border-radius:5px;font-size:13px}
+
+.intro{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:10px}
+.intro h3{color:var(--gold);font-size:15px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.kv{display:flex;flex-wrap:wrap;gap:8px 0;margin:10px 0}
+.kv .k{color:var(--dim);width:150px;font-size:13px}
+.kv .v{flex:1;min-width:200px}
+.note-ar{background:var(--bg2);border-right:3px solid var(--gold);border-radius:8px;padding:12px 16px;margin:10px 0}
+
+.ep{background:var(--card);border:1px solid var(--line);border-radius:11px;margin:14px 0;overflow:hidden}
+.ep-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--card2);flex-wrap:wrap}
+.m{font-weight:700;font-size:11px;padding:4px 10px;border-radius:6px;letter-spacing:.5px;font-family:monospace}
+.m-get{background:rgba(76,175,125,.16);color:var(--get)}
+.m-post{background:rgba(76,143,175,.16);color:var(--post)}
+.m-del{background:rgba(224,96,106,.16);color:var(--del)}
+.path{font-family:'Consolas',monospace;font-size:14.5px;color:var(--text);font-weight:600}
+.lock{margin-left:auto;font-size:11px;color:var(--dim);white-space:nowrap}
+.lock b{color:var(--gold2)}
+.r-super{color:var(--gold2);font-weight:700}
+.r-both{color:var(--get);font-weight:700}
+.ep-body{padding:16px 18px}
+.job{margin-bottom:12px}
+.lbl{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;font-weight:700}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+th,td{padding:8px 11px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+th{color:var(--gold);font-size:12px;background:rgba(201,168,76,.05)}
+td.field{font-family:'Consolas',monospace;color:var(--gold2);white-space:nowrap}
+td.type{font-family:'Consolas',monospace;color:var(--dim);font-size:12.5px}
+.tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:monospace}
+.t-req{background:rgba(224,160,76,.16);color:var(--req)}
+.t-opt{background:rgba(125,118,160,.16);color:var(--opt)}
+td.ar{direction:rtl;text-align:right}
+.none{color:var(--dim);font-style:italic;font-size:13.5px}
+.enum{color:var(--gold2);font-family:monospace;font-size:12.5px}
+.resp{background:var(--code);border-radius:8px;padding:10px 13px;margin-top:6px;font-family:'Consolas',monospace;font-size:12.5px;color:var(--dim);white-space:pre-wrap;line-height:1.6}
+.foot{margin-top:46px;color:#5a5470;font-size:12px;text-align:center;border-top:1px solid var(--line);padding-top:16px}
+.pill{display:inline-block;font-family:monospace;font-size:11.5px;padding:2px 9px;border-radius:5px;background:var(--bg2);color:var(--gold2);margin:2px 3px}
+.toc{columns:2;column-gap:30px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 24px;margin:14px 0 8px}
+.toc a{color:var(--text);text-decoration:none;font-size:14px;display:block;padding:3px 0}
+.toc a:hover{color:var(--gold2)}
+@media(max-width:640px){.toc{columns:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Haflati — Admin Panel API Reference</h1>
+  <div class="sub">حفلتي · مرجع الـ API للوحة الأدمن (React) · Laravel 12 · Updated 2026-08</div>
+
+  <!-- INTRO -->
+  <div class="intro">
+    <h3>Base &amp; Auth</h3>
+    <div class="kv"><div class="k">Base URL</div><div class="v"><code>https://events-api-production-138b.up.railway.app/api</code></div></div>
+    <div class="kv"><div class="k">Auth header</div><div class="v"><code>Authorization: Bearer {token}</code></div></div>
+    <div class="kv"><div class="k">Content-Type</div><div class="v"><code>application/json</code></div></div>
+    <div class="kv"><div class="k">Accept</div><div class="v"><code>application/json</code> (always send this header)</div></div>
+    <div class="kv"><div class="k">Roles</div><div class="v"><span class="r-both">both</span> = super_admin + support &nbsp;·&nbsp; <span class="r-super">super</span> = super_admin only</div></div>
+
+    <div class="note-ar ar">
+      كل الـ endpoints تبدأ بـ <code>/admin</code> وتحتاج <code>Authorization: Bearer {token}</code> ما عدا <code>/admin/login</code>.
+      الـ token بتاخده من الـ login. في <b>دورين</b>: <b>super_admin</b> عندو كل شي، و<b>support</b> عندو العرض + الموافقة على الفيندور (KYC) + الدعم فقط — بلا فلوس أو حظر أو حذف محتوى.
+      المسارات المعلّمة <span class="r-super">super</span> بترجع <code>403</code> لو ناداها support. كل الردود مغلّفة بـ <code>{ "status": "success" | "error", ... }</code>، والقوائم مصفّحة (Laravel pagination: <code>data, current_page, last_page, total</code>).
+    </div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <a href="#auth">1 · Authentication</a>
+    <a href="#dashboard">2 · Dashboard &amp; Stats</a>
+    <a href="#bell">3 · Notifications (bell)</a>
+    <a href="#vendors">4 · Vendors</a>
+    <a href="#users">5 · Users</a>
+    <a href="#bookings">6 · Bookings &amp; Disputes</a>
+    <a href="#support">7 · Support</a>
+    <a href="#moderation">8 · Content Moderation</a>
+    <a href="#money">9 · Money Oversight</a>
+    <a href="#audit">10 · Audit &amp; Admin Accounts</a>
+  </div>
+
+  <!-- 1 · AUTH -->
+  <h2 id="auth">1 · Authentication <span style="font-size:14px;color:var(--dim)">— تسجيل الدخول</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/login</span><span class="lock">🌐 Public · throttled 5/min</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">تسجيل دخول الأدمن. بيرجّع <code>token</code> + بيانات الأدمن. <code>401</code> لو الإيميل/كلمة السر غلط. محدود بـ 5 محاولات بالدقيقة.</div></div>
+      <div class="lbl">Body</div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">email</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">إيميل الأدمن (غير حسّاس لحالة الأحرف).</td></tr>
+        <tr><td class="field">password</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">كلمة السر.</td></tr>
+      </table>
+      <div class="lbl" style="margin-top:10px">Response</div>
+      <div class="resp">{ "status":"success", "token":"…", "admin":{ "id":1, "name":"…", "email":"…", "role":"super_admin" } }</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/logout</span><span class="lock">🔒 any admin</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">يلغي الـ token الحالي.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <!-- 2 · DASHBOARD -->
+  <h2 id="dashboard">2 · Dashboard &amp; Stats <span style="font-size:14px;color:var(--dim)">— اللوحة والإحصائيات</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/dashboard</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">أرقام اللوحة الرئيسية + عدّادات الشريط الجانبي (النقاط الحمرا).</div></div>
+      <div class="lbl">Response</div>
+      <div class="resp">{ "status":"success",
+  "stats":{ "total_users","total_vendors","approved_vendors","pending_vendors",
+            "banned_vendors","total_bookings","active_bookings","completed_bookings",
+            "profit_today","profit_month","profit_all_time" },
+  "nav_badges":{ "pending_vendors","unread_support","reported_content",
+                 "refunds_due","unpaid_withdrawals" } }</div>
+    </div>
+  </div>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/stats/financial</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">التقرير المالي الكامل. <code>summary</code> إجمالي، و<code>net</code> صافي الربح الحقيقي، ونوافذ زمنية، ومنحنى 12 شهر جاهز للرسم.</div></div>
+      <div class="lbl">Response</div>
+      <div class="resp">{ "status":"success", "currency":"SYP",
+  "summary":{ "gross_volume","platform_profit","vendor_payouts","transactions" },
+  "net":{ "gross_profit","refunded_to_customers","commission_lost",
+          "commission_reclaimed","net_profit" },
+  "today":{…}, "this_month":{…}, "this_year":{…},
+  "monthly_trend":[ { "month":"2026-08","gross_volume","platform_profit","transactions" }, … ] }</div>
+    </div>
+  </div>
+
+  <!-- 3 · BELL -->
+  <h2 id="bell">3 · Notifications — the bell <span style="font-size:14px;color:var(--dim)">— جرس الإشعارات</span></h2>
+  <p style="color:var(--dim);font-size:13.5px" class="ar">سجل أحداث لكل أدمن (حالة "مقروء" مستقلة). كل إشعار فيه <code>data.type</code> = <span class="enum">vendor_kyc · support · content_report · withdrawal · refund_due</span> + رقم الهدف للتنقّل.</p>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/notifications</span><span class="lock">🔒 any admin</span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">إشعارات هذا الأدمن (الأحدث أولاً) + <code>unread_count</code>.</div></div>
+      <div class="lbl">Response</div>
+      <div class="resp">{ "status":"success", "unread_count":3,
+  "notifications":[ { "id","title","body","read_at","created_at","data":{ "type","…id" } }, … ] }</div>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/notifications/read-all</span><span class="lock">🔒 any admin</span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">تعليم كل إشعارات هذا الأدمن كمقروءة.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/notifications/{id}/read</span><span class="lock">🔒 any admin</span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">تعليم إشعار واحد مقروء. <code>404</code> لو مش إشعار هذا الأدمن.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+
+  <!-- 4 · VENDORS -->
+  <h2 id="vendors">4 · Vendors <span style="font-size:14px;color:var(--dim)">— الفيندورية</span></h2>
+
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/vendors</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">قائمة مصفّحة. كل فيندور فيه <code>account_status</code> محسوب.</div></div>
+      <div class="lbl">Query</div>
+      <table>
+        <tr><th>Param</th><th>Type</th><th>الشرح</th></tr>
+        <tr><td class="field">search</td><td class="type">string</td><td class="ar">اسم / اسم نشاط / هاتف.</td></tr>
+        <tr><td class="field">status</td><td class="type">enum</td><td class="ar"><span class="enum">kyc_pending · active · winding_down · banned</span> — تبويبات الحالة الأربعة (تقسيم تام).</td></tr>
+        <tr><td class="field">is_active</td><td class="type">0 | 1</td><td class="ar">فلتر بديل بسيط (لسا يشتغل).</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/vendors/pending</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">طابور KYC — الفيندورية المنتظرين موافقة (غير محظورين). مصفّح.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/vendors/{id}</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">فيندور واحد + منتجاته + <code>bookings_count</code> + <code>reviews_count</code> + <code>account_status</code>.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/vendors/{id}/approve</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">موافقة KYC → <code>is_approved=true</code>.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/vendors/{id}/reject</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">رفض KYC (لا يحظر فيندور فعّال — الحظر منفصل).</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">سبب الرفض، حتى 1000. بينحفظ على الفيندور.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/vendors/{id}/ban</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar"><b>حظر فوري (احتيال).</b> يلغي + يرجّع كل الحجوزات الجارية، ويسحب عمولة المنصة من الفيندور على الحجوزات المعتمدة. الرد فيه <code>cancelled_bookings</code> + <code>commission_charged</code>.</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب الحظر، حتى 1000.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/vendors/{id}/ban-gradual</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar"><b>حظر تدريجي.</b> يرجّع المعلّقة، يخلّي المعتمدة تكمل، يحظر تلقائياً لما تخلص. بلا سحب عمولة. → <code>winding_down</code>.</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب الحظر.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/vendors/{id}/unban</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">إعادة تفعيل فيندور محظور/متوقّف → <code>active</code>.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/vendors/{id}/wallet</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">محفظة الفيندور + السجل الكامل. <code>available_balance</code> ممكن يكون <b>سالب</b> (مدين للمنصة بعد سحب عمولة).</div></div>
+      <div class="lbl">Response</div>
+      <div class="resp">{ "status":"success", "vendor":{ "id","business_name" },
+  "wallet":{ "available_balance","pending_clearance","total_earned","currency" },
+  "transactions":[ … ] }</div>
+    </div>
+  </div>
+
+  <!-- 5 · USERS -->
+  <h2 id="users">5 · Users <span style="font-size:14px;color:var(--dim)">— المستخدمين</span></h2>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/users</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">قائمة مصفّحة + <code>bookings_count</code> لكل مستخدم.</div></div>
+      <div class="lbl">Query</div>
+      <table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr>
+        <tr><td class="field">search</td><td class="type">string</td><td class="ar">اسم / هاتف.</td></tr>
+        <tr><td class="field">is_active</td><td class="type">0 | 1</td><td class="ar">تبويبات نشط / محظور.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/users/{id}</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">مستخدم واحد + حجوزاته (مع الفيندور والمنتج).</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/users/{id}/toggle</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">حظر / فك حظر مستخدم (يقلب <code>is_active</code>). <b>محمي:</b> يرفض (<code>422</code> + العدد) لو عندو حجز <b>مدفوع</b> جاري — سوِّه أول. مسودات غير مدفوعة فقط → ينجح مع <code>warning</code>.</div></div>
+      <div class="lbl">Body</div><div class="none">No body.</div>
+    </div>
+  </div>
+
+  <!-- 6 · BOOKINGS -->
+  <h2 id="bookings">6 · Bookings &amp; Disputes <span style="font-size:14px;color:var(--dim)">— الحجوزات والنزاعات</span></h2>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/bookings</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">قائمة مصفّحة (مع المستخدم والفيندور والمنتج).</div></div>
+      <div class="lbl">Query</div>
+      <table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr>
+        <tr><td class="field">status</td><td class="type">string</td><td class="ar"><span class="enum">awaiting_payment · pending · approved · declined · completed · cancelled</span></td></tr>
+        <tr><td class="field">vendor_id</td><td class="type">integer</td><td class="ar">حجوزات فيندور معيّن.</td></tr>
+        <tr><td class="field">user_id</td><td class="type">integer</td><td class="ar">حجوزات مستخدم معيّن.</td></tr>
+        <tr><td class="field">search</td><td class="type">string</td><td class="ar">رقم الحجز / اسم الزبون / اسم الفيندور.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/bookings/{id}</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">حجز كامل: الزبون، الفيندور، المنتج، والدفعة.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/bookings/{id}/cancel</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar"><b>حل نزاع.</b> يلغي حجز واحد، يرجّع للزبون 100%، يعكس رصيد الفيندور — <b>بلا</b> سحب عمولة (الخطأ غير واضح).</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">سبب الإلغاء.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/bookings/{id}/cancel-vendor-request</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar"><b>إلغاء بطلب الفيندور.</b> فقط لحجز <code>approved</code> (<code>422</code> غير هيك). يرجّع للزبون 100% <b>ويسحب العمولة من الفيندور</b> (هو السبب). الرد: <code>refund_amount</code> + <code>commission_charged</code>.</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-opt">optional</span></td><td class="ar">سبب الإلغاء.</td></tr></table>
+    </div>
+  </div>
+
+  <!-- 7 · SUPPORT -->
+  <h2 id="support">7 · Support <span style="font-size:14px;color:var(--dim)">— الدعم</span></h2>
+  <p style="color:var(--dim);font-size:13.5px" class="ar">صندوق وارد واحد للتيكيتات (المستخدمين) والمحادثات (الفيندورية). الأحداث بتنخلق من التطبيق (شوف آخر الصفحة). كلا الدورين يتعامل مع الدعم.</p>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/support</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">صندوق الوارد. كل خيط فيه <code>owner_name</code>، <code>owner_phone</code>، <code>unread_count</code>. + كائن <code>counts</code>.</div></div>
+      <div class="lbl">Query</div>
+      <table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr>
+        <tr><td class="field">owner_type</td><td class="type">enum</td><td class="ar"><span class="enum">user · vendor</span></td></tr>
+        <tr><td class="field">status</td><td class="type">enum</td><td class="ar"><span class="enum">open · in_review · resolved</span></td></tr>
+        <tr><td class="field">unread</td><td class="type">1</td><td class="ar">الخيوط اللي فيها رسالة غير مقروءة فقط.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/support/{id}</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">الخيط الكامل: كل الرسائل + <code>owner</code> + سياق <b>الحجز</b> (فيندور/منتج/دفعة) لتيكيتات المستخدمين. الفتح يعلّم رسائل الطرف الآخر مقروءة.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/support/{id}/messages</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">رد الأدمن. على تيكيت جديد → يفتح المحادثة (<code>in_review</code>)، يضبط <code>handled_by</code>، ويشعر الطرف الآخر.</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">message</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">نص الرد، حتى 5000.</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/support/{id}/resolve</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">إغلاق الخيط (مسجّل بالتدقيق، الطرف الآخر بينشعر). تيكيت المستخدم بيضل مغلق؛ محادثة الفيندور بتنفتح لو كتب مجدداً.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+
+  <!-- 8 · MODERATION -->
+  <h2 id="moderation">8 · Content Moderation <span style="font-size:14px;color:var(--dim)">— الإشراف على المحتوى</span></h2>
+  <p style="color:var(--dim);font-size:13.5px" class="ar">القوائم الثلاثة بترجع <code>reports_count</code> (بلاغات معلّقة) → أظهر شارة FLAGGED / REPORTED لما &gt; 0.</p>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/reviews</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">مراجعات مصفّحة + <code>reports_count</code>.</div></div><div class="lbl">Query</div><table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr><tr><td class="field">vendor_id</td><td class="type">integer</td><td class="ar">مراجعات فيندور معيّن.</td></tr></table></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/products</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">منتجات للإشراف + <code>reports_count</code> + الفيندور + الصور.</div></div><div class="lbl">Query</div><table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr><tr><td class="field">search</td><td class="type">string</td><td class="ar">اسم المنتج.</td></tr><tr><td class="field">vendor_id</td><td class="type">integer</td><td class="ar">منتجات فيندور معيّن.</td></tr></table></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/portfolio</span><span class="lock">🔒 <b class="r-both">both</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">أعمال البورتفوليو للإشراف + <code>reports_count</code> + الفيندور + الصور.</div></div><div class="lbl">Query</div><table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr><tr><td class="field">vendor_id</td><td class="type">integer</td><td class="ar">بورتفوليو فيندور معيّن.</td></tr></table></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/admin/reviews/{id}</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">حذف مراجعة مسيئة + إعادة حساب <code>rating_avg</code> + مسح بلاغاتها.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/admin/products/{id}</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">حذف منتج (+ صوره + بلاغاته).</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/admin/portfolio/{id}</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">حذف عمل بورتفوليو (+ صوره + بلاغاته).</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/reports/{type}/{id}/dismiss</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">تجاهل بلاغ كاذب بلا حذف المحتوى. <code>{type}</code> = <span class="enum">review · product · portfolio_item</span>. الشارة بتختفي.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+
+  <!-- 9 · MONEY -->
+  <h2 id="money">9 · Money Oversight <span style="font-size:14px;color:var(--dim)">— الرقابة المالية</span></h2>
+  <p style="color:var(--dim);font-size:13.5px" class="ar">⚠️ التحويل الفعلي يدوي حالياً (بانتظار ShamCash payout API). هالـ endpoints بتعطي رؤية وتتبّع كاملين.</p>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/payments</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">كل الدفعات الواردة (مع الحجز → المستخدم والفيندور). مصفّح.</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/refunds-due</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">حجوزات ملغية لسا مستحقّة استرجاع + <code>total_due</code> (تستثني المدفوع والمُسقَط).</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/refunds/{id}/mark-paid</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">تعليم استرجاع كمدفوع بعد التحويل اليدوي. (يُرفض لو مُسقَط.)</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/refunds/{id}/waive</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar"><b>إسقاط استرجاع</b> — المنصة بتحتفظ بالفلوس رسمياً (احتيال مثلاً). بينخرج من قائمة المستحقات.</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">سبب الإسقاط (مسجّل بالتدقيق).</td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/withdrawals</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">طلبات سحب الفيندورية + <code>total_unpaid</code>.</div></div><div class="lbl">Query</div><table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr><tr><td class="field">unpaid</td><td class="type">1</td><td class="ar">المستحقة فقط (تستثني المدفوع والمرفوض).</td></tr></table></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/withdrawals/{id}/mark-paid</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">تعليم دفعة سحب كمرسَلة. (يُرفض لو الطلب مرفوض.)</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/withdrawals/{id}/reject</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar"><b>رفض طلب سحب</b> مشبوه. المبلغ بيرجع لرصيد الفيندور المتاح تلقائياً، والطلب بيخرج من الطابور.</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">reason</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">سبب الرفض.</td></tr></table>
+    </div>
+  </div>
+
+  <!-- 10 · AUDIT + ADMINS -->
+  <h2 id="audit">10 · Audit &amp; Admin Accounts <span style="font-size:14px;color:var(--dim)">— التدقيق وحسابات الأدمن</span></h2>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/audit-logs</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">كل عملية حسّاسة، الأحدث أولاً: مين، شو، على شو (<code>target_type</code> + <code>target_id</code>)، إيمتى.</div></div><div class="lbl">Query</div><table><tr><th>Param</th><th>Type</th><th>الشرح</th></tr><tr><td class="field">search</td><td class="type">string</td><td class="ar">اسم الحركة / اسم الأدمن.</td></tr></table></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-get">GET</span><span class="path">/admin/admins</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">قائمة حسابات الأدمن (id, name, email, role, last_login_at).</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-post">POST</span><span class="path">/admin/admins</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body">
+      <div class="job"><div class="lbl">Job</div><div class="ar">إنشاء حساب أدمن (عادةً support).</div></div>
+      <div class="lbl">Body</div>
+      <table><tr><th>Field</th><th>Type</th><th>Required</th><th>الشرح</th></tr>
+        <tr><td class="field">name</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">الاسم، حتى 255.</td></tr>
+        <tr><td class="field">email</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">إيميل فريد.</td></tr>
+        <tr><td class="field">password</td><td class="type">string</td><td><span class="tag t-req">required</span></td><td class="ar">6 خانات على الأقل.</td></tr>
+        <tr><td class="field">role</td><td class="type">enum</td><td><span class="tag t-req">required</span></td><td class="ar"><span class="enum">super_admin · support</span></td></tr></table>
+    </div>
+  </div>
+  <div class="ep">
+    <div class="ep-head"><span class="m m-del">DELETE</span><span class="path">/admin/admins/{id}</span><span class="lock">🔑 <b class="r-super">super</b></span></div>
+    <div class="ep-body"><div class="job"><div class="lbl">Job</div><div class="ar">حذف حساب أدمن. لا يمكن حذف حسابك أنت (<code>422</code>).</div></div><div class="lbl">Body</div><div class="none">No body.</div></div>
+  </div>
+
+  <!-- APP-SIDE FEEDERS -->
+  <h2 id="feeders">Appendix · App-side events that feed the admin</h2>
+  <p style="color:var(--dim);font-size:13.5px" class="ar">هالـ endpoints على تطبيقات الزبون/الفيندور (مش لوحة الأدمن)، بس بتخلق التيكيتات والبلاغات والطلبات اللي بيشوفها الأدمن. للمرجع فقط.</p>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Guard</th><th>الشرح</th></tr>
+    <tr><td>POST</td><td class="field">/support/tickets</td><td>user</td><td class="ar">فتح تيكيت (subject, message, booking_id?, category?).</td></tr>
+    <tr><td>GET/POST</td><td class="field">/support/tickets · /{id} · /{id}/messages</td><td>user</td><td class="ar">تيكيتات المستخدم + الرد (بعد رد الأدمن فقط).</td></tr>
+    <tr><td>GET/POST</td><td class="field">/vendor/support · /vendor/support/messages</td><td>vendor</td><td class="ar">محادثة الفيندور الدائمة.</td></tr>
+    <tr><td>POST</td><td class="field">/reviews|products|portfolio/{id}/report</td><td>user</td><td class="ar">تبليغ عن محتوى (reason?). الفيندor: /vendor/reviews/{id}/report.</td></tr>
+    <tr><td>POST</td><td class="field">/vendor/withdraw</td><td>vendor</td><td class="ar">طلب سحب الرصيد المتاح → يظهر بـ /admin/withdrawals.</td></tr>
+  </table>
+
+  <div class="foot">Haflati · Admin Panel API — مرجع كامل للوحة الأدمن (React) · لكل تفاصيل السلوك والصلاحيات شوف <code>docs/admin-system.html</code> · 2026-08</div>
+</div>
+</body>
+</html>

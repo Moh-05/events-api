@@ -15,8 +15,13 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminManagementController;
+use App\Http\Controllers\AdminSupportController;
+use App\Http\Controllers\SupportController;
+use App\Http\Controllers\ContentReportController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PortfolioController;
+use App\Http\Controllers\SavedItemController;
+use App\Http\Controllers\ChatController;
 use Illuminate\Support\Facades\Route;
 
 // ─────────────────────────────────────────────
@@ -68,6 +73,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/reviews/{id}', [ReviewController::class, 'update']);        // edit own review (POST, form-data friendly)
     Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);     // soft-delete own review
 
+    // Saved items (wishlist / "saved" tab)
+    Route::get('/saved', [SavedItemController::class, 'index']);
+    Route::get('/saved/ids', [SavedItemController::class, 'ids']); // just the saved product ids, to fill hearts on browse pages
+    Route::post('/saved', [SavedItemController::class, 'store']);
+    Route::delete('/saved/{productId}', [SavedItemController::class, 'destroy']);
+
     // Payments
     Route::post('/payments/verify', [PaymentController::class, 'verify']);
 
@@ -75,6 +86,25 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
+    // Support tickets (user → admin). Replying is only possible after
+    // support responds; a resolved ticket stays closed.
+    Route::post('/support/tickets', [SupportController::class, 'storeTicket']);
+    Route::get('/support/tickets', [SupportController::class, 'myTickets']);
+    Route::get('/support/tickets/{id}', [SupportController::class, 'showTicket']);
+    Route::post('/support/tickets/{id}/messages', [SupportController::class, 'replyTicket']);
+
+    // Report content (feeds the admin moderation badges)
+    Route::post('/reviews/{id}/report', [ContentReportController::class, 'reportReview']);
+    Route::post('/products/{id}/report', [ContentReportController::class, 'reportProduct']);
+    Route::post('/portfolio/{id}/report', [ContentReportController::class, 'reportPortfolio']);
+
+    // Chat with vendors (only after paying for a booking with them)
+    Route::get('/conversations', [ChatController::class, 'index']);
+    Route::post('/conversations/vendor/{vendorId}', [ChatController::class, 'openWithVendor']); // open/create — the gate
+    Route::get('/conversations/{id}/messages', [ChatController::class, 'messages']);            // ?after={id} for polling
+    Route::post('/conversations/{id}/messages', [ChatController::class, 'send']);
+    Route::post('/conversations/{id}/read', [ChatController::class, 'markRead']);
 });
 
 
@@ -143,6 +173,20 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::get('/vendor/notifications', [NotificationController::class, 'index']);
     Route::post('/vendor/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::post('/vendor/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
+    // Support chat (vendor ↔ admin) — one persistent thread (SUPPORT button)
+    Route::get('/vendor/support', [SupportController::class, 'vendorThread']);
+    Route::post('/vendor/support/messages', [SupportController::class, 'vendorSend']);
+
+    // Chat with customers (same ChatController — the caller is resolved from the
+    // guard; the vendor has no "open" route, the user always initiates)
+    Route::get('/vendor/conversations', [ChatController::class, 'index']);
+    Route::get('/vendor/conversations/{id}/messages', [ChatController::class, 'messages']); // ?after={id} for polling
+    Route::post('/vendor/conversations/{id}/messages', [ChatController::class, 'send']);
+    Route::post('/vendor/conversations/{id}/read', [ChatController::class, 'markRead']);
+
+    // Report an abusive review (on the vendor's own profile or elsewhere)
+    Route::post('/vendor/reviews/{id}/report', [ContentReportController::class, 'reportReview']);
 });
 
 // ─────────────────────────────────────────────
@@ -155,6 +199,12 @@ Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('
 Route::middleware('auth:admins')->group(function () {
 
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+
+    // Admin bell — event feed, per-admin read state (every admin has one).
+    // Reuses NotificationController (owner() detects the admin guard).
+    Route::get('/admin/notifications', [NotificationController::class, 'index']);
+    Route::post('/admin/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::post('/admin/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
     // ── View + KYC — super_admin AND support (read-only + approve/reject KYC) ──
     Route::middleware('role:super_admin,support')->group(function () {
@@ -173,6 +223,17 @@ Route::middleware('auth:admins')->group(function () {
         Route::get('/admin/bookings/{id}', [AdminController::class, 'bookingDetail']);
 
         Route::get('/admin/reviews', [AdminController::class, 'reviews']);                    // ?vendor_id=
+
+        // Content moderation — browse listings (delete is super_admin only, below)
+        Route::get('/admin/products', [AdminController::class, 'products']);                  // ?search= ?vendor_id=
+        Route::get('/admin/portfolio', [AdminController::class, 'portfolioItems']);           // ?vendor_id=
+
+        // Support inbox — user tickets + vendor chats (handling support is
+        // the support role's job, so both roles get it)
+        Route::get('/admin/support', [AdminSupportController::class, 'index']);               // ?owner_type= ?status= ?unread=1
+        Route::get('/admin/support/{id}', [AdminSupportController::class, 'show']);
+        Route::post('/admin/support/{id}/messages', [AdminSupportController::class, 'reply']);
+        Route::post('/admin/support/{id}/resolve', [AdminSupportController::class, 'resolve']);
     });
 
     // ── Sensitive actions — super_admin ONLY (ban, money, disputes, audit, admins) ──
@@ -187,24 +248,32 @@ Route::middleware('auth:admins')->group(function () {
 
         // Dispute resolution — cancel + refund a single booking
         Route::post('/admin/bookings/{id}/cancel', [AdminController::class, 'cancelBooking']);
+        // Vendor-requested cancel — refund customer 100% + charge the
+        // platform commission to the vendor's wallet
+        Route::post('/admin/bookings/{id}/cancel-vendor-request', [AdminController::class, 'cancelVendorRequest']);
 
         // Content moderation — remove abusive review / product / portfolio item
         Route::delete('/admin/reviews/{id}', [AdminController::class, 'deleteReview']);
         Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct']);
         Route::delete('/admin/portfolio/{id}', [AdminController::class, 'deletePortfolioItem']);
+        // ...or clear a false flag without deleting (type: review|product|portfolio_item)
+        Route::post('/admin/reports/{type}/{id}/dismiss', [AdminController::class, 'dismissReports']);
 
         // Money oversight
         Route::get('/admin/vendors/{id}/wallet', [AdminController::class, 'vendorWallet']); // a vendor's earnings/ledger
         Route::get('/admin/payments', [AdminController::class, 'payments']);
         Route::get('/admin/stats/financial', [AdminController::class, 'financials']); // income/profit report
 
-        // Refunds owed to customers (pay out manually, then mark paid)
+        // Refunds owed to customers (pay out manually, then mark paid —
+        // or waive: officially keep the money, e.g. fraud)
         Route::get('/admin/refunds-due', [AdminController::class, 'refundsDue']);
         Route::post('/admin/refunds/{id}/mark-paid', [AdminController::class, 'markRefundPaid']);
+        Route::post('/admin/refunds/{id}/waive', [AdminController::class, 'waiveRefund']);
 
         // Vendor withdrawal payouts
         Route::get('/admin/withdrawals', [AdminController::class, 'withdrawals']);          // ?unpaid=1
         Route::post('/admin/withdrawals/{id}/mark-paid', [AdminController::class, 'markWithdrawalPaid']);
+        Route::post('/admin/withdrawals/{id}/reject', [AdminController::class, 'rejectWithdrawal']); // refunds the held amount back to the wallet
 
         Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
 

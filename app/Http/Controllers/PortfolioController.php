@@ -158,6 +158,12 @@ class PortfolioController extends Controller
 
         $item->delete();
 
+        // The content is gone — drop any moderation reports pointing at it
+        // (same cleanup the admin-side delete does).
+        \App\Models\ContentReport::where('reportable_type', 'portfolio_item')
+            ->where('reportable_id', $item->id)
+            ->delete();
+
         return response()->json([
             'status'  => 'success',
             'message' => __('messages.portfolio_item_deleted'),

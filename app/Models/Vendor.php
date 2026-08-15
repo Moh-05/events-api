@@ -15,6 +15,24 @@ class Vendor extends Authenticatable
     // (HaflatiDemoSeeder). It changes no existing behaviour — see smart-search.md.
     use HasApiTokens, Notifiable, HasFactory;
 
+    // A freshly registered vendor is is_approved=false → it lands in the KYC
+    // queue. Ping the reviewers (both roles do KYC) via the admin bell. Hooked
+    // on the model so the vendor registration flow stays untouched.
+    protected static function booted(): void
+    {
+        static::created(function (Vendor $vendor): void {
+            if (! $vendor->is_approved) {
+                app(\App\Services\NotificationService::class)->notifyAdmins(
+                    ['super_admin', 'support'],
+                    'New vendor awaiting KYC',
+                    trim(($vendor->business_name ?: "{$vendor->first_name} {$vendor->last_name}"))
+                        . ' registered and needs review.',
+                    ['type' => 'vendor_kyc', 'vendor_id' => (string) $vendor->id]
+                );
+            }
+        });
+    }
+
     // Local scope: Vendor::active() returns only non-banned vendors.
     // Used on public/customer-facing queries (browse, search). Admin queries
     // omit it on purpose so admins can still see and manage banned vendors.
@@ -93,8 +111,16 @@ class Vendor extends Authenticatable
     //   active        → normal
     //   winding_down  → banned, but still finishing existing bookings
     //   banned        → fully blocked
-    public function getAccountStatusAttribute(): string
+    public function getAccountStatusAttribute(): ?string
     {
+        // A column-limited select (vendor:id,business_name) doesn't load the
+        // two source flags — computing on their null would fabricate "banned"
+        // for a perfectly active vendor. No data → no status.
+        if (! array_key_exists('is_active', $this->attributes)
+            || ! array_key_exists('winding_down', $this->attributes)) {
+            return null;
+        }
+
         if ($this->is_active) {
             return 'active';
         }

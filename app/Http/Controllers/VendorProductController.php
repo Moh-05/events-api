@@ -243,6 +243,12 @@ class VendorProductController extends Controller
 
         $product->delete();
 
+        // The content is gone — drop any moderation reports pointing at it
+        // (same cleanup the admin-side delete does).
+        \App\Models\ContentReport::where('reportable_type', 'product')
+            ->where('reportable_id', $product->id)
+            ->delete();
+
         return response()->json([
             'status'  => 'success',
             'message' => __('messages.product_deleted'),

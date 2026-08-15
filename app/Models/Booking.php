@@ -26,6 +26,7 @@ class Booking extends Model
         'responded_at',
         'refund_amount',
         'refund_paid_at',
+        'refund_waived_at',
     ];
 
     protected function casts(): array
@@ -34,12 +35,13 @@ class Booking extends Model
             'details'          => 'array',
             'selected_options' => 'array',
             'event_date'     => 'datetime',
-            'delivery_date'   => 'datetime',
-            'old_event_date'  => 'datetime',
-            'price_agreed'    => 'decimal:2',
-            'refund_amount'   => 'decimal:2',
-            'refund_paid_at'  => 'datetime',
-            'responded_at'    => 'datetime',
+            'delivery_date'    => 'datetime',
+            'old_event_date'   => 'datetime',
+            'price_agreed'     => 'decimal:2',
+            'refund_amount'    => 'decimal:2',
+            'refund_paid_at'   => 'datetime',
+            'responded_at'     => 'datetime',
+            'refund_waived_at' => 'datetime',
         ];
     }
 

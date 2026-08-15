@@ -161,12 +161,15 @@ class NotificationService
         ]);
     }
 
-    /*
-    public function notifyAdmins(string $role, string $title, string $body): void
+    // Admin bell (event feed). Fans out ONE inbox row per targeted admin so each
+    // admin keeps their own read state. Role-targeted: pass the roles that can
+    // actually act on the event (['super_admin'] for money; both roles for
+    // KYC / support / etc.). Admins have no device token, so this is inbox-only
+    // — the React console polls GET /admin/notifications.
+    public function notifyAdmins(array $roles, string $title, string $body, array $data = []): void
     {
-        Admin::where('role', $role)
-            ->whereNotNull('fcm_token')
-            ->each(fn($admin) => $this->send($admin->fcm_token, $title, $body));
+        Admin::whereIn('role', $roles)
+            ->pluck('id')
+            ->each(fn ($id) => $this->saveToInbox('admin', $id, $title, $body, $data));
     }
-    */
 }

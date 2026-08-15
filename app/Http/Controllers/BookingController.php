@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
+    public function __construct(private NotificationService $notifications)
+    {
+    }
+
     // Customer sends a booking request. One endpoint — the vendor's
     // booking_style (server-side truth) decides which shape applies:
     //   order       -> storeOrder():       items[] cart, delivery fields
@@ -538,10 +542,24 @@ class BookingController extends Controller
             ->where('status', 'pending')
             ->firstOrFail();
 
+        // A pending booking is PAID (pay-first flow). Declining it means the
+        // customer is owed everything back — record it so the refund shows up
+        // in the admin's refunds-due list instead of silently vanishing.
+        $paid = (float) Payment::where('booking_id', $booking->id)
+            ->where('status', 'verified')->value('amount_paid');
+
         // No stock change: a pending booking never decremented stock (stock is
         // only taken at approve), so there is nothing to restore here.
-        $booking->update(['status' => 'declined', 'responded_at' => now()]);
+        // responded_at powers response-time; refund_amount records the refund the
+        // customer is owed (both changes kept from the merge).
+        $booking->update([
+            'status'        => 'declined',
+            'responded_at'  => now(),
+            'refund_amount' => $paid > 0 ? round($paid, 2) : null,
+        ]);
 
+        // One translated decline notification to the customer (Arabic/English by
+        // their language). :id fills the booking number.
         (new NotificationService())->notifyUserTrans(
             $booking->user,
             'messages.notif_declined_title',
@@ -549,6 +567,16 @@ class BookingController extends Controller
             ['id' => $booking->id],
             ['booking_id' => $booking->id]
         );
+
+        // A declined PAID booking creates a refund the admin must pay out.
+        if ($paid > 0) {
+            $this->notifications->notifyAdmins(
+                ['super_admin'],
+                'Refund due',
+                "A declined booking (#{$booking->id}) owes the customer a {$paid} SYP refund.",
+                ['type' => 'refund_due', 'booking_id' => (string) $booking->id]
+            );
+        }
 
         return response()->json([
             'status'  => 'success',

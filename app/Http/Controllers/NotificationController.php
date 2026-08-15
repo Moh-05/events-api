@@ -65,11 +65,16 @@ class NotificationController extends Controller
         ]);
     }
 
-    // Figure out whether the caller is a user or a vendor
+    // Figure out whether the caller is a user, a vendor, or an admin — the same
+    // inbox powers all three (the admin console's bell reuses this controller).
     private function owner(Request $request): array
     {
         $actor = $request->user();
-        $type  = $actor instanceof \App\Models\Vendor ? 'vendor' : 'user';
+        $type  = match (true) {
+            $actor instanceof \App\Models\Vendor => 'vendor',
+            $actor instanceof \App\Models\Admin  => 'admin',
+            default                              => 'user',
+        };
 
         return [$type, $actor->id];
     }
