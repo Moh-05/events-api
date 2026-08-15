@@ -76,6 +76,39 @@ class ChatController extends Controller
         ], $conversation->wasRecentlyCreated ? 201 : 200);
     }
 
+    // VENDOR only: open (or create) the conversation with a given user. Same gate
+    // as the user side — the user must have a PAID booking with this vendor (which
+    // is exactly what a received booking request is). firstOrCreate means if the
+    // user already opened it, the vendor just gets that same conversation back.
+    public function openWithUser(Request $request, $userId)
+    {
+        $vendorId = $request->user()->id;
+
+        $user = User::find($userId);
+        if (! $user) {
+            return response()->json(['status' => 'error', 'message' => 'User not found'], 404);
+        }
+
+        if (! $this->hasPaidBooking($user->id, $vendorId)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'You can chat a customer only after they have paid for a booking with you.',
+            ], 403);
+        }
+
+        $conversation = Conversation::firstOrCreate([
+            'user_id'   => $user->id,
+            'vendor_id' => $vendorId,
+        ]);
+
+        $conversation->load('user:id,first_name,last_name,profile_image');
+
+        return response()->json([
+            'status'       => 'success',
+            'conversation' => $conversation,
+        ], $conversation->wasRecentlyCreated ? 201 : 200);
+    }
+
     // Fetch a conversation's messages, oldest first. Pass ?after={lastMessageId}
     // to get ONLY newer messages — this is how the app polls for new ones.
     public function messages(Request $request, $id)

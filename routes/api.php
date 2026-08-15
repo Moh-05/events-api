@@ -182,6 +182,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     // Chat with customers (same ChatController — the caller is resolved from the
     // guard; the vendor has no "open" route, the user always initiates)
     Route::get('/vendor/conversations', [ChatController::class, 'index']);
+    Route::post('/vendor/conversations/user/{userId}', [ChatController::class, 'openWithUser']); // vendor opens chat with a paid customer
     Route::get('/vendor/conversations/{id}/messages', [ChatController::class, 'messages']); // ?after={id} for polling
     Route::post('/vendor/conversations/{id}/messages', [ChatController::class, 'send']);
     Route::post('/vendor/conversations/{id}/read', [ChatController::class, 'markRead']);
