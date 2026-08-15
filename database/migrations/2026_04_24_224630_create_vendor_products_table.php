@@ -16,7 +16,12 @@ return new class extends Migration
             $table->decimal('price', 10, 2)->nullable();
             $table->decimal('deposit_percent', 5, 2)->default(20)->nullable(); // 20% deposit by default (only for appointments products)
             $table->json('meta')->nullable();
+            // is_available = STOCK-controlled (auto false when stock hits 0).
+            // is_hidden    = VENDOR-controlled manual hide (stays there, just not
+            //                shown to customers). A product is visible to customers
+            //                only when is_available = true AND is_hidden = false.
             $table->boolean('is_available')->default(true);
+            $table->boolean('is_hidden')->default(false);
             $table->integer('stock')->nullable(); // stock count for order vendors (cake_shop, store). null = not tracked
 
             // Discount / offer. The vendor sets a % off an EXISTING item; the item

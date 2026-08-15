@@ -18,6 +18,7 @@ class VendorProduct extends Model
         'price',
         'meta',
         'is_available',
+        'is_hidden',
         'stock',
         'discount_percent',
         'discount_ends_at',
@@ -32,6 +33,7 @@ class VendorProduct extends Model
     protected $casts = [
         'meta' => 'array',
         'is_available' => 'boolean',
+        'is_hidden' => 'boolean',
         'price' => 'decimal:2',
         'stock' => 'integer',
         'discount_percent'       => 'decimal:2',

@@ -51,7 +51,9 @@ class VendorProductController extends Controller
             ]);
         }
 
+        // Public list — hide the vendor's manually-hidden products from customers.
         $query = VendorProduct::where('vendor_id', $vendorId)
+            ->where('is_hidden', false)
             ->with('images');
 
         if ($request->filled('name')) {
@@ -329,6 +331,34 @@ class VendorProductController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => __('messages.offer_removed'),
+        ]);
+    }
+
+    // Vendor hides / shows a product. Hidden = the item stays in the vendor's own
+    // list but is not shown to customers (browse, search, discovery) and can't be
+    // booked, until the vendor shows it again. Separate from is_available, which
+    // the stock system controls automatically. Send { is_hidden: true|false } or
+    // nothing to flip.
+    public function toggleHidden(Request $request, $id)
+    {
+        $request->validate([
+            'is_hidden' => 'sometimes|boolean',
+        ]);
+
+        $vendor  = $request->user();
+        $product = VendorProduct::where('id', $id)
+            ->where('vendor_id', $vendor->id)
+            ->firstOrFail();
+
+        $product->update([
+            'is_hidden' => $request->has('is_hidden')
+                ? $request->boolean('is_hidden')
+                : ! $product->is_hidden,
+        ]);
+
+        return response()->json([
+            'status'    => 'success',
+            'is_hidden' => $product->is_hidden,
         ]);
     }
 }

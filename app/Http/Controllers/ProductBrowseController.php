@@ -39,6 +39,7 @@ class ProductBrowseController extends Controller
         // fields drive is_on_offer / discounted_price (added by the model).
         $query = VendorProduct::query()
             ->where('is_available', true)
+            ->where('is_hidden', false) // vendor manually hidden -> not shown to customers
             ->whereHas('vendor', fn ($q) => $q->where('is_approved', true)->where('is_active', true))
             ->with([
                 'vendor:id,business_name,vendor_type,booking_style,city,rating_avg,profile_image',

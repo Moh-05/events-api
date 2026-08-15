@@ -134,6 +134,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::delete('/vendor/products/{id}', [VendorProductController::class, 'destroy']);
     Route::post('/vendor/products/{id}/discount', [VendorProductController::class, 'setDiscount']);     // put on offer
     Route::delete('/vendor/products/{id}/discount', [VendorProductController::class, 'removeDiscount']); // end offer early
+    Route::post('/vendor/products/{id}/toggle-hidden', [VendorProductController::class, 'toggleHidden']); // hide/show from customers
 
     // Portfolio (Vendor)
     Route::get('/vendor/portfolio', [PortfolioController::class, 'index']);

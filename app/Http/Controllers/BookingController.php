@@ -74,7 +74,7 @@ class BookingController extends Controller
             // Can't book an unavailable product. A product auto-hides
             // (is_available = false) the moment its stock hits 0, so this also
             // blocks booking a sold-out product.
-            if ($product->is_available === false) {
+            if ($product->is_available === false || $product->is_hidden) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => __('messages.product_not_available', ['name' => $product->name]),
@@ -126,7 +126,7 @@ class BookingController extends Controller
 
         $product = VendorProduct::findOrFail($request->vendor_product_id);
 
-        if ($product->is_available === false) {
+        if ($product->is_available === false || $product->is_hidden) {
             return response()->json([
                 'status'  => 'error',
                 'message' => __('messages.product_not_available', ['name' => $product->name]),
@@ -277,7 +277,7 @@ class BookingController extends Controller
                     ], 422);
                 }
 
-                if ($product->is_available === false) {
+                if ($product->is_available === false || $product->is_hidden) {
                     return response()->json([
                         'status'  => 'error',
                         'message' => __('messages.product_not_available', ['name' => $product->name]),

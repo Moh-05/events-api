@@ -363,7 +363,29 @@ Not yours → **404**.
 #### `DELETE /vendor/products/{id}`
 **200:** `{ "status": "success", "message": "Product deleted successfully" }`. Not yours → **404**.
 
-**Product object fields:** `id, vendor_id, name, description, price (2-dec string|null), stock (int|null), meta (array), is_available (bool), deposit_percent, created_at, updated_at, images[]`. Each image: `id, vendor_product_id, image_path, is_primary (bool), image_url (full URL), created_at, updated_at`.
+#### `POST /vendor/products/{id}/discount`  — put an existing item on offer
+Vendor sets a % discount on a product/service they already own. Starts NOW, ends on a chosen date (max 1 month out). Commission at payment is ALWAYS taken on the ORIGINAL price — the vendor carries the discount. The item shows in Home's "Best Offers" until it expires.
+| field | type | required | rule |
+|---|---|---|---|
+| discount_percent | numeric | yes | 1–90 |
+| ends_at | datetime | yes | after now, at most 1 month out (`YYYY-MM-DD HH:MM:SS`) |
+
+**200:** `{ "status":"success", "product": { …, "is_on_offer":true, "discounted_price":"75.00" } }`
+**422:** validation (ends_at over 1 month). **409:** `"This item already has an active offer"` (one live at a time) OR `"You can add a new offer on this item only one week after the previous one ended"` (1-week cooldown, returns `available_at`). Not yours → **404**.
+
+#### `DELETE /vendor/products/{id}/discount`  — end an offer early
+**200:** `{ "status":"success", "message":"Offer removed" }` (starts the 1-week cooldown). **404:** `"This item has no active offer"`.
+
+#### `POST /vendor/products/{id}/toggle-hidden`  — hide / show from customers
+Hide a product so customers can't see or book it — it STAYS in the vendor's own list (so they can un-hide). Separate from `is_available` (stock-controlled): a product is shown to customers only when `is_available=true` AND `is_hidden=false`.
+| field | type | required | rule |
+|---|---|---|---|
+| is_hidden | boolean | no | omit to flip the current value |
+
+**200:** `{ "status":"success", "is_hidden": true|false }`. Not yours → **404**.
+- While hidden: the item is gone from `GET /products`, `GET /vendors/{id}/products/search`, and booking it returns **409**; but it still appears in the vendor's own `GET /vendor/products`.
+
+**Product object fields:** `id, vendor_id, name, description, price (2-dec string|null), stock (int|null), meta (array), is_available (bool), is_hidden (bool), deposit_percent, discount_percent (2-dec|null), discount_ends_at (datetime|null), is_on_offer (bool, appended), discounted_price (2-dec string, appended — equals price when no live offer), created_at, updated_at, images[]`. Each image: `id, vendor_product_id, image_path, is_primary (bool), image_url (full URL), created_at, updated_at`.
 
 ### 4.3 Portfolio
 
@@ -682,6 +704,12 @@ On a brand-new vendor (no bookings answered), `GET /vendor/response-time` → `r
 
 **S18 — Localization (Accept-Language).**
 Take any request that returns a `message` or validation `errors` (e.g. `POST /vendor/send-otp` with no `phone` → 422). Call it once with `Accept-Language: ar` and once with `Accept-Language: en`. Assert: same status code and same JSON shape, but the `message`/`errors` text is Arabic in the first and English in the second. Also assert that enum VALUES in any response (`vendor_type`, `status`, `booking_style`) stay the English key in BOTH languages (they are never translated by the API — the app maps them to Arabic labels).
+
+**S19 — Discount / offer lifecycle.**
+Create a product. `POST /vendor/products/{id}/discount` `{discount_percent:25, ends_at: <10 days out>}` → 200; assert `product.is_on_offer:true` and `discounted_price` = price×0.75. `POST` again while active → **409** (already active). `POST` with `ends_at` >1 month → **422**. `DELETE /vendor/products/{id}/discount` → 200; re-GET shows `is_on_offer:false`. Immediately `POST` a new discount → **409** (1-week cooldown).
+
+**S20 — Hide / show a product.**
+Create a product (visible in `GET /products`). `POST /vendor/products/{id}/toggle-hidden` `{is_hidden:true}` → `is_hidden:true`. Assert it DISAPPEARS from `GET /products` and from `GET /vendors/{vendorId}/products/search`, and a user `POST /bookings` for it → **409**. Assert it STILL appears in the vendor's own `GET /vendor/products`. Toggle back (empty body flips) → `is_hidden:false`; it reappears in `GET /products`.
 
 ---
 
