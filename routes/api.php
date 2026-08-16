@@ -40,6 +40,7 @@ Route::post('/vendor/complete-registration', [VendorAuthController::class, 'comp
 
 // Public browse
 Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: Home / Explore / Filters
+Route::get('/vendors/nearby', [VendorBrowseController::class, 'nearby']); // Explore map: vendors + distance_km, nearest first (keep BEFORE /vendors/{id})
 Route::get('/products', [ProductBrowseController::class, 'index']); // item discovery: Home rails / Filters / search
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
 Route::get('/vendors/{vendorId}/reviews', [ReviewController::class, 'vendorReviews']);

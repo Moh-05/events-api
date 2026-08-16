@@ -122,6 +122,40 @@ class VendorBrowseController extends Controller
         ]);
     }
 
+    // Explore screen — vendors on the map/list, sorted NEAREST first, each with
+    // distance_km. lat/lng are the phone's GPS (required). Optional vendor_type
+    // filter drives the "explore only wedding halls" path from a Home category.
+    // Offline vendors (is_accepting_bookings=false) are STILL shown (the app shows
+    // a "not accepting bookings" banner on tap) — no price here, just the vendor.
+    public function nearby(Request $request)
+    {
+        $request->validate([
+            'lat'         => 'required|numeric|between:-90,90',
+            'lng'         => 'required|numeric|between:-180,180',
+            'vendor_type' => 'sometimes|string',
+        ]);
+
+        $query = Vendor::where('is_approved', true)
+            ->where('is_active', true)
+            ->select([
+                'id', 'business_name', 'vendor_type', 'vendor_style', 'booking_style',
+                'city', 'rating_avg', 'profile_image', 'cover_image',
+                'is_accepting_bookings', 'latitude', 'longitude',
+            ]);
+
+        if ($request->filled('vendor_type')) {
+            $query->where('vendor_type', $request->vendor_type);
+        }
+
+        // Adds distance_km + sorts closest-first (reuses the Haversine helper).
+        $this->sortByDistance($query, $request->lat, $request->lng);
+
+        return response()->json([
+            'status'  => 'success',
+            'vendors' => $query->paginate(15)->withQueryString(),
+        ]);
+    }
+
     // Adds distance_km to each vendor and sorts closest-first.
     // This is the standard Haversine formula (distance between two GPS points
     // on a sphere) — the math looks scary but it's a well-known copy-paste
