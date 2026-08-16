@@ -42,8 +42,8 @@ class VendorProductController extends Controller
     // Search products by name within a specific vendor
     public function searchVendorProducts(Request $request, $vendorId)
     {
-        // A banned vendor's work is hidden from customers (data stays in the DB).
-        if (!Vendor::active()->whereKey($vendorId)->exists()) {
+        // A banned OR not-yet-approved vendor's work is hidden (data stays in DB).
+        if (!Vendor::whereKey($vendorId)->where('is_approved', true)->where('is_active', true)->exists()) {
             return response()->json([
                 'status'   => 'success',
                 'products' => [],
@@ -51,8 +51,10 @@ class VendorProductController extends Controller
             ]);
         }
 
-        // Public list — hide the vendor's manually-hidden products from customers.
+        // Public list — show only available, non-hidden products (same visibility
+        // rule as GET /products).
         $query = VendorProduct::where('vendor_id', $vendorId)
+            ->where('is_available', true)
             ->where('is_hidden', false)
             ->with('images');
 

@@ -29,6 +29,7 @@ class User extends Authenticatable
 
     protected $hidden = [
         'remember_token',
+        'fcm_token', // device token — never exposed in any API response
     ];
 
     // Full public URL to the profile image, so the app uses it directly.

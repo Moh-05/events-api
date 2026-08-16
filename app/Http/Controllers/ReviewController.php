@@ -157,6 +157,12 @@ class ReviewController extends Controller
     // Get all reviews for a vendor (public endpoint — used on the vendor's public profile page)
     public function vendorReviews(int $vendorId)
     {
+        // A banned or not-yet-approved vendor's work is hidden from customers.
+        if (! \App\Models\Vendor::where('id', $vendorId)
+                ->where('is_approved', true)->where('is_active', true)->exists()) {
+            return response()->json(['status' => 'success', 'reviews' => []]);
+        }
+
         $reviews = Review::where('vendor_id', $vendorId)
             ->with('user:id,first_name,last_name')
             ->latest()

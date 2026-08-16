@@ -25,9 +25,14 @@ class PortfolioController extends Controller
         ]);
     }
 
-    // Public — any vendor's portfolio
+    // Public — an approved+active vendor's portfolio (hidden for banned/unapproved).
     public function vendorPortfolio(Request $request, $vendorId)
     {
+        if (! \App\Models\Vendor::where('id', $vendorId)
+                ->where('is_approved', true)->where('is_active', true)->exists()) {
+            return response()->json(['status' => 'success', 'portfolio' => []]);
+        }
+
         $items = PortfolioItem::where('vendor_id', $vendorId)
             ->with('images')
             ->latest()
