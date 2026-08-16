@@ -50,19 +50,19 @@ return [
 
     // Notification titles/bodies (sent to user or vendor)
     'notif_payment_received_title' => 'Payment Received',
-    'notif_payment_received_body'  => 'Your payment was confirmed. Your booking is now waiting for vendor approval.',
-    'notif_new_booking_title'      => 'New Paid Booking',
-    'notif_new_booking_body'       => 'You have a new paid booking #:id. Please accept or decline.',
-    'notif_approved_title'         => 'Booking Approved',
-    'notif_approved_body'          => 'Your booking #:id has been approved by the vendor.',
+    'notif_payment_received_body'  => 'Your payment was confirmed. Your booking is now waiting for the vendor to accept it.',
+    'notif_new_booking_title'      => 'New Booking',
+    'notif_new_booking_body'       => 'You have a new paid booking from :name. Please accept or decline it.',
+    'notif_approved_title'         => 'Booking Accepted',
+    'notif_approved_body'          => ':name accepted your booking.',
     'notif_completed_title'        => 'Service Completed',
-    'notif_completed_body'         => "Your booking #:id is complete. Don't forget to leave a review!",
+    'notif_completed_body'         => "Your booking with :name is complete. Don't forget to leave a review!",
     'notif_declined_title'         => 'Booking Declined',
-    'notif_declined_body'          => 'Your booking #:id was declined. Your payment will be refunded.',
+    'notif_declined_body'          => ':name declined your booking. Your payment will be refunded.',
     'notif_review_title'           => 'New Review',
-    'notif_review_body'            => 'You received a :rating-star review.',
+    'notif_review_body'            => ':name gave you a :rating-star review.',
     'notif_cancelled_title'        => 'Booking Cancelled',
-    'notif_cancelled_body'         => 'The customer cancelled booking #:id.',
+    'notif_cancelled_body'         => ':name cancelled their booking.',
 
     // Notifications
     'notification_not_found'  => 'Notification not found',

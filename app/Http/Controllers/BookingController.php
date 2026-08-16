@@ -353,7 +353,7 @@ class BookingController extends Controller
                 $booking->vendor,
                 'messages.notif_cancelled_title',
                 'messages.notif_cancelled_body',
-                ['id' => $booking->id],
+                ['name' => trim($booking->user->first_name . ' ' . $booking->user->last_name)],
                 ['booking_id' => $booking->id]
             );
 
@@ -409,7 +409,7 @@ class BookingController extends Controller
                 $booking->vendor,
                 'messages.notif_cancelled_title',
                 'messages.notif_cancelled_body',
-                ['id' => $booking->id],
+                ['name' => trim($booking->user->first_name . ' ' . $booking->user->last_name)],
                 ['booking_id' => $booking->id]
             );
 
@@ -483,7 +483,7 @@ class BookingController extends Controller
             $booking->user,
             'messages.notif_approved_title',
             'messages.notif_approved_body',
-            ['id' => $booking->id],
+            ['name' => $booking->vendor->business_name],
             ['booking_id' => $booking->id]
         );
 
@@ -523,7 +523,7 @@ class BookingController extends Controller
             $booking->user,
             'messages.notif_completed_title',
             'messages.notif_completed_body',
-            ['id' => $booking->id],
+            ['name' => $booking->vendor->business_name],
             ['booking_id' => $booking->id]
         );
 
@@ -582,7 +582,7 @@ class BookingController extends Controller
                 $booking->user,
                 'messages.notif_declined_title',
                 'messages.notif_declined_body',
-                ['id' => $booking->id],
+                ['name' => $booking->vendor->business_name],
                 ['booking_id' => $booking->id]
             );
         }
@@ -694,12 +694,12 @@ class BookingController extends Controller
 
         if ($user instanceof \App\Models\Vendor) {
             $bookings = Booking::where('vendor_id', $user->id)
-                ->with(['user:id,first_name,last_name,profile_image', 'product', 'items.product:id,name,price'])
+                ->with(['user:id,first_name,last_name,profile_image', 'product', 'items.product:id,name,price,discount_percent,discount_ends_at'])
                 ->latest()
                 ->get();
         } else {
             $bookings = Booking::where('user_id', $user->id)
-                ->with(['vendor', 'product', 'items.product:id,name,price'])
+                ->with(['vendor', 'product', 'items.product:id,name,price,discount_percent,discount_ends_at'])
                 ->latest()
                 ->get();
         }
@@ -717,7 +717,7 @@ class BookingController extends Controller
         $vendor   = $request->user();
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('status', 'pending')
-            ->with(['user:id,first_name,last_name', 'product:id,name,price'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at'])
             ->latest()
             ->take(10)
             ->get();
@@ -744,7 +744,7 @@ class BookingController extends Controller
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('status', 'approved')
             ->where('event_date', '>=', now())
-            ->with(['user:id,first_name,last_name', 'product:id,name'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at'])
             ->orderBy('event_date', 'asc')
             ->get();
 
@@ -791,7 +791,7 @@ class BookingController extends Controller
         $vendor  = $request->user();
         $booking = Booking::where('id', $id)
             ->where('vendor_id', $vendor->id)
-            ->with(['user:id,first_name,last_name,phone,profile_image', 'product.images', 'items.product:id,name,price', 'payment'])
+            ->with(['user:id,first_name,last_name,phone,profile_image', 'product.images', 'items.product:id,name,price,discount_percent,discount_ends_at', 'payment'])
             ->firstOrFail();
 
         return response()->json([
@@ -808,7 +808,7 @@ class BookingController extends Controller
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('booking_style', 'order')
             ->where('status', '!=', 'awaiting_payment')
-            ->with(['user:id,first_name,last_name', 'product:id,name,price', 'items.product:id,name,price'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at', 'items.product:id,name,price,discount_percent,discount_ends_at'])
             ->latest()
             ->take(10)
             ->get();

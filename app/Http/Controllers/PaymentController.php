@@ -124,7 +124,7 @@ class PaymentController extends Controller
             $vendor,
             'messages.notif_new_booking_title',
             'messages.notif_new_booking_body',
-            ['id' => $booking->id]
+            ['name' => trim($user->first_name . ' ' . $user->last_name)]
         );
 
         return response()->json([

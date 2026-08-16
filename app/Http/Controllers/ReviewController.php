@@ -81,7 +81,7 @@ class ReviewController extends Controller
             $vendor,
             'messages.notif_review_title',
             'messages.notif_review_body',
-            ['rating' => $request->rating],
+            ['name' => trim($booking->user->first_name . ' ' . $booking->user->last_name), 'rating' => $request->rating],
             ['booking_id' => $booking->id]
         );
 
