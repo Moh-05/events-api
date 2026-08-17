@@ -90,6 +90,52 @@ class ProductBrowseController extends Controller
         ]);
     }
 
+    // Public single-product detail. ONE endpoint for every path into the product
+    // screen: tapped from a Home rail, from search, or from inside a vendor's
+    // profile — it is the same screen, so it is the same endpoint. The list
+    // endpoints carry only the primary image; this carries ALL images for the
+    // gallery, plus the full vendor so the app can show who sells it.
+    //
+    // Same visibility rule as index(): the item must be available and not hidden,
+    // and its vendor approved + active. A product that fails any of those is a
+    // 404 here — the same as if it did not exist. That keeps a hidden or banned
+    // vendor's item unreachable even by typing its id directly.
+    public function show($id)
+    {
+        $product = VendorProduct::where('id', $id)
+            ->where('is_available', true)
+            ->where('is_hidden', false)
+            ->whereHas('vendor', fn ($q) => $q->where('is_approved', true)->where('is_active', true))
+            ->with([
+                // Full vendor card: enough to render the "sold by" block and let the
+                // app deep-link to the vendor profile. is_active + winding_down are
+                // included so the appended account_status can actually compute.
+                'vendor:id,business_name,vendor_type,vendor_style,booking_style,city,rating_avg,profile_image,cover_image,is_accepting_bookings,is_active,winding_down,latitude,longitude',
+                // Whole gallery, primary image first.
+                'images',
+            ])
+            ->first();
+
+        if (! $product) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => __('messages.product_not_found'),
+            ], 404);
+        }
+
+        // Primary first, then the rest in insertion order, so the app can show
+        // images[0] as the hero without sorting client-side.
+        $product->setRelation(
+            'images',
+            $product->images->sortByDesc('is_primary')->values()
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'product' => $product,
+        ]);
+    }
+
     // Sorting. Rating/most_booked/nearest depend on the vendor, so they join it.
     private function applySort($query, Request $request): void
     {

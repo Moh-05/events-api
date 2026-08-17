@@ -17,6 +17,9 @@ return [
     'profile_image_removed' => 'Profile image removed',
     'cover_image_removed'   => 'Cover image removed',
 
+    // Products
+    'product_not_found' => 'Product not found',
+
     // Bookings
     'booking_not_found'          => 'Booking not found',
     'booking_cancelled'          => 'Booking cancelled',

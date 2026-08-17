@@ -254,6 +254,42 @@ Assertions:
 - A hidden or sold-out (`is_available=false`) product, or an unapproved vendor's product, must **not** appear.
 `sort=nearest` without `lat`/`lng` → **422**.
 
+### 4.3b `GET /products/{id}` — single product detail (the product screen)
+One endpoint for **every** path into the product detail screen — tapped from a Home rail, from search, or from inside a vendor's profile. It is the same screen, so it is the same endpoint. Unlike the list endpoints (which carry only `primary_image`), this returns **ALL images** for the gallery plus the **full vendor** object.
+
+**200:**
+```json
+{
+  "status": "success",
+  "product": {
+    "id": 20, "vendor_id": 3, "name": "…", "description": "…",
+    "price": "150.00", "deposit_percent": "20.00", "meta": { }, "stock": 3,
+    "is_available": true, "is_hidden": false,
+    "discount_percent": "25.00|null", "discount_ends_at": "…|null",
+    "is_on_offer": true, "discounted_price": "112.50",
+    "created_at": "…", "updated_at": "…",
+    "vendor": {
+      "id": 3, "business_name": "…", "vendor_type": "photographer",
+      "vendor_style": "…", "booking_style": "appointment", "city": "…",
+      "rating_avg": "4.50", "profile_image": "…|null", "cover_image": "…|null",
+      "is_accepting_bookings": true, "is_active": true, "winding_down": false,
+      "latitude": "…|null", "longitude": "…|null",
+      "profile_image_url": "…|null", "cover_image_url": "…|null",
+      "account_status": "active"
+    },
+    "images": [
+      { "id": 9, "vendor_product_id": 20, "image_path": "…", "is_primary": true, "image_url": "…" },
+      { "id": 10, "vendor_product_id": 20, "image_path": "…", "is_primary": false, "image_url": "…" }
+    ]
+  }
+}
+```
+Assertions:
+- **`images[0]` is always the primary image** (sorted server-side) — use it as the hero, the rest as the gallery. `images` is `[]` if the product has none.
+- Unlike the mini-vendor in `GET /products`, here **`account_status` is `"active"`, NOT null** — this select includes `is_active`/`winding_down` so the appended attribute computes. `fcm_token`/`remember_token` absent.
+- **404 for anything not publicly visible**: unknown id, `is_available=false` (sold out), `is_hidden=true` (vendor hid it), or a vendor that is not (`is_approved AND is_active`). All return the same **404** `{ "status": "error", "message": "Product not found" }` — indistinguishable from a missing id, so nothing leaks.
+- No auth required.
+
 ### 4.4 `GET /vendors/{id}/products/search?name=...` — within one vendor
 Public. If the vendor is not approved+active (`is_approved=false` OR `is_active=false`) → **200** `{ "status": "success", "products": [], "note": "Vendor unavailable" }`. Otherwise returns that vendor's products filtered to **`is_available=true AND is_hidden=false`** (same visibility rule as `GET /products` — sold-out and hidden items do NOT appear), each with `images[]`. `?name=` filters `name LIKE %name%` (optional).
 **200:** `{ "status": "success", "products": [ { /* product + images[] */ } ] }`

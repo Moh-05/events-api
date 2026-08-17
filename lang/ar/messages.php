@@ -17,6 +17,9 @@ return [
     'profile_image_removed' => 'تمت إزالة صورة الملف الشخصي',
     'cover_image_removed'   => 'تمت إزالة صورة الغلاف',
 
+    // Products
+    'product_not_found' => 'المنتج غير موجود',
+
     // Bookings
     'booking_not_found'        => 'الحجز غير موجود',
     'booking_cancelled'        => 'تم إلغاء الحجز',
