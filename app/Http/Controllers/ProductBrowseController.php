@@ -29,9 +29,10 @@ class ProductBrowseController extends Controller
             'max_price'  => 'sometimes|numeric|min:0',
             'min_rating' => 'sometimes|numeric|min:0|max:5',
             'search'     => 'sometimes|string',
-            'sort'       => 'sometimes|in:newest,top_rated,price_low,price_high,most_booked,nearest',
+            'sort'       => 'sometimes|in:random,newest,top_rated,price_low,price_high,most_booked,nearest',
             'lat'        => 'required_if:sort,nearest|numeric|between:-90,90',
             'lng'        => 'required_if:sort,nearest|numeric|between:-180,180',
+            'per_page'   => 'sometimes|integer|min:1|max:50', // rail = 15; "show more" list can ask for more
         ]);
 
         // Only show items from approved + active vendors, and only available items.
@@ -85,14 +86,14 @@ class ProductBrowseController extends Controller
 
         return response()->json([
             'status'   => 'success',
-            'products' => $query->paginate(15)->withQueryString(),
+            'products' => $query->paginate((int) $request->input('per_page', 15))->withQueryString(),
         ]);
     }
 
     // Sorting. Rating/most_booked/nearest depend on the vendor, so they join it.
     private function applySort($query, Request $request): void
     {
-        switch ($request->input('sort', 'newest')) {
+        switch ($request->input('sort', 'random')) {
             case 'price_low':
                 $query->orderBy('price', 'asc');
                 break;
@@ -102,7 +103,8 @@ class ProductBrowseController extends Controller
                 break;
 
             case 'top_rated':
-                // Order by the vendor's rating via a correlated subquery.
+                // "Top rated" for a product = its VENDOR's rating (we rate vendors,
+                // not products). Order by the owner vendor's rating_avg.
                 $query->orderByDesc(
                     \App\Models\Vendor::select('rating_avg')
                         ->whereColumn('vendors.id', 'vendor_products.vendor_id')
@@ -111,6 +113,10 @@ class ProductBrowseController extends Controller
 
             case 'most_booked':
                 $query->withCount('bookings')->orderByDesc('bookings_count');
+                break;
+
+            case 'newest':
+                $query->latest();
                 break;
 
             case 'nearest':
@@ -129,9 +135,11 @@ class ProductBrowseController extends Controller
                     ->orderByRaw('distance_km is null, distance_km asc');
                 break;
 
-            case 'newest':
+            case 'random':
             default:
-                $query->latest();
+                // Default browsing feels fresh/varied. "Recently Added" has its own
+                // rail via ?sort=newest, so the default is deliberately NOT newest.
+                $query->inRandomOrder();
                 break;
         }
     }
