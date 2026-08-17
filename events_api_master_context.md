@@ -1037,6 +1037,39 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 
 ---
 
+## ⭐⭐ UPDATES — 2026-08-16/17 (Moh session: nearby, user docs, security fixes, offer/notif/sort fixes — ALL DEPLOYED, app ~97% done)
+
+> **CURRENT STATE — read this first.** Everything below is COMMITTED and LIVE on production. `main` = `origin/main` = deployed (latest commit `fed12b6`). Working tree clean. `dev` is BEHIND main (main is the source of truth now — we've been committing straight to main since the big merge; a `git checkout dev && git merge main` fast-forward catches it up whenever Amer needs it). Production DB was `migrate:fresh`ed at end of session (empty — teams make their own test data; admin reseeded `admin@haflati.com`/`0000`).
+
+### What was built/fixed this session (all live)
+1. **`GET /vendors/nearby`** — the Explore map endpoint. One endpoint, both Explore paths: no filter (nav-bar Explore) or `?vendor_type=` (tapped a Home category). `lat`/`lng` REQUIRED; returns approved+active vendors + `distance_km`, nearest first. Offline vendors (`is_accepting_bookings=false`) ARE shown (app shows a banner on tap). No prices — just vendor + distance. Route is registered BEFORE `/vendors/{id}` so "nearby" isn't captured as an id. (Decision: NO radius filter — we show the km, we don't filter by it; the design's "within X km" slider was dropped as low-value.)
+2. **User (customer) API docs** — `docs/user-api.html` (43 endpoints, human reference) + `docs/user-api-testing.md` (33 endpoints, 19 test scenarios, machine-executable for the Flutter dev's Claude). Same quality/template as the vendor pair. Built by 2 subagents, verified by me.
+3. **SECURITY fixes (were open gaps):** (a) public sub-resource endpoints now gate on vendor state — `vendorReviews`, `vendorPortfolio`, `searchVendorProducts` return EMPTY for a not-approved/not-active vendor (before, a banned/unapproved vendor's reviews/portfolio/products were publicly fetchable by id). `searchVendorProducts` also filters `is_hidden=false`. (b) `User::$hidden` now includes `fcm_token` (was exposed on the user object; Vendor already hid it).
+4. **Earnings bug FIX:** `GET /vendor/earnings` + `GET /vendor/stats` were summing ALL verified payments — including paid-but-not-yet-approved (`pending`) bookings, i.e. money the vendor hadn't earned. Now both filter booking status to `approved`/`completed` (matches the wallet, which credits on approve).
+5. **Offer-price display bug FIX (important):** vendor booking-list endpoints selected `product:id,name,price` only, which stripped `discount_percent`/`discount_ends_at` → the `is_on_offer`/`discounted_price` accessors returned wrong values (showed original price). Added the discount columns to ALL product eager-loads in BookingController, so the offer price shows everywhere the vendor sees a booked product. (Note: `item.unit_price` was always the correct charged price — the accessors were the broken part.)
+6. **Notifications rewritten — no more dumb "booking #id":** all 6 notification bodies now use NAMES. Customer sees the vendor's `business_name` (accepted/declined/completed); vendor sees the customer's name (new booking/cancel/review). `booking_id` stays in the notification `data` payload for tap-navigation. en + ar both updated with `:name` placeholder. (This was Mohamad's "Option A".)
+7. **`GET /products` sort/pagination refinements:** default sort is now **random** (was newest — "Recently Added" already has its own rail via `?sort=newest`, so default random feels varied). `top_rated` KEPT but explicitly sorts products by the OWNER VENDOR's `rating_avg` (products have no rating of their own). Added optional `?per_page=` (1–50, default 15) so the app controls page size: rail=15, the "show more" full vertical list can request more. KEEP the Laravel paginator shape (`current_page`/`last_page`/`total`/`next_page_url`) — it powers the "show more → load next page" flow (rail shows 15, tap show-more opens a paginated vertical list).
+8. **Chat rule (from prior session, now confirmed live):** chat opens once the vendor APPROVES a paid booking (not just paid). Both directions: user `POST /conversations/vendor/{id}`, vendor `POST /vendor/conversations/user/{id}`. Decline accepts an optional free-text `reason` → becomes the customer's decline notification VERBATIM (vendor types it, not translated).
+
+### Design reconciliation (the NEW design system)
+- The correct current design is in the repo folder **`Haflati Design System (new)/`** (untracked; `ui_kits/user/Home.html`, `Filters.html`, `Explore.html`). The Home 5-rail layout + Filters (Category, Price min/max, Rating, Sort: random/nearest/top_rated/price_low/most_booked) MATCH what we built. Distance is DISPLAYED not filtered. Design is guidance, not contract — we drop things that don't add value (e.g. the radius filter).
+
+### The customer app is now FEATURE-COMPLETE on the backend
+Home (all 5 rails), Explore (map + nearest + category filter), vendor detail, product discovery + filters + search, booking (both shapes + selected_options), payment, offers/discounts, favorites, chat, reviews, notifications, support — ALL live.
+
+### What's LEFT (~3%)
+- **`GET /categories`** — the 10 category tiles + counts, OR hardcode in Flutter (undecided; leaning hardcode since the enum is fixed).
+- **Public single-product detail endpoint** — NOT built. There's no `GET /products/{id}` for customers (only vendor's own `GET /vendor/products/{id}`). The customer gets a product's full data (meta + is_on_offer + discounted_price) from the LIST endpoints, but has no dedicated single-product detail with ALL images. Discussed but not built — decide if the product-detail screen needs it (it probably does, for all images + full meta).
+- **Smart Search (FastAPI)** — separate repo/service, Moh+Amer's final learning sprint. Groundwork in this repo: `smart-search.md`, `HaflatiDemoSeeder` (LOCAL ONLY seeder), factories.
+- **Pre-launch kill list** (do LAST — all kept ON now for testing): `0000` payment bypass · OTP in auth responses · `debug_notifications` in payment response · set `APP_DEBUG=false` on Railway · **UltraMsg renewed this session** (new instance `instance188530` set on Railway — OTP may actually send via WhatsApp now) · **rotate the leaked Supabase S3 key**.
+
+### Ops notes learned this session
+- Railway link drops per-machine + sometimes times out; retry `railway link --project distinguished-imagination --environment production --service events-api` then chain the `railway ssh` in the same call. Prod server is `php artisan serve` (single-threaded dev server, ~122 MB idle RAM) — FINE for a few testers, but before ~100 concurrent users switch to FrankenPHP for parallel requests. $5 Railway plan handles 100 test users on RAM/cost (lightweight API); concurrency is the only limit, not user count.
+- **Firebase:** ONE project (`hafleti-80cf0`) for BOTH apps — the backend service-account JSON covers users AND vendors; nothing to change when the user app is added. Flutter adds each app (customer + vendor) to the SAME project with its own `google-services.json`/plist.
+- **Terminal `????` on Arabic is a Windows/PowerShell display issue only** — data stores fine. To send Arabic via curl reliably, write the JSON body from a pure Python `urllib` script (raw UTF-8), not shell strings.
+
+---
+
 ## ⭐ UPDATES — 2026-08-14/15 (Moh + Amer: BIG batch — offers, discovery, chat, merge, all DEPLOYED)
 
 > **READ THIS FIRST — current state of the whole project.** Everything below is
