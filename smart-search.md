@@ -57,22 +57,44 @@ vendor's id, it dies here.
 
 ---
 
-## The visibility rule
+## The visibility rule — NON-NEGOTIABLE
 
 Already appended to this repo's `README.md`. Repeated because it is the one rule
-that matters:
+that matters. **All four flags, every time, in every customer-facing query —
+including anything Smart Search touches:**
 
 ```
 vendors.is_active = 1 AND vendors.is_approved = 1
   AND vendor_products.is_available = 1 AND vendor_products.is_hidden = 0
 ```
 
-(`is_hidden` was added 2026-08: the vendor's manual hide, separate from the
-stock-driven `is_available`. Both must be excluded.)
+What each one means, and why dropping any one of them is a real bug:
 
-**`Vendor::scopeActive()` checks `is_active` ONLY.** No scope, middleware or
-helper adds `is_approved` — `EnsureActive` also only covers `is_active`. Write
-both conditions explicitly in every customer-facing query.
+| Flag | Table | Who sets it | Dropping it leaks |
+| ---- | ----- | ----------- | ----------------- |
+| `is_approved` | `vendors` | Admin, at KYC | an unvetted business nobody has verified |
+| `is_active` | `vendors` | Admin, at ban | a **banned** vendor — the worst case |
+| `is_available` | `vendor_products` | System, from stock | a sold-out item the customer cannot buy |
+| `is_hidden` | `vendor_products` | The **vendor**, manually | an item the vendor deliberately took down |
+
+`is_approved` and `is_hidden` are the two that get forgotten, and they are the
+two with the sharpest consequences — `is_approved` because it exposes an unvetted
+business, `is_hidden` because the vendor made an explicit choice we would be
+overriding. Treat a query missing either as broken, not as a style issue.
+
+**Three traps that have each caused a real bug in this repo:**
+
+1. **`Vendor::scopeActive()` checks `is_active` ONLY.** No scope, middleware or
+   helper adds `is_approved` — `EnsureActive` also only covers `is_active`.
+   Write both conditions explicitly, every time. There is no shortcut, and
+   `active()` looking complete is exactly why this is easy to get wrong.
+2. **Apply the rule to the JOINED row, not one table.** A product with
+   `is_available = 1` whose shop was banned must still disappear. The bait rows
+   below exist to prove this specific case.
+3. **Secondary surfaces leak too.** The 2026-08-17 audit (§4) found the leak in
+   *Saved items*, not in the discovery endpoints. Any query that returns a
+   product — favourites, recommendations, a search result, anything Smart Search
+   hydrates — carries the full rule.
 
 ---
 
@@ -196,23 +218,48 @@ The app must never crash because of the AI layer.
 
 Env vars needed here: `SMART_SEARCH_URL`, `SMART_SEARCH_KEY`.
 
-### 4. Partial-leak note — `VendorProductController::searchVendorProducts`
+### 4. Leak audit — CLOSED 2026-08-17
 
-It filters the vendor with `Vendor::active()` and (as of 2026-08) also excludes
-`is_hidden = 1` products. It STILL returns products **regardless of `is_available`**
-— i.e. a sold-out product can appear through that endpoint. Low priority (a
-sold-out item showing is far less bad than a banned vendor's), but add
-`is_available = 1` there on the leak-audit day for full consistency with the
-visibility rule above.
+An audit of every customer-facing product query was run on 2026-08-17. The old
+note here ("`searchVendorProducts` still returns products regardless of
+`is_available`") is **out of date — that was fixed.** Current state of every
+path a customer can reach a product through:
+
+| Path | Status |
+| ---- | ------ |
+| `GET /products` (browse/rails/search) | full rule applied |
+| `GET /products/{id}` (detail, added 2026-08-17) | full rule; a failing product 404s exactly like a missing id, so an id cannot be probed |
+| `GET /vendors/{id}/products/search` (vendor profile) | full rule + returns `[]` for a not-approved/not-active vendor |
+| `POST /bookings` (all 3 call sites) | 409 on `is_available = 0` or `is_hidden = 1` |
+| `GET /saved` + `GET /saved/ids` | **was leaking — fixed 2026-08-17** (see below) |
+| `VendorProductController::index()` | unfiltered, but **not routed** — dead code, no live exposure. Delete it or add the rule if it is ever wired up. |
+
+**The bug that was found:** `GET /saved` filtered only `is_active`, and
+`GET /saved/ids` filtered *nothing*. So a product the vendor had hidden — or one
+belonging to an unapproved vendor — stayed visible in every user's Saved screen
+and kept its heart lit, even though it had disappeared from browse, search and
+detail. Both now apply the full four-flag rule. Saved rows are **not deleted**
+when they fail the rule; they simply drop out of the response and come back if
+the vendor un-hides or restocks the item.
+
+**Why this one is worth remembering for search:** it is the exact failure mode
+Smart Search is most likely to repeat. The leak did not come from the discovery
+endpoints everyone thinks to check — it came from a *secondary* surface that
+also happens to return products. When FastAPI returns ids and Laravel hydrates
+them, the rule must be applied at the **hydration** step, not just assumed from
+whatever the index contains. An embedding index goes stale the moment a vendor
+hides a product; only a live re-check on the joined row is trustworthy.
 
 ---
 
 ## Things that are NOT affected by Smart Search
 
-- **Arabic translation.** `lang/` does not exist yet and translation has not
-  started. It does not block search: user-generated content (business_name, bio,
-  product names) is **never translated** — vendors type Arabic already. `lang/ar/`
-  is for validation and error messages, which search never reads.
+- **Arabic translation.** (Updated: `lang/ar` + `lang/en` were BUILT and deployed
+  in the 2026-08-07 session — this section used to say translation had not
+  started.) It still does not affect search: `lang/` holds validation and error
+  messages only, which search never reads. User-generated content (business_name,
+  bio, product names) is **never translated** — vendors type Arabic already, and
+  that raw text is exactly what gets embedded.
 - **`vendor_type` values.** Always the English enum (`photographer`,
   `makeupArtist`, …) in every JSON, whatever language the query is in — the value
   goes straight into `WHERE vendor_type = ?`. Translation only adds display
@@ -225,12 +272,24 @@ visibility rule above.
 
 ## Rules for anyone (human or Claude) working in this repo
 
-1. **Work on `dev`.** `main` auto-deploys to Railway.
-2. **Seed locally only.** Never against Railway.
-3. **Do not delete the `BAIT-` rows.** They are the leak test.
-4. **Do not add `is_approved` to `scopeActive()`.** Admin queries deliberately
+1. **The four-flag visibility rule is mandatory** — `is_approved` + `is_active` on
+   the vendor, `is_available` + `is_hidden` on the product, in EVERY
+   customer-facing query, applied to the joined row. This is rule #1 for a
+   reason: it is the only one where getting it wrong exposes a banned or
+   unvetted business to customers. See "The visibility rule" above.
+2. **Re-apply the rule when hydrating FastAPI results.** The AI layer returns ids;
+   the index can be stale. Laravel re-checks live rows so the AI can never widen
+   what a customer sees. Never trust an id just because the index returned it.
+3. **Note on branches:** this file used to say "work on `dev`". Since the big
+   merge (2026-08-14) work has gone **straight to `main`**, which auto-deploys to
+   Railway — so a push here is a deploy. `dev` is behind and catches up by
+   fast-forward when Amer needs it. Confirm the current branch before starting.
+4. **Seed locally only.** Never against Railway.
+5. **Do not delete the `BAIT-` rows.** They are the leak test — and they target
+   exactly the flags people forget (§ the bait notes above).
+6. **Do not add `is_approved` to `scopeActive()`.** Admin queries deliberately
    see banned and unapproved vendors. Write the conditions explicitly in
    customer-facing queries instead.
-5. **After `migrate:fresh`, the embeddings are gone.** Reindex.
-6. The AI repo's `CLAUDE.md` is the source of truth for search design. If this
+7. **After `migrate:fresh`, the embeddings are gone.** Reindex.
+8. The AI repo's `CLAUDE.md` is the source of truth for search design. If this
    file and that file disagree, that one wins — and fix this one.

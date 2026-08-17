@@ -9,12 +9,19 @@ class SavedItemController extends Controller
 {
     // List the current user's saved items, split into the two tabs the "Saved"
     // screen shows: Packages (appointment vendors — venues, photographers, DJs)
-    // and Products (order vendors — cake shops, stores). A banned vendor's items
-    // are hidden (same rule as browse/search) but stay saved in the DB.
+    // and Products (order vendors — cake shops, stores).
+    //
+    // Applies the FULL customer visibility rule, the same one browse/search use:
+    // the vendor must be approved AND active, and the product available AND not
+    // hidden. Anything failing that drops out of the list but stays saved in the
+    // DB, so it reappears if the vendor un-hides it or restocks. Checking only
+    // is_active here used to leak a vendor-hidden product into every user's
+    // Saved screen.
     public function index(Request $request)
     {
         $saved = SavedItem::where('user_id', $request->user()->id)
-            ->whereHas('product.vendor', fn ($q) => $q->where('is_active', true))
+            ->whereHas('product', fn ($q) => $q->where('is_available', true)->where('is_hidden', false))
+            ->whereHas('product.vendor', fn ($q) => $q->where('is_approved', true)->where('is_active', true))
             ->with([
                 'product.images',
                 // The Vendor model appends account_status (needs is_active +
@@ -53,9 +60,13 @@ class SavedItemController extends Controller
     // Why a separate endpoint: GET /saved already returns this info, but it
     // ships every product's full data; this one is tiny and fast when all you
     // need is "which hearts are on".
+    // Same visibility rule as index(), so a heart can never point at a product
+    // the customer can no longer see anywhere else.
     public function ids(Request $request)
     {
         $ids = SavedItem::where('user_id', $request->user()->id)
+            ->whereHas('product', fn ($q) => $q->where('is_available', true)->where('is_hidden', false))
+            ->whereHas('product.vendor', fn ($q) => $q->where('is_approved', true)->where('is_active', true))
             ->pluck('vendor_product_id');
 
         return response()->json([
