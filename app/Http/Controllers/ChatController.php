@@ -222,7 +222,23 @@ class ChatController extends Controller
     {
         $service = app(NotificationService::class);
         $preview = Str::limit($message->body, 80);
-        $data    = ['type' => 'chat', 'conversation_id' => (string) $conversation->id];
+
+        // The push carries the WHOLE message, not just the conversation id.
+        // Chat is polled (GET /conversations/{id}/messages?after=), so a push
+        // arrives instantly while the message itself only shows up on the
+        // recipient's next poll — the notification would land seconds before
+        // the bubble appeared. With the full message in the payload the app can
+        // render it the moment the push arrives, and treat the next poll as a
+        // no-op (same message id). FCM data values must all be strings.
+        $data = [
+            'type'            => 'chat',
+            'conversation_id' => (string) $conversation->id,
+            'message_id'      => (string) $message->id,
+            'sender_type'     => $message->sender_type,
+            'sender_id'       => (string) $message->sender_id,
+            'body'            => $message->body,
+            'created_at'      => $message->created_at->toJSON(),
+        ];
 
         if ($senderSide === 'user') {
             $vendor = Vendor::find($conversation->vendor_id);
