@@ -66,6 +66,10 @@ return [
     'notif_declined_body'          => 'قام :name برفض حجزك. سيتم إعادة مبلغك',
     'notif_review_title'           => 'تقييم جديد',
     'notif_review_body'            => 'قام :name بتقييمك بـ :rating نجوم',
+    'notif_event_reminder_title' => 'مناسبة قادمة',
+    'notif_event_reminder_body'  => 'مناسبتك مع :name بعد :days أيام. استعدّ لها!',
+    'notif_low_stock_title'      => 'المخزون شارف على النفاد',
+    'notif_low_stock_body'       => 'بقي :count فقط من ":name". أعد التزويد قبل نفاده.',
     'notif_cancelled_title'        => 'تم إلغاء الحجز',
     'notif_cancelled_body'         => 'قام :name بإلغاء حجزه',
 
@@ -87,7 +91,7 @@ return [
     'no_balance'              => 'لا يوجد رصيد متاح للسحب حالياً',
     'withdrawal_successful'   => 'تم السحب بنجاح',
     'shamcash_account_saved'   => 'تم حفظ حساب ShamCash',
-    'shamcash_account_missing' => 'الرجاء إضافة حساب ShamCash قبل السحب حتى نعرف وين نحوّل المبلغ',
+    'shamcash_account_missing' => 'يرجى إضافة حساب ShamCash قبل السحب لنتمكن من تحويل المبلغ إليه',
 
     // Admin messages — kept in English for now (React admin dashboard / admins
     // work in English). Translate later if the admin app needs Arabic.

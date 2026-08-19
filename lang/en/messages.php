@@ -64,6 +64,10 @@ return [
     'notif_declined_body'          => ':name declined your booking. Your payment will be refunded.',
     'notif_review_title'           => 'New Review',
     'notif_review_body'            => ':name gave you a :rating-star review.',
+    'notif_event_reminder_title'   => 'Upcoming Event',
+    'notif_event_reminder_body'    => 'Your event with :name is in :days days. Get ready!',
+    'notif_low_stock_title'        => 'Low Stock',
+    'notif_low_stock_body'         => 'Only :count left of ":name". Restock before it sells out.',
     'notif_cancelled_title'        => 'Booking Cancelled',
     'notif_cancelled_body'         => ':name cancelled their booking.',
 

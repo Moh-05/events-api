@@ -15,3 +15,9 @@ Schedule::command('bookings:auto-complete')->dailyAt('01:00');
 // Revert products whose discount period has ended (and start the cooldown).
 // Pricing is already correct via the is_on_offer accessor; this cleans up fields.
 Schedule::command('offers:expire')->hourly();
+
+// Remind appointment vendors 3 days before an approved event.
+Schedule::command('bookings:remind-upcoming')->dailyAt('09:00');
+
+// Warn seller vendors when a product is nearly sold out.
+Schedule::command('products:alert-low-stock')->dailyAt('09:30');

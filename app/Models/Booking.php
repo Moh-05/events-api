@@ -24,6 +24,7 @@ class Booking extends Model
         'price_agreed',
         'selected_options',
         'responded_at',
+        'reminded_at',
         'refund_amount',
         'refund_paid_at',
         'refund_waived_at',
