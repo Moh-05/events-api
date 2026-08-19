@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Services\PhoneNumberService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -16,12 +17,16 @@ class UserAuthController extends Controller
             'phone' => 'required|string|min:7|max:15|regex:/^\+?[0-9]+$/'
         ]);
 
+        // Normalize BEFORE it becomes a cache key, so "0933..." and "933..."
+        // hit the same OTP entry and the same account on verify.
+        $phone = PhoneNumberService::normalize($request->phone);
+
         $otp = rand(100000, 999999);
-        Cache::put('otp_' . $request->phone, $otp, now()->addMinutes(5));
+        Cache::put('otp_' . $phone, $otp, now()->addMinutes(5));
 
         $response = Http::asForm()->post("https://api.ultramsg.com/" . env('ULTRAMSG_INSTANCE_ID') . "/messages/chat", [
             'token' => env('ULTRAMSG_TOKEN'),
-            'to'    => $request->phone,
+            'to'    => $phone,
             'body'  => "Verification Code: $otp",
         ]);
 
@@ -42,13 +47,15 @@ class UserAuthController extends Controller
             'otp'   => 'required|integer|digits:6',
         ]);
 
-        $cachedOtp = Cache::get('otp_' . $request->phone);
+        $phone = PhoneNumberService::normalize($request->phone);
+
+        $cachedOtp = Cache::get('otp_' . $phone);
         if (!$cachedOtp || $cachedOtp != $request->otp) {
             return response()->json(['message' => __('messages.invalid_otp')], 400);
         }
 
-        Cache::forget('otp_' . $request->phone);
-        $user = User::where('phone', $request->phone)->first();
+        Cache::forget('otp_' . $phone);
+        $user = User::where('phone', $phone)->first();
 
         if ($user) {
             return response()->json([
@@ -59,7 +66,7 @@ class UserAuthController extends Controller
         }
 
         $regToken = Str::random(64);
-        Cache::put('reg_token_' . $regToken, $request->phone, now()->addMinutes(15));
+        Cache::put('reg_token_' . $regToken, $phone, now()->addMinutes(15));
 
         return response()->json(['status' => 'new_user', 'registration_token' => $regToken]);
     }

@@ -836,7 +836,7 @@ pre.json .c{color:#5a5470}      /* comment  */
       <div class="lbl" style="margin-top:12px">Responses</div>
       <div class="resp">
         <div class="resp-item">
-          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">مصفوفة <code>bookings</code>، الأحدث أولاً. كل حجز فيه <code>vendor</code> و <code>product</code> و <code>items</code> (كل عنصر: product + quantity + unit_price).</span></div>
+          <div class="resp-head"><span class="sc sc-2">200</span><span class="resp-desc">مصفوفة <code>bookings</code>، الأحدث أولاً. كل حجز فيه <code>vendor</code> و <code>product</code> و <code>items</code> (كل عنصر: product + quantity + unit_price + selected_options).</span></div>
 <pre class="json">{
   <span class="k">"status"</span>: <span class="s">"success"</span>,
   <span class="k">"bookings"</span>: [
@@ -847,16 +847,18 @@ pre.json .c{color:#5a5470}      /* comment  */
       <span class="k">"status"</span>: <span class="s">"pending"</span>,
       <span class="k">"delivery_date"</span>: <span class="s">"2026-08-25T00:00:00.000000Z"</span>,
       <span class="k">"refund_amount"</span>: <span class="n">null</span>,
+      <span class="k">"selected_options"</span>: <span class="n">null</span> <span class="c">/* appointment-level picks; null for order bookings — see each item instead */</span>,
       <span class="k">"vendor"</span>: { <span class="k">"id"</span>: <span class="n">7</span>, <span class="k">"business_name"</span>: <span class="s">"Sara Studio"</span>, <span class="k">"profile_image_url"</span>: <span class="s">"https://.../ab.jpg"</span> <span class="c">/* ... */</span> },
       <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> <span class="c">/* ... */</span> },
       <span class="k">"items"</span>: [
-        { <span class="k">"quantity"</span>: <span class="n">2</span>, <span class="k">"unit_price"</span>: <span class="s">"150000.00"</span>, <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> } }
+        { <span class="k">"quantity"</span>: <span class="n">2</span>, <span class="k">"unit_price"</span>: <span class="s">"150000.00"</span>, <span class="k">"selected_options"</span>: { <span class="k">"flavor"</span>: <span class="s">"chocolate"</span> }, <span class="k">"product"</span>: { <span class="k">"id"</span>: <span class="n">15</span>, <span class="k">"name"</span>: <span class="s">"Chocolate Cake"</span>, <span class="k">"price"</span>: <span class="s">"150000.00"</span> } }
       ]
       <span class="c">/* ... created_at / updated_at */</span>
     }
     <span class="c">/* ... باقي الحجوزات */</span>
   ]
 }</pre>
+          <div class="ar" style="margin-top:8px"><b>ملاحظة:</b> الـ <code>selected_options</code> اختيارات العميل من الـ <code>meta</code> تبع المنتج — مخزّنة على الحجز نفسه للـ appointment (باقة واحدة)، وعلى كل <code>item</code> للـ order (كل صنف بخياراته). القيمة <code>null</code> إذا العميل ما اختار شي.</div>
         </div>
       </div>
     </div>

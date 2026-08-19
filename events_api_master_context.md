@@ -1037,6 +1037,104 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 
 ---
 
+## ⭐ UPDATES — 2026-08-19 (Moh + Claude session: product detail endpoint, saved-items leak fix, CORS gap found, phone-normalization fix written)
+
+### 1. `GET /products/{id}` — DEPLOYED (closes the roadmap item from 2026-08-16/17)
+Public, no auth. One endpoint for every path into the product detail screen (Home
+rail tap, search, or inside a vendor profile — same screen either way). Returns
+**ALL images** (primary sorted to `images[0]`) + the **full vendor** object (with
+`is_active`/`winding_down` in the select so `account_status` actually computes,
+unlike the `null` you get from the `GET /products` list). Same visibility rule as
+everywhere else — sold-out, hidden, or a not-approved/not-active vendor's product
+all 404 identically to a missing id (`{"status":"error","message":"Product not
+found"}`, en/ar), so nothing leaks by guessing an id. Verified against real
+production data post-deploy (product id 1, a wedding hall package) — full shape,
+correct `account_status:"active"`, no `fcm_token`/`remember_token` leak. Route
+registered at `/products/{id}`, **after** the static `/products` route (same
+"keep the specific route first" rule as `/vendors/nearby`). Commit `2139f7d`.
+
+### 2. Saved-items visibility leak — FOUND AND FIXED
+Audit (prompted by the customer visibility rule discussion) found `GET /saved`
+filtered only `vendors.is_active`, and `GET /saved/ids` filtered **nothing**.
+Result: a product the vendor had hidden (`is_hidden=1`), or one belonging to an
+unapproved vendor, stayed in a user's Saved screen with the heart still lit —
+even after it had already vanished from browse/search/detail. Both now apply the
+full four-flag rule (`is_approved` + `is_active` on vendor, `is_available` +
+`is_hidden` on product). Rows are filtered out, not deleted, so an item
+reappears automatically if the vendor un-hides or restocks it. Proved with a
+real seeded row before and after the fix (count went 1→0 on hide, back to 1 on
+restore); 20/20 suite. Commit `2712541`.
+
+Also folded into this commit: `smart-search.md` got a real update — the four-flag
+visibility rule is now marked non-negotiable with a table of what each flag
+leaks if dropped, and two stale claims were corrected (`lang/` now exists;
+work goes to `main` not `dev`). The old note claiming `searchVendorProducts`
+still ignored `is_available` was wrong — that one was already fixed earlier;
+this settles that discrepancy for good. See `smart-search.md` § the visibility
+rule / § 4 leak audit.
+
+### 3. Phone-number login bug — root cause confirmed, fix WRITTEN, NOT yet deployed
+Mohamad reported: a customer/vendor who signs up typing their phone one way
+(e.g. `0933xxxxxx`) and later logs in typing it another way (`933xxxxxx`, no
+leading trunk 0) gets silently treated as a brand-new account instead of logged
+in, because `UserAuthController`/`VendorAuthController` used `$request->phone`
+RAW everywhere — the OTP cache key, the `User`/`Vendor::where('phone', ...)`
+lookup, and the `create()` write — with zero normalization. UltraMsg itself
+tolerates all the shapes; only OUR matching was broken. Confirmed as a REAL,
+already-happened bug, not hypothetical: production already has vendors stored
+in different raw shapes side by side (`0949101231` vendor 1, `935983121` vendor
+3 — no leading zero).
+
+**Fix written** (NOT committed/pushed yet): new `App\Services\PhoneNumberService::normalize()`
+— strips non-digits, then either strips the `963` country code prefix or a
+leading trunk `0`, and rebuilds as canonical `+963XXXXXXXXX`. Wired into both
+`sendOtp()` and `verifyOtp()` in both auth controllers, applied BEFORE the value
+touches the cache key, the DB lookup, or the DB write, so all three input shapes
+collapse to one account.
+
+**Deliberately NOT done, per Mohamad's explicit instruction:** no backfill of
+EXISTING phone rows (local or production) to the canonical format, and
+**no `migrate:fresh`** — "leave the current account and dont ever migrate fresh
+... later on when i tell u we can migrate fresh." So: new signups from the
+moment this ships will normalize correctly and match on relogin; accounts that
+already exist under an inconsistent raw phone stay exactly as they are (and
+could still mismatch on a differently-typed relogin) until Mohamad explicitly
+authorizes a backfill or a fresh migrate. **Next session: this needs testing,
+committing, and deploying** — it was left mid-flow (code written, unlinted-in-CI,
+untested) when the session moved to other tasks.
+
+### 4. CORS — found wide open by default, decided to defer (NOT a bug needing an urgent fix)
+Question from Mohamad: the React admin dashboard needs its own deploy (Vercel —
+recommended, free Hobby tier, no expiry for a non-commercial student project;
+the React dev owns that deploy, not the backend side) separate from just having
+the Railway API URL. While checking whether that dashboard could reach the API
+from a browser: **this repo has no `config/cors.php` and no CORS middleware
+registered** — Laravel 12's `HandleCors` middleware IS in the global stack by
+default (framework-level, not something we added), and with no published config
+it falls back to the vendor default: `allowed_origins => ['*']`. Confirmed LIVE
+against production with a real preflight `OPTIONS` request from a fake origin —
+`access-control-allow-origin: *` came back. So: the React dashboard will connect
+from any Vercel URL with zero config needed — CORS is NOT currently a blocker.
+But `*` is wide open to any website, not just our own dashboard's domain — for
+an admin panel specifically (not the Flutter apps, which ignore CORS entirely)
+that's more exposure than it should have, especially combined with the still-
+unrotated seeded admin password. **Decision: defer, not urgent** — same bucket
+as the rest of the pre-launch kill list. Once the React dev has his real Vercel
+URL, publish `config/cors.php` and lock `allowed_origins` to just that one
+domain instead of `*`. Two-minute fix, deliberately not done yet because we
+don't have the real URL to lock it to.
+
+### Updated pre-launch kill list (supersedes the 2026-08-16/17 line below)
+`0000` payment bypass · OTP in auth responses · `debug_notifications` in payment
+response · `APP_DEBUG=false` on Railway · rotate the leaked Supabase S3 key ·
+**lock `config/cors.php` `allowed_origins` to the real admin-dashboard domain
+once it exists (currently defaults wide open to `*`)** · **finish, test, commit
+and deploy the phone-normalization fix (§3 above — code is written, not shipped)**
+· (UltraMsg was renewed 2026-08-17, instance `instance188530` — OTP may actually
+send via WhatsApp now, worth a real-device check before launch).
+
+---
+
 ## ⭐⭐ UPDATES — 2026-08-16/17 (Moh session: nearby, user docs, security fixes, offer/notif/sort fixes — ALL DEPLOYED, app ~97% done)
 
 > **CURRENT STATE — read this first.** Everything below is COMMITTED and LIVE on production. `main` = `origin/main` = deployed (latest commit `fed12b6`). Working tree clean. `dev` is BEHIND main (main is the source of truth now — we've been committing straight to main since the big merge; a `git checkout dev && git merge main` fast-forward catches it up whenever Amer needs it). Production DB was `migrate:fresh`ed at end of session (empty — teams make their own test data; admin reseeded `admin@haflati.com`/`0000`).
@@ -1057,11 +1155,11 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 ### The customer app is now FEATURE-COMPLETE on the backend
 Home (all 5 rails), Explore (map + nearest + category filter), vendor detail, product discovery + filters + search, booking (both shapes + selected_options), payment, offers/discounts, favorites, chat, reviews, notifications, support — ALL live.
 
-### What's LEFT (~3%)
+### What's LEFT (~3%) — SUPERSEDED, see 2026-08-19 section above for current state
+- ~~**Public single-product detail endpoint**~~ — BUILT + DEPLOYED 2026-08-19 (`GET /products/{id}`). See that section.
 - **`GET /categories`** — the 10 category tiles + counts, OR hardcode in Flutter (undecided; leaning hardcode since the enum is fixed).
-- **Public single-product detail endpoint** — NOT built. There's no `GET /products/{id}` for customers (only vendor's own `GET /vendor/products/{id}`). The customer gets a product's full data (meta + is_on_offer + discounted_price) from the LIST endpoints, but has no dedicated single-product detail with ALL images. Discussed but not built — decide if the product-detail screen needs it (it probably does, for all images + full meta).
 - **Smart Search (FastAPI)** — separate repo/service, Moh+Amer's final learning sprint. Groundwork in this repo: `smart-search.md`, `HaflatiDemoSeeder` (LOCAL ONLY seeder), factories.
-- **Pre-launch kill list** (do LAST — all kept ON now for testing): `0000` payment bypass · OTP in auth responses · `debug_notifications` in payment response · set `APP_DEBUG=false` on Railway · **UltraMsg renewed this session** (new instance `instance188530` set on Railway — OTP may actually send via WhatsApp now) · **rotate the leaked Supabase S3 key**.
+- **Pre-launch kill list** — see the updated list in the 2026-08-19 section above (adds CORS + phone-normalization deploy to this same list).
 
 ### Ops notes learned this session
 - Railway link drops per-machine + sometimes times out; retry `railway link --project distinguished-imagination --environment production --service events-api` then chain the `railway ssh` in the same call. Prod server is `php artisan serve` (single-threaded dev server, ~122 MB idle RAM) — FINE for a few testers, but before ~100 concurrent users switch to FrankenPHP for parallel requests. $5 Railway plan handles 100 test users on RAM/cost (lightweight API); concurrency is the only limit, not user count.

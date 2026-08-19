@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vendor;
+use App\Services\PhoneNumberService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -16,12 +17,16 @@ class VendorAuthController extends Controller
             'phone' => 'required|string|min:7|max:15|regex:/^\+?[0-9]+$/'
         ]);
 
+        // Normalize BEFORE it becomes a cache key, so "0933..." and "933..."
+        // hit the same OTP entry and the same account on verify.
+        $phone = PhoneNumberService::normalize($request->phone);
+
         $otp = rand(100000, 999999);
-        Cache::put('otp_' . $request->phone, $otp, now()->addMinutes(5));
+        Cache::put('otp_' . $phone, $otp, now()->addMinutes(5));
 
         $response = Http::asForm()->post("https://api.ultramsg.com/" . env('ULTRAMSG_INSTANCE_ID') . "/messages/chat", [
             'token' => env('ULTRAMSG_TOKEN'),
-            'to'    => $request->phone,
+            'to'    => $phone,
             'body'  => "Verification Code: $otp",
         ]);
 
@@ -42,13 +47,15 @@ class VendorAuthController extends Controller
             'otp'   => 'required|integer|digits:6',
         ]);
 
-        $cachedOtp = Cache::get('otp_' . $request->phone);
+        $phone = PhoneNumberService::normalize($request->phone);
+
+        $cachedOtp = Cache::get('otp_' . $phone);
         if (!$cachedOtp || $cachedOtp != $request->otp) {
             return response()->json(['message' => __('messages.invalid_otp')], 400);
         }
 
-        Cache::forget('otp_' . $request->phone);
-        $vendor = Vendor::where('phone', $request->phone)->first();
+        Cache::forget('otp_' . $phone);
+        $vendor = Vendor::where('phone', $phone)->first();
 
         if ($vendor) {
             // Fully banned vendors can't log in. Data stays intact; unbanning
@@ -69,7 +76,7 @@ class VendorAuthController extends Controller
         }
 
         $regToken = Str::random(64);
-        Cache::put('reg_token_' . $regToken, $request->phone, now()->addMinutes(15));
+        Cache::put('reg_token_' . $regToken, $phone, now()->addMinutes(15));
 
         return response()->json([
             'status'             => 'new_vendor',
@@ -83,7 +90,12 @@ class VendorAuthController extends Controller
             'registration_token' => 'required|string|size:64',
             'first_name'         => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
             'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
-            'city'               => 'required|string|min:2|max:100',
+            // No more city for vendors — a vendor's location IS lat/lng. Both
+            // required at registration (customers need to find vendors near
+            // them from day one, not after a later profile edit).
+            'latitude'           => 'required|numeric|between:-90,90',
+            'longitude'          => 'required|numeric|between:-180,180',
+            'address'            => 'sometimes|nullable|string|max:255',
             'birth_date'         => 'required|date|before:today|after:1900-01-01',
             'vendor_type'        => 'required|in:photographer,makeupArtist,dj,weddingHall,flowers,gifts,dresses,accessories,candles,cakes',
             'vendor_style'       => 'sometimes|in:service_provider,seller', // helper for Flutter; no backend logic
@@ -100,7 +112,9 @@ class VendorAuthController extends Controller
             'phone'         => $phone,
             'first_name'    => $request->first_name,
             'last_name'     => $request->last_name,
-            'city'          => $request->city,
+            'latitude'      => $request->latitude,
+            'longitude'     => $request->longitude,
+            'address'       => $request->address,
             'birth_date'    => $request->birth_date,
             'vendor_type'   => $request->vendor_type,
             'booking_style' => $bookingStyle,

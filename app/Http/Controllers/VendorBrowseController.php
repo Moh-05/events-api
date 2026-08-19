@@ -15,7 +15,6 @@ class VendorBrowseController extends Controller
     {
         $request->validate([
             'vendor_type' => 'sometimes|string',
-            'city'        => 'sometimes|string',
             'min_rating'  => 'sometimes|numeric|min:0|max:5',
             'min_price'   => 'sometimes|numeric|min:0',
             'max_price'   => 'sometimes|numeric|min:0',
@@ -41,8 +40,8 @@ class VendorBrowseController extends Controller
         $query = Vendor::where('is_approved', true)
             ->where('is_active', true)
             ->select([
-                'id', 'business_name', 'vendor_type', 'city', 'rating_avg',
-                'profile_image', 'latitude', 'longitude',
+                'id', 'business_name', 'vendor_type', 'rating_avg',
+                'profile_image', 'latitude', 'longitude', 'address',
                 'is_accepting_bookings',
             ])
             ->withMin('products', 'price')
@@ -51,10 +50,6 @@ class VendorBrowseController extends Controller
         // Filters — each applies only if Flutter sent it.
         if ($request->filled('vendor_type')) {
             $query->where('vendor_type', $request->vendor_type);
-        }
-
-        if ($request->filled('city')) {
-            $query->where('city', 'like', '%' . $request->city . '%');
         }
 
         if ($request->filled('min_rating')) {
@@ -104,8 +99,8 @@ class VendorBrowseController extends Controller
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'vendor_style', 'booking_style',
-                'city', 'bio', 'rating_avg', 'profile_image', 'cover_image',
-                'is_accepting_bookings', 'latitude', 'longitude',
+                'bio', 'rating_avg', 'profile_image', 'cover_image',
+                'is_accepting_bookings', 'latitude', 'longitude', 'address',
             ])
             // No vendor-level price — a vendor has no single price. The prices live
             // on the individual products/packages listed under the vendor.
@@ -139,8 +134,8 @@ class VendorBrowseController extends Controller
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'vendor_style', 'booking_style',
-                'city', 'rating_avg', 'profile_image', 'cover_image',
-                'is_accepting_bookings', 'latitude', 'longitude',
+                'rating_avg', 'profile_image', 'cover_image',
+                'is_accepting_bookings', 'latitude', 'longitude', 'address',
             ]);
 
         if ($request->filled('vendor_type')) {
