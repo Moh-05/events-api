@@ -20,19 +20,37 @@ namespace App\Services;
 // use that everywhere. Canonical form (always stored, regardless of which
 // shape the user typed): "+963" + the 9-digit local number, e.g.
 // "+963933123456".
+//
+// MUST be idempotent: normalize(normalize($x)) === normalize($x). The
+// 2026-08-19 backfill (phones:normalize) re-normalizes every existing row on
+// each run, and a value already in canonical form is a completely normal
+// input (e.g. a fresh signup's own phone passed through twice by accident).
+// An earlier version of this function was NOT idempotent — it only knew how
+// to strip a leading trunk 0, so an already-canonical "+963900000001" (no
+// leading 0 in the digit string) fell through untouched and got a SECOND
+// "963" prepended, corrupting it to "+963963900000001". Caught by re-running
+// the backfill locally before it ever touched production.
 class PhoneNumberService
 {
     private const COUNTRY_CODE = '963';
 
     public static function normalize(string $phone): string
     {
-        // Strip everything but digits (drops '+', spaces, dashes if any slipped through).
+        // Strip everything but digits (drops '+', spaces, dashes).
         $digits = preg_replace('/\D/', '', $phone);
 
-        // Drop a leading trunk 0 if present ("0933..." -> "933..."). A no-op
-        // when the user already typed it without one ("933...").
-        $local = preg_replace('/^0+/', '', $digits);
+        // Already canonical (or otherwise carries the country code) — strip
+        // it off first so it isn't double-prepended below. Checked BEFORE the
+        // trunk-0 strip because a canonical number's digits never start with
+        // a literal "0".
+        if (str_starts_with($digits, self::COUNTRY_CODE)) {
+            $digits = substr($digits, strlen(self::COUNTRY_CODE));
+        } else {
+            // Local shape: drop a leading trunk 0 if present ("0933..." ->
+            // "933..."). No-op when already typed without one ("933...").
+            $digits = preg_replace('/^0+/', '', $digits);
+        }
 
-        return '+' . self::COUNTRY_CODE . $local;
+        return '+' . self::COUNTRY_CODE . $digits;
     }
 }
