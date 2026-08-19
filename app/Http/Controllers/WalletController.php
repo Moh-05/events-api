@@ -50,7 +50,18 @@ class WalletController extends Controller
     // Real payout to the vendor's bank waits on the ShamCash payout API.
     public function withdraw(Request $request)
     {
-        $vendor    = $request->user();
+        $vendor = $request->user();
+
+        // No payout destination on file -> refuse before anything else. The
+        // admin's job is to send money to this account within 24h; a
+        // withdrawal with nowhere to send it just stalls in their queue.
+        if (! $vendor->shamcash_account) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => __('messages.shamcash_account_missing'),
+            ], 422);
+        }
+
         $available = $this->wallet->balances(
             WalletTransaction::where('vendor_id', $vendor->id)
                 ->with('booking:id,status')

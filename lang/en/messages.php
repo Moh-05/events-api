@@ -84,6 +84,8 @@ return [
     // Wallet
     'no_balance'                 => 'No balance available to withdraw yet',
     'withdrawal_successful'      => 'Withdrawal successful (real payout pending ShamCash payout API)',
+    'shamcash_account_saved'     => 'ShamCash account saved',
+    'shamcash_account_missing'   => 'Set your ShamCash account before withdrawing, so we know where to send your payout',
 
     // Admin — vendors
     'vendor_approved'              => 'Vendor approved',

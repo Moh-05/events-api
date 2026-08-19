@@ -62,6 +62,7 @@ class Vendor extends Authenticatable
         'is_active',
         'winding_down',
         'is_accepting_bookings',
+        'shamcash_account',
         'rejection_reason',
         'fcm_token',
         'language',

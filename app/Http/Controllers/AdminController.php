@@ -859,7 +859,10 @@ class AdminController extends Controller
     public function withdrawals(Request $request)
     {
         $query = WalletTransaction::where('type', 'withdrawal')
-            ->with('vendor:id,business_name,phone')
+            // shamcash_account = where to actually send this payout. Included
+            // here (not just on the vendor's own profile) so the admin can act
+            // on a withdrawal straight from this list, no separate lookup.
+            ->with('vendor:id,business_name,phone,shamcash_account')
             ->latest();
 
         if ($request->filled('unpaid')) {

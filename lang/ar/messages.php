@@ -84,8 +84,10 @@ return [
     'offer_removed'        => 'تم إلغاء العرض',
 
     // Wallet
-    'no_balance'            => 'لا يوجد رصيد متاح للسحب حالياً',
-    'withdrawal_successful' => 'تم السحب بنجاح',
+    'no_balance'              => 'لا يوجد رصيد متاح للسحب حالياً',
+    'withdrawal_successful'   => 'تم السحب بنجاح',
+    'shamcash_account_saved'   => 'تم حفظ حساب ShamCash',
+    'shamcash_account_missing' => 'الرجاء إضافة حساب ShamCash قبل السحب حتى نعرف وين نحوّل المبلغ',
 
     // Admin messages — kept in English for now (React admin dashboard / admins
     // work in English). Translate later if the admin app needs Arabic.

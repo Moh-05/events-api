@@ -121,6 +121,7 @@ Route::middleware(['auth:vendors', 'active'])->group(function () {
     Route::delete('/vendor/profile/image', [VendorProfileController::class, 'deleteImage']);
     Route::delete('/vendor/profile/cover', [VendorProfileController::class, 'deleteCover']);
     Route::post('/vendor/availability/toggle', [VendorProfileController::class, 'toggleAvailability']); // online/offline for new bookings
+    Route::post('/vendor/shamcash-account', [VendorProfileController::class, 'updateShamcashAccount']); // set/update payout destination
 
     // Device FCM token (sent by the Flutter app)
     Route::post('/vendor/fcm-token', [VendorProfileController::class, 'updateFcmToken']);

@@ -147,4 +147,29 @@ class VendorProfileController extends Controller
 
         return response()->json(['status' => 'success']);
     }
+
+    // Set / update the vendor's OWN ShamCash account — just an id string, the
+    // same shape as the platform's own SHAMCASH_ACCOUNT_ID env var. This is
+    // where a payout goes when the vendor withdraws; it is NOT the platform's
+    // account (customers pay INTO the platform's account, never the vendor's
+    // directly). Not tied to registration — a vendor can work for a while
+    // before ever setting this, but POST /vendor/withdraw refuses (422) until
+    // it's set, so admin never gets a payout request with nowhere to send it.
+    // Re-calling this endpoint overwrites the previous value (e.g. the vendor
+    // changed accounts) — it is not a one-time-only lock.
+    public function updateShamcashAccount(Request $request)
+    {
+        $request->validate([
+            'shamcash_account' => 'required|string|max:255',
+        ]);
+
+        $vendor = $request->user();
+        $vendor->update(['shamcash_account' => $request->shamcash_account]);
+
+        return response()->json([
+            'status'           => 'success',
+            'message'          => __('messages.shamcash_account_saved'),
+            'shamcash_account' => $vendor->shamcash_account,
+        ]);
+    }
 }
