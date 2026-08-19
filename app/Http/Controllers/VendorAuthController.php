@@ -90,6 +90,11 @@ class VendorAuthController extends Controller
             'registration_token' => 'required|string|size:64',
             'first_name'         => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
             'last_name'          => 'required|string|min:2|max:50|regex:/^[\p{L}\s]+$/u',
+            // business_name already existed as a column but was never accepted
+            // here — a vendor could only register with it null and had to set
+            // it afterward via POST /vendor/profile. Required now, alongside
+            // the other core identity fields.
+            'business_name'      => 'required|string|max:255',
             // No more city for vendors — a vendor's location IS lat/lng. Both
             // required at registration (customers need to find vendors near
             // them from day one, not after a later profile edit).
@@ -112,6 +117,7 @@ class VendorAuthController extends Controller
             'phone'         => $phone,
             'first_name'    => $request->first_name,
             'last_name'     => $request->last_name,
+            'business_name' => $request->business_name,
             'latitude'      => $request->latitude,
             'longitude'     => $request->longitude,
             'address'       => $request->address,
