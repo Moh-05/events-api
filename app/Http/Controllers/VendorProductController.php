@@ -200,7 +200,7 @@ class VendorProductController extends Controller
             ->withCount(['bookings' => function ($q) {
                 $q->whereIn('status', ['pending', 'approved', 'completed']);
             }])
-            ->with('images')
+            ->with('primaryImage')
             ->orderByDesc('bookings_count')
             ->take(5)
             ->get();
@@ -220,7 +220,7 @@ class VendorProductController extends Controller
         $products = VendorProduct::where('vendor_id', $vendor->id)
             ->whereNotNull('stock') // only products that track stock
             ->where('stock', '<=', $threshold)
-            ->with('images')
+            ->with('primaryImage')
             ->orderBy('stock', 'asc')
             ->get();
 

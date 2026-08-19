@@ -717,7 +717,7 @@ class BookingController extends Controller
         $vendor   = $request->user();
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('status', 'pending')
-            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at', 'product.primaryImage'])
             ->latest()
             ->take(10)
             ->get();
@@ -744,7 +744,7 @@ class BookingController extends Controller
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('status', 'approved')
             ->where('event_date', '>=', now())
-            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at', 'product.primaryImage'])
             ->orderBy('event_date', 'asc')
             ->get();
 
@@ -808,7 +808,7 @@ class BookingController extends Controller
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->where('booking_style', 'order')
             ->where('status', '!=', 'awaiting_payment')
-            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at', 'items.product:id,name,price,discount_percent,discount_ends_at'])
+            ->with(['user:id,first_name,last_name', 'product:id,name,price,discount_percent,discount_ends_at', 'product.primaryImage', 'items.product:id,name,price,discount_percent,discount_ends_at', 'items.product.primaryImage'])
             ->latest()
             ->take(10)
             ->get();
