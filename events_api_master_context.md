@@ -1037,7 +1037,9 @@ Separate from the admin ban (`is_active`) and the per-date blocks. A vendor can 
 
 ---
 
-## ⭐ UPDATES — 2026-08-19 (Moh + Claude session: product detail endpoint, saved-items leak fix, CORS gap found, phone-normalization fix written)
+## ⭐⭐ UPDATES — 2026-08-19 (Moh + Claude session: product detail, saved-items leak fix, CORS gap, phone-normalization DEPLOYED + fixed outage, vendor location replaces city, ShamCash payout account)
+
+> **Superseded within this same date** — §3 below originally said the phone fix was "written, NOT deployed." It was deployed later the same session, broke every existing login, got fixed, and got backfilled. See §5 and §6 for the real sequence — read those before assuming §3 alone is current.
 
 ### 1. `GET /products/{id}` — DEPLOYED (closes the roadmap item from 2026-08-16/17)
 Public, no auth. One endpoint for every path into the product detail screen (Home
@@ -1124,14 +1126,115 @@ URL, publish `config/cors.php` and lock `allowed_origins` to just that one
 domain instead of `*`. Two-minute fix, deliberately not done yet because we
 don't have the real URL to lock it to.
 
+### 5. Phone fix DEPLOYED — then broke every existing login, then fixed (read this before touching phone auth again)
+§3 above says the phone-normalization fix was "written, NOT deployed." That
+changed later the same session: Mohamad approved shipping it, so `981566c`
+went out (phone fix + the vendor-location work in §7 below, together).
+
+**It broke login for every account that existed before the deploy.** Root
+cause: login always normalizes the typed number to `+963{local}` before the DB
+lookup, but — per Mohamad's explicit instruction — existing rows were left in
+their ORIGINAL raw shape (`0949101231`, `935983121`, ...), never converted.
+`+963949101231` never equals `0949101231`, so **no** pre-existing account could
+log in with any input, not just a differently-typed one. Confirmed live —
+Mohamad's own vendor login broke immediately, reported same session.
+
+Fixed in `3b89d72`, two parts:
+1. New command `php artisan phones:normalize` (`--force` to write, dry-run by
+   default) backfills every existing `users`/`vendors` phone through the SAME
+   `PhoneNumberService::normalize()` new signups use. No migration, no schema
+   change — an `UPDATE` on the existing `phone` column.
+2. Found a SECOND real bug while testing the backfill, before it ever touched
+   production: `normalize()` was not idempotent. Re-running it on an
+   already-canonical `+963900000001` produced `+963963900000001` (double
+   country code) — the "already has 963" check had been dropped during an
+   earlier simplification pass, so a value with no leading `0` just got `963`
+   prepended a second time. Fixed: `normalize()` now checks for the country
+   code FIRST, strips it if present, else strips a leading trunk `0`. Verified
+   idempotent (`normalize(normalize(normalize(x))) === normalize(x)`) across
+   all input shapes before running anywhere near real data.
+
+**Backfill run for real** on both local and PRODUCTION (`railway ssh
+--service events-api "php artisan phones:normalize --force"`, dry-run checked
+first): 2 users + 5 vendors converted from raw local shape to `+963{local}`.
+Reproduced Mohamad's exact bug report afterward on production — sent OTP to
+`0949101231`, verified it, got `"status":"login"` with a real token. Confirmed
+fixed, not assumed.
+
+**State now:** every account, old and new, stores `+963{local}`. Login works
+regardless of which shape (`09...` or `9...`, matches Mohamad's confirmation
+that Flutter only ever sends one of those two — never `+963` itself) the
+person types, for every account, old and new. The `phones:normalize` command
+stays in the codebase (`app/Console/Commands/NormalizeExistingPhones.php`) —
+safe to re-run anytime (idempotent, dry-run by default), useful if a future
+merge or manual DB edit reintroduces a raw phone.
+
+### 6. Vendor location REPLACES city (Mohamad's request, DEPLOYED same commit as §5's fix, `981566c`)
+"There is no more city for vendor, there is location only." Applies to
+VENDORS only — the user (`UserAuthController`/`UserProfileController`) side is
+untouched, still has `city`.
+
+- `POST /vendor/complete-registration` no longer accepts `city`. `latitude` +
+  `longitude` are now REQUIRED (422 if missing); `address` optional.
+- Every place vendor data is returned now carries `latitude`/`longitude`/
+  `address` instead of `city`: `GET /vendors` (browse), `GET /vendors/{id}`
+  (detail), `GET /vendors/nearby`, and the embedded vendor mini-object on both
+  `GET /products` and `GET /products/{id}`.
+- The `?city=` browse filter is REMOVED entirely (Mohamad's call — customers
+  already have `sort=nearest&lat=&lng=`, the real replacement).
+- `vendors.city` DB COLUMN IS UNTOUCHED — no migration, per "no migrate:fresh."
+  Code just stops reading/writing it. The column sits dead in the schema.
+- Verified against real inserted rows through the actual controllers: `city`
+  genuinely absent (not null-but-present) from all five read paths;
+  registration 422s on missing lat/lng; `?city=` is now a harmless no-op.
+
+### 7. Vendor ShamCash payout account — NEW (Mohamad's request, `c19cf50`, DEPLOYED)
+The withdraw flow (`POST /vendor/withdraw` → admin notified → admin sends
+manually within 24h → `mark-paid`, see the 2026-06-29 admin session) had a real
+hole: nothing anywhere captured WHERE a vendor's payout should go. The admin
+got "vendor X wants Y SYP," no destination.
+
+- New nullable `vendors.shamcash_account` column — additive migration only
+  (`2026_08_19_102217_add_shamcash_account_to_vendors_table`), no data
+  touched, no `migrate:fresh`. Just an id string, same shape as the platform's
+  own `SHAMCASH_ACCOUNT_ID` env var (NOT the same account — customers pay INTO
+  the platform's; this is where the platform pays OUT to the vendor).
+- **`POST /vendor/shamcash-account`** — vendor sets/updates it (`{
+  "shamcash_account": "acc_..." }`). Not a one-time lock — re-calling
+  overwrites, for when a vendor changes accounts.
+- **`POST /vendor/withdraw` now refuses (422, en/ar)** if no account is on
+  file — a withdrawal can never reach the admin with nowhere to send money.
+- **Fixed a real bug found while building this:** `GET /admin/withdrawals`
+  column-limited the vendor select to `business_name,phone` — even after an
+  account was set, the admin's payout list silently dropped it (same class of
+  bug as the `account_status`-on-limited-select issue this codebase has hit
+  more than once). Now includes `shamcash_account`, so the admin can act on a
+  withdrawal straight from that list.
+- Verified end-to-end with real data: blocked without account (422) → set
+  succeeds (200) → withdraw succeeds once set, resets `available` to 0 →
+  account visible on the admin list alongside name/phone. 20/20 suite.
+
+### 8. Customer support routes — EXISTING, verified/explained (Mohamad asked how the Flutter dev should wire it), NOT new work
+Mohamad described exactly what `SupportController`'s USER side already does —
+open a ticket, admin sees it + gets notified, user CANNOT send a second message
+until an admin replies (server-enforced 422, not a client-side rule), admin
+reply turns it into a real back-and-forth, resolved = closed for good. Nothing
+was built this session — confirmed against the real controller and routes,
+then explained: `POST /support/tickets` (open, first message), `GET
+/support/tickets` (list + `unread_count`), `GET /support/tickets/{id}`
+(thread + marks admin replies read), `POST /support/tickets/{id}/messages`
+(reply — 422 while `open`, 422 while `resolved`, 201 while `in_review`). No
+polling/websocket needed — unlike `/conversations/*` (user↔vendor chat), this
+is low-frequency; refetch-on-open is enough.
+
 ### Updated pre-launch kill list (supersedes the 2026-08-16/17 line below)
 `0000` payment bypass · OTP in auth responses · `debug_notifications` in payment
 response · `APP_DEBUG=false` on Railway · rotate the leaked Supabase S3 key ·
 **lock `config/cors.php` `allowed_origins` to the real admin-dashboard domain
-once it exists (currently defaults wide open to `*`)** · **finish, test, commit
-and deploy the phone-normalization fix (§3 above — code is written, not shipped)**
-· (UltraMsg was renewed 2026-08-17, instance `instance188530` — OTP may actually
-send via WhatsApp now, worth a real-device check before launch).
+once it exists (currently defaults wide open to `*`)** · (UltraMsg was renewed
+2026-08-17, instance `instance188530` — OTP may actually send via WhatsApp now,
+worth a real-device check before launch) · ~~finish/deploy the phone-
+normalization fix~~ DONE, see §5-6.
 
 ---
 
