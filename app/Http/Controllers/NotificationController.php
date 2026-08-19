@@ -17,9 +17,19 @@ class NotificationController extends Controller
             ->latest()
             ->get();
 
+        // Unread count BEFORE localizing (localized() mutates title/body only,
+        // but count from the raw collection to keep the intent obvious).
+        $unread = $notifications->whereNull('read_at')->count();
+
+        // Render each row in the language THIS request asked for, so switching
+        // the app to Arabic also switches the notification history. Rows with
+        // no translation key keep their stored text.
+        $locale = app()->getLocale();
+        $notifications->each(fn (Notification $n) => $n->localized($locale));
+
         return response()->json([
             'status'        => 'success',
-            'unread_count'  => $notifications->whereNull('read_at')->count(),
+            'unread_count'  => $unread,
             'notifications' => $notifications,
         ]);
     }
@@ -45,7 +55,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'status'       => 'success',
-            'notification' => $notification,
+            'notification' => $notification->localized(app()->getLocale()),
         ]);
     }
 

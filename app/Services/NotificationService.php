@@ -97,13 +97,15 @@ class NotificationService
     public function notifyUserTrans(User $user, string $titleKey, string $bodyKey, array $params = [], array $data = []): array
     {
         [$title, $body] = $this->render($user->language, $titleKey, $bodyKey, $params);
-        return $this->notifyUser($user, $title, $body, $data);
+        // Keys travel with it so the inbox row can be re-rendered in whatever
+        // language the app asks for later (see NotificationController::index).
+        return $this->notifyUser($user, $title, $body, $data, $titleKey, $bodyKey, $params);
     }
 
     public function notifyVendorTrans(Vendor $vendor, string $titleKey, string $bodyKey, array $params = [], array $data = []): array
     {
         [$title, $body] = $this->render($vendor->language, $titleKey, $bodyKey, $params);
-        return $this->notifyVendor($vendor, $title, $body, $data);
+        return $this->notifyVendor($vendor, $title, $body, $data, $titleKey, $bodyKey, $params);
     }
 
     // Render a title/body pair in a specific locale without changing the app's
@@ -117,10 +119,10 @@ class NotificationService
         ];
     }
 
-    public function notifyUser(User $user, string $title, string $body, array $data = []): array
+    public function notifyUser(User $user, string $title, string $body, array $data = [], ?string $titleKey = null, ?string $bodyKey = null, array $params = []): array
     {
         // Always save to the inbox first (so the bell icon shows history)
-        $this->saveToInbox('user', $user->id, $title, $body, $data);
+        $this->saveToInbox('user', $user->id, $title, $body, $data, $titleKey, $bodyKey, $params);
 
         if (!$user->fcm_token) {
             // no device token yet — expected during testing before Flutter sends it
@@ -133,10 +135,10 @@ class NotificationService
         return $result;
     }
 
-    public function notifyVendor(Vendor $vendor, string $title, string $body, array $data = []): array
+    public function notifyVendor(Vendor $vendor, string $title, string $body, array $data = [], ?string $titleKey = null, ?string $bodyKey = null, array $params = []): array
     {
         // Always save to the inbox first (so the bell icon shows history)
-        $this->saveToInbox('vendor', $vendor->id, $title, $body, $data);
+        $this->saveToInbox('vendor', $vendor->id, $title, $body, $data, $titleKey, $bodyKey, $params);
 
         if (!$vendor->fcm_token) {
             // no device token yet — expected during testing before Flutter sends it
@@ -150,13 +152,18 @@ class NotificationService
     }
 
     // Store the notification in the DB so it can be listed later (bell icon)
-    private function saveToInbox(string $type, int $id, string $title, string $body, array $data = []): void
+    private function saveToInbox(string $type, int $id, string $title, string $body, array $data = [], ?string $titleKey = null, ?string $bodyKey = null, array $params = []): void
     {
         Notification::create([
             'notifiable_type' => $type,
             'notifiable_id'   => $id,
+            // Rendered text is kept as the fallback: rows written before the
+            // translation keys existed, and anything with no key at all.
             'title'           => $title,
             'body'            => $body,
+            'title_key'       => $titleKey,
+            'body_key'        => $bodyKey,
+            'params'          => $params ?: null,
             'data'            => $data ?: null,
         ]);
     }
