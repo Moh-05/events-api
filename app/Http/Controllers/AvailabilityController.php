@@ -199,4 +199,78 @@ class AvailabilityController extends Controller
             'halls'                   => $halls,
         ]);
     }
+
+    // Same idea as freeWeddingHallSlotsThisMonth(), generalized to EVERY
+    // appointment-style vendor (photographer, makeupArtist, dj, weddingHall) —
+    // filtered by booking_style rather than a hardcoded type list, so this
+    // never drifts from how the platform itself derives appointment vs order
+    // (see VendorAuthController::completeRegistration). Order (seller) vendors
+    // have no calendar and are excluded, same as everywhere else in this file.
+    public function freeAppointmentVendorSlotsThisMonth(Request $request)
+    {
+        $today      = now()->startOfDay();
+        $monthStart = now()->startOfMonth();
+        $monthEnd   = now()->endOfMonth();
+
+        $remainingDaysInMonth = $today->copy()->startOfDay()->diffInDays($monthEnd->copy()->startOfDay()) + 1;
+
+        // Optional narrowing to one category, e.g. ?vendor_type=photographer —
+        // same query still only ever matches appointment-style types, so a
+        // seller type passed here just returns an empty, harmless result.
+        $request->validate([
+            'vendor_type' => 'sometimes|string',
+        ]);
+
+        $query = Vendor::where('is_approved', true)
+            ->where('is_active', true)
+            ->where('booking_style', 'appointment')
+            ->select([
+                'id', 'business_name', 'vendor_type', 'rating_avg',
+                'profile_image', 'cover_image', 'latitude', 'longitude', 'address',
+                'is_accepting_bookings',
+            ]);
+
+        if ($request->filled('vendor_type')) {
+            $query->where('vendor_type', $request->vendor_type);
+        }
+
+        $vendors = $query->get();
+
+        $totalFree = 0;
+        $free      = [];
+
+        foreach ($vendors as $vendor) {
+            $bookedThisMonth = Booking::where('vendor_id', $vendor->id)
+                ->whereIn('status', self::HELD_STATUSES)
+                ->whereNotNull('event_date')
+                ->whereBetween('event_date', [$today, $monthEnd])
+                ->distinct()
+                ->count('event_date');
+
+            $blockedThisMonth = VendorBlockedDate::where('vendor_id', $vendor->id)
+                ->whereBetween('date', [$today->toDateString(), $monthEnd->toDateString()])
+                ->count();
+
+            $freeDays = max(0, $remainingDaysInMonth - $bookedThisMonth - $blockedThisMonth);
+
+            $totalFree += $freeDays;
+
+            // Only vendors that actually have a free day this month are
+            // returned — a fully booked vendor contributes to the totals but
+            // is not worth showing as a card.
+            if ($freeDays > 0) {
+                $vendor->free_days = $freeDays;
+                $free[] = $vendor;
+            }
+        }
+
+        return response()->json([
+            'status'                  => 'success',
+            'month'                   => $monthStart->format('Y-m'),
+            'remaining_days_in_month' => $remainingDaysInMonth,
+            'vendors_counted'         => $vendors->count(),
+            'total_free_slots'        => $totalFree,
+            'vendors'                 => $free,
+        ]);
+    }
 }

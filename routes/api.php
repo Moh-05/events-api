@@ -42,6 +42,7 @@ Route::post('/vendor/complete-registration', [VendorAuthController::class, 'comp
 Route::get('/vendors', [VendorBrowseController::class, 'index']); // discovery: Home / Explore / Filters
 Route::get('/vendors/nearby', [VendorBrowseController::class, 'nearby']); // Explore map: vendors + distance_km, nearest first (keep BEFORE /vendors/{id})
 Route::get('/vendors/wedding-halls/free-slots', [AvailabilityController::class, 'freeWeddingHallSlotsThisMonth']); // total free wedding-hall days, this calendar month (keep BEFORE /vendors/{id})
+Route::get('/vendors/appointment/free-slots', [AvailabilityController::class, 'freeAppointmentVendorSlotsThisMonth']); // same idea, ALL appointment-style vendors (photographer, makeupArtist, dj, weddingHall); optional ?vendor_type= (keep BEFORE /vendors/{id})
 Route::get('/products', [ProductBrowseController::class, 'index']); // item discovery: Home rails / Filters / search
 Route::get('/products/{id}', [ProductBrowseController::class, 'show']); // product detail screen: all images + full vendor
 Route::get('/vendors/{vendorId}/products/search', [VendorProductController::class, 'searchVendorProducts']);
