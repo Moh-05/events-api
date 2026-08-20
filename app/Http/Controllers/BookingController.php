@@ -102,7 +102,7 @@ class BookingController extends Controller
                 'status'            => 'awaiting_payment', // hidden from vendor until payment is confirmed
                 'notes'             => $request->notes,
                 'details'           => $request->details,
-                'delivery_date'     => $request->delivery_date,
+                'delivery_date'     => $this->deriveDeliveryDate($products),
                 'delivery_address'  => $request->delivery_address,
             ]);
 
@@ -227,7 +227,10 @@ class BookingController extends Controller
                 'items.*.vendor_product_id' => 'required_with:items|exists:vendor_products,id',
                 'items.*.quantity'          => 'sometimes|integer|min:1',
                 'details'                   => 'sometimes|nullable|array',
-                'delivery_date'             => 'sometimes|nullable|date',
+                // Never customer input — recomputed below from the (possibly
+                // new) cart's products when items[] is replaced. See store()'s
+                // deriveDeliveryDate() for the same rule at creation time.
+                'delivery_date'             => 'prohibited',
                 'delivery_address'          => 'sometimes|nullable|string',
                 'event_date'                => 'prohibited',
                 'event_location'            => 'prohibited',
@@ -295,17 +298,24 @@ class BookingController extends Controller
             DB::transaction(function () use ($booking, $products, $lines) {
                 $booking->items()->delete();
                 $this->createOrderItems($booking, $products, $lines);
-                $booking->update(['vendor_product_id' => $lines->first()['product_id']]);
+                $booking->update([
+                    'vendor_product_id' => $lines->first()['product_id'],
+                    // Cart changed -> the delivery promise may have too
+                    // (different products, different max_delivery_days).
+                    // Recompute from scratch rather than keep the old value.
+                    'delivery_date'     => $this->deriveDeliveryDate($products),
+                ]);
             });
         }
 
+        // delivery_date deliberately excluded — it's prohibited as input and is
+        // recomputed above only when items[] actually changes.
         $booking->update($request->only([
             'notes',
             'event_date',
             'event_location',
             'duration_hours',
             'details',
-            'delivery_date',
             'delivery_address',
         ]));
 
@@ -647,6 +657,30 @@ class BookingController extends Controller
     // only when they share the same product AND the same selected_options — the
     // same product with different options (white rose vs red rose) stays separate.
     // Each line: { product_id, quantity, options }.
+    // Computes an order's delivery_date from the vendor's OWN per-product
+    // promise (max_delivery_days), not the customer. It is never customer
+    // input — StoreOrderBookingRequest prohibits delivery_date outright.
+    //
+    // A cart can mix products with different promises (or none at all), so
+    // this takes the LONGEST max_delivery_days among the products actually in
+    // the cart: the order isn't done until its slowest item arrives. If NO
+    // product in the cart has a policy set, there is nothing to compute from —
+    // delivery_date stays null, same as before this feature existed (and the
+    // order then relies only on the customer's own "I received it" button,
+    // BookingController::markReceived, with no auto-complete fallback date).
+    //
+    // $products is keyed by vendor_product_id, same shape storeOrder() already
+    // builds it in.
+    private function deriveDeliveryDate($products): ?\Illuminate\Support\Carbon
+    {
+        $maxDays = $products
+            ->pluck('max_delivery_days')
+            ->filter() // drops null/0 — vendors with no policy don't count
+            ->max();
+
+        return $maxDays ? now()->addDays($maxDays) : null;
+    }
+
     private function buildOrderLines(array $items): \Illuminate\Support\Collection
     {
         return collect($items)

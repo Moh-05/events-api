@@ -23,7 +23,11 @@ class StoreOrderBookingRequest extends FormRequest
             'items.*.selected_options'  => 'sometimes|nullable|array', // customer's picks per item, from the product meta
             'notes'                     => 'sometimes|nullable|string',
             'details'                   => 'sometimes|nullable|array',
-            'delivery_date'             => 'sometimes|nullable|date',
+            // delivery_date is NO LONGER customer input — the vendor sets a
+            // max_delivery_days policy per product (in its meta), and the
+            // backend computes the real delivery_date from that at order time.
+            // See BookingController::storeOrder().
+            'delivery_date'             => 'prohibited',
             'delivery_address'          => 'sometimes|nullable|string',
 
             // Appointment fields don't belong on an order.

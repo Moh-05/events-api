@@ -76,6 +76,10 @@ class VendorProductController extends Controller
             'description'         => 'sometimes|nullable|string',
             'price'               => 'sometimes|nullable|numeric|min:0',
             'stock'               => 'sometimes|nullable|integer|min:0',
+            // Optional seller delivery promise ("I deliver within N days").
+            // Left null = no policy; the resulting order's delivery_date then
+            // stays null too, same as before this feature existed.
+            'max_delivery_days'   => 'sometimes|nullable|integer|min:1|max:365',
             'meta'                => 'sometimes|array',
             'images'              => 'required|array',
             'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
@@ -85,12 +89,13 @@ class VendorProductController extends Controller
         $vendor = $request->user();
 
         $product = VendorProduct::create([
-            'vendor_id'   => $vendor->id,
-            'name'        => $request->name ?? null,
-            'description' => $request->description ?? null,
-            'price'       => $request->price ?? null,
-            'stock'       => $request->stock ?? null,
-            'meta'        => $request->meta ?? [],
+            'vendor_id'         => $vendor->id,
+            'name'              => $request->name ?? null,
+            'description'       => $request->description ?? null,
+            'price'             => $request->price ?? null,
+            'stock'             => $request->stock ?? null,
+            'max_delivery_days' => $request->max_delivery_days ?? null,
+            'meta'              => $request->meta ?? [],
         ]);
 
         if ($request->hasFile('images')) {
@@ -136,6 +141,7 @@ class VendorProductController extends Controller
             'description'         => 'sometimes|nullable|string',
             'price'               => 'sometimes|nullable|numeric|min:0',
             'stock'               => 'sometimes|nullable|integer|min:0',
+            'max_delivery_days'   => 'sometimes|nullable|integer|min:1|max:365',
             'meta'                => 'sometimes|array',
             'images'              => 'sometimes|array',
             'images.*'            => 'image|mimes:jpg,jpeg,png|max:2048',
@@ -155,6 +161,7 @@ class VendorProductController extends Controller
             'description',
             'price',
             'stock',
+            'max_delivery_days',
             'meta',
         ]));
 
