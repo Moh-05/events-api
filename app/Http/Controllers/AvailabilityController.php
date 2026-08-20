@@ -124,4 +124,66 @@ class AvailabilityController extends Controller
             ->unique()
             ->values();
     }
+
+    // Public — total count of free wedding-hall DAYS across THIS calendar month,
+    // summed over every approved+active weddingHall vendor. "Free" = today or
+    // later, not already booked, and not manually blocked by that vendor — same
+    // definition publicAvailability() uses per vendor, just counted and summed
+    // across all of them instead of listed per one.
+    //
+    // Example: 3 approved wedding halls, 30-day month, today is the 10th ->
+    // 21 remaining days each (30 - 9 elapsed) = 63 slots before subtracting
+    // anything booked/blocked. Each hall's own booked+blocked days are removed
+    // from ITS OWN 21, then the three counts are summed.
+    public function freeWeddingHallSlotsThisMonth()
+    {
+        $today      = now()->startOfDay();
+        $monthStart = now()->startOfMonth();
+        $monthEnd   = now()->endOfMonth();
+
+        // Remaining days in the month, today inclusive — the pool each hall's
+        // count is drawn from. Halls never rented for a day already past.
+        // diffInDays() on two Carbon instances that aren't both exact midnight
+        // returns a float (e.g. 12.999...); comparing whole DAYS, so use the
+        // date part only and round to a clean integer count.
+        $remainingDaysInMonth = $today->copy()->startOfDay()->diffInDays($monthEnd->copy()->startOfDay()) + 1;
+
+        $vendorIds = Vendor::where('is_approved', true)
+            ->where('is_active', true)
+            ->where('vendor_type', 'weddingHall')
+            ->pluck('id');
+
+        $totalFree = 0;
+        $halls     = [];
+
+        foreach ($vendorIds as $vendorId) {
+            // Booked or blocked days for THIS hall, clipped to today..end-of-month
+            // (a booking earlier this month, before today, doesn't cost a "free"
+            // slot — that day is simply gone, not something to subtract twice).
+            $bookedThisMonth = Booking::where('vendor_id', $vendorId)
+                ->whereIn('status', self::HELD_STATUSES)
+                ->whereNotNull('event_date')
+                ->whereBetween('event_date', [$today, $monthEnd])
+                ->distinct()
+                ->count('event_date');
+
+            $blockedThisMonth = VendorBlockedDate::where('vendor_id', $vendorId)
+                ->whereBetween('date', [$today->toDateString(), $monthEnd->toDateString()])
+                ->count();
+
+            $free = max(0, $remainingDaysInMonth - $bookedThisMonth - $blockedThisMonth);
+
+            $halls[]    = ['vendor_id' => $vendorId, 'free_days' => $free];
+            $totalFree += $free;
+        }
+
+        return response()->json([
+            'status'                  => 'success',
+            'month'                   => $monthStart->format('Y-m'),
+            'remaining_days_in_month' => $remainingDaysInMonth,
+            'wedding_halls_counted'   => $vendorIds->count(),
+            'total_free_slots'        => $totalFree,
+            'halls'                   => $halls,
+        ]);
+    }
 }
