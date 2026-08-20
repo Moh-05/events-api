@@ -214,12 +214,18 @@ class ReviewController extends Controller
             : 0.0;
 
         return response()->json([
-            'status'           => 'success',
-            'rating_avg'       => (float) $avg,
-            'total_reviews'    => $total,
-            'star_breakdown'   => $breakdown,    // { "5": {count, percent}, ... }
-            'positive_percent' => $positivePercent,
-            'trend'            => $trend,         // percent vs last month, can be negative
+            'status'                => 'success',
+            'rating_avg'            => (float) $avg,
+            'total_reviews'         => $total,
+            'star_breakdown'        => $breakdown,          // { "5": {count, percent}, ... }
+            'positive_percent'      => $positivePercent,
+            // Server-computed month-over-month change in average rating, from
+            // ALL reviews in the database (not a loaded/paginated page). Can be
+            // negative. rating_growth_percent is the explicit field name the
+            // Flutter side asked for; trend is kept as an alias so nothing
+            // already reading it breaks.
+            'rating_growth_percent' => $trend,
+            'trend'                 => $trend,
         ]);
     }
 
