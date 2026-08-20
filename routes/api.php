@@ -69,6 +69,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::post('/bookings/{id}', [BookingController::class, 'update']);
     Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancel']);
+    Route::post('/bookings/{id}/received', [BookingController::class, 'markReceived']); // customer confirms an ORDER arrived -> completes it immediately, unlocks vendor payout
 
     // Reviews
     Route::post('/reviews', [ReviewController::class, 'store']);

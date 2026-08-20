@@ -533,6 +533,45 @@ class BookingController extends Controller
         ]);
     }
 
+    // Customer confirms they physically received an ORDER (seller vendor).
+    // Completes the booking immediately, regardless of the product's own
+    // delivery_date estimate — that estimate is only a fallback safety net
+    // (bookings:auto-complete) for when the customer never presses this. The
+    // moment this fires, delivery_date is overwritten with NOW: it becomes the
+    // real delivery date, not the vendor's original estimate, so booking
+    // history reads accurately. Completing unlocks the vendor's payout from
+    // escrow immediately (WalletService clears on status = completed), which is
+    // the whole point — the vendor doesn't have to wait for their own estimate
+    // to elapse once the customer has confirmed receipt themselves.
+    public function markReceived(Request $request, int $id)
+    {
+        $user    = $request->user();
+        $booking = Booking::where('id', $id)
+            ->where('user_id', $user->id)
+            ->where('booking_style', 'order')
+            ->where('status', 'approved')
+            ->firstOrFail();
+
+        $booking->update([
+            'status'        => 'completed',
+            'delivery_date' => now(),
+        ]);
+        $booking->refresh();
+
+        $this->notifications->notifyVendorTrans(
+            $booking->vendor,
+            'messages.notif_order_received_title',
+            'messages.notif_order_received_body',
+            ['name' => trim($user->first_name . ' ' . $user->last_name)],
+            ['booking_id' => $booking->id]
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'booking' => $booking->load(['vendor', 'product', 'items.product']),
+        ]);
+    }
+
     // Vendor declines a booking
     public function decline(Request $request, int $id)
     {

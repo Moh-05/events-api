@@ -70,6 +70,8 @@ return [
     'notif_event_reminder_body'  => 'مناسبتك مع :name بعد :days أيام. استعدّ لها!',
     'notif_low_stock_title'      => 'المخزون شارف على النفاد',
     'notif_low_stock_body'       => 'بقي :count فقط من ":name". أعد التزويد قبل نفاده.',
+    'notif_order_received_title'   => 'تم استلام الطلب',
+    'notif_order_received_body'    => 'أكّد :name استلام طلبه. أصبح مستحقّك متاحاً للسحب الآن.',
     'notif_cancelled_title'        => 'تم إلغاء الحجز',
     'notif_cancelled_body'         => 'قام :name بإلغاء حجزه',
 

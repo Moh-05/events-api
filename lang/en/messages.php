@@ -68,6 +68,8 @@ return [
     'notif_event_reminder_body'    => 'Your event with :name is in :days days. Get ready!',
     'notif_low_stock_title'        => 'Low Stock',
     'notif_low_stock_body'         => 'Only :count left of ":name". Restock before it sells out.',
+    'notif_order_received_title'   => 'Order Received',
+    'notif_order_received_body'    => ':name confirmed they received their order. Your payout is now available to withdraw.',
     'notif_cancelled_title'        => 'Booking Cancelled',
     'notif_cancelled_body'         => ':name cancelled their booking.',
 
