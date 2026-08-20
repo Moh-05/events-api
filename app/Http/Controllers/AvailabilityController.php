@@ -148,40 +148,53 @@ class AvailabilityController extends Controller
         // date part only and round to a clean integer count.
         $remainingDaysInMonth = $today->copy()->startOfDay()->diffInDays($monthEnd->copy()->startOfDay()) + 1;
 
-        $vendorIds = Vendor::where('is_approved', true)
+        // Full card fields (same set VendorBrowseController uses), not just an
+        // id — Flutter can render these halls directly as browse cards.
+        $vendors = Vendor::where('is_approved', true)
             ->where('is_active', true)
             ->where('vendor_type', 'weddingHall')
-            ->pluck('id');
+            ->select([
+                'id', 'business_name', 'vendor_type', 'rating_avg',
+                'profile_image', 'cover_image', 'latitude', 'longitude', 'address',
+                'is_accepting_bookings',
+            ])
+            ->get();
 
         $totalFree = 0;
         $halls     = [];
 
-        foreach ($vendorIds as $vendorId) {
+        foreach ($vendors as $vendor) {
             // Booked or blocked days for THIS hall, clipped to today..end-of-month
             // (a booking earlier this month, before today, doesn't cost a "free"
             // slot — that day is simply gone, not something to subtract twice).
-            $bookedThisMonth = Booking::where('vendor_id', $vendorId)
+            $bookedThisMonth = Booking::where('vendor_id', $vendor->id)
                 ->whereIn('status', self::HELD_STATUSES)
                 ->whereNotNull('event_date')
                 ->whereBetween('event_date', [$today, $monthEnd])
                 ->distinct()
                 ->count('event_date');
 
-            $blockedThisMonth = VendorBlockedDate::where('vendor_id', $vendorId)
+            $blockedThisMonth = VendorBlockedDate::where('vendor_id', $vendor->id)
                 ->whereBetween('date', [$today->toDateString(), $monthEnd->toDateString()])
                 ->count();
 
             $free = max(0, $remainingDaysInMonth - $bookedThisMonth - $blockedThisMonth);
 
-            $halls[]    = ['vendor_id' => $vendorId, 'free_days' => $free];
             $totalFree += $free;
+
+            // Only halls that actually HAVE a free day this month are returned —
+            // a fully booked hall contributes to nothing the app would show.
+            if ($free > 0) {
+                $vendor->free_days = $free;
+                $halls[] = $vendor;
+            }
         }
 
         return response()->json([
             'status'                  => 'success',
             'month'                   => $monthStart->format('Y-m'),
             'remaining_days_in_month' => $remainingDaysInMonth,
-            'wedding_halls_counted'   => $vendorIds->count(),
+            'wedding_halls_counted'   => $vendors->count(),
             'total_free_slots'        => $totalFree,
             'halls'                   => $halls,
         ]);
