@@ -499,6 +499,10 @@ class BookingController extends Controller
 
         $booking->refresh();
 
+        // The vendor just answered — fold this response into their stored
+        // average (what customers see on their card).
+        $this->touchResponseTime($vendor);
+
         (new NotificationService())->notifyUserTrans(
             $booking->user,
             'messages.notif_approved_title',
@@ -622,6 +626,9 @@ class BookingController extends Controller
             'responded_at'  => now(),
             'refund_amount' => $paid > 0 ? round($paid, 2) : null,
         ]);
+
+        // Declining is a response too — it counts toward the average.
+        $this->touchResponseTime($vendor);
 
         // Decline notification to the customer. If the vendor typed a reason, that
         // exact text is the notification body (free text, not translated). The
@@ -991,10 +998,23 @@ class BookingController extends Controller
     // A vendor who has never responded to a booking is marked as new.
     public function responseTime(Request $request)
     {
-        $vendor = $request->user();
+        // Reads the stored average maintained by touchResponseTime(). The same
+        // value customers see on this vendor's card — one source of truth, so
+        // the two sides can never disagree.
+        return response()->json([
+            'status'        => 'success',
+            'response_time' => $request->user()->response_time,
+        ]);
+    }
 
-        // Only bookings the vendor actually acted on, and that have a verified
-        // payment (so there's a real "paid at" moment to measure from).
+    // Recalculates and stores a vendor's average response time. Called whenever
+    // the vendor answers a paid booking (approve or decline), i.e. exactly when
+    // responded_at is set.
+    //
+    // Stored rather than computed on read because customers see this on every
+    // vendor card — computing it live would add a query per vendor per list.
+    private function touchResponseTime(Vendor $vendor): void
+    {
         $bookings = Booking::where('vendor_id', $vendor->id)
             ->whereNotNull('responded_at')
             ->whereHas('payment', fn ($query) => $query->where('status', 'verified'))
@@ -1002,42 +1022,18 @@ class BookingController extends Controller
             ->get();
 
         if ($bookings->isEmpty()) {
-            return response()->json([
-                'status'        => 'success',
-                'response_time' => [
-                    'is_new' => true, // no bookings answered yet — app shows "New"
-                    'label'  => null,
-                ],
-            ]);
+            return;
         }
 
-        // Average gap in minutes between paid time and vendor response time.
-        $avgMinutes = $bookings->avg(function (Booking $booking) {
-            return $booking->payment->created_at->diffInMinutes($booking->responded_at);
-        });
+        // Gap between the booking being PAID (when the vendor could first see
+        // it) and the vendor answering.
+        $avgMinutes = $bookings->avg(
+            fn (Booking $booking) => $booking->payment->created_at->diffInMinutes($booking->responded_at)
+        );
 
-        return response()->json([
-            'status'        => 'success',
-            'response_time' => [
-                'is_new'          => false,
-                'label'           => $this->responseTimeLabel($avgMinutes),
-                'average_minutes' => (int) round($avgMinutes), // raw value if the app wants it
-                'based_on'        => $bookings->count(),       // how many responses it averages
-            ],
+        $vendor->update([
+            'avg_response_minutes' => (int) round($avgMinutes),
+            'response_count'       => $bookings->count(),
         ]);
-    }
-
-    // Moderate a raw minute average into a human range, so the app shows
-    // "usually replies in 1-2 hours" instead of "43 minutes".
-    private function responseTimeLabel(float $minutes): string
-    {
-        return match (true) {
-            $minutes < 30      => 'under 30 minutes',
-            $minutes < 60      => '30-60 minutes',
-            $minutes < 120     => '1-2 hours',
-            $minutes < 360     => '2-6 hours',
-            $minutes < 1440    => '6-24 hours',
-            default            => 'over a day',
-        };
     }
 }

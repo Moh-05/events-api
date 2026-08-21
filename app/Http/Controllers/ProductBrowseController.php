@@ -43,7 +43,7 @@ class ProductBrowseController extends Controller
             ->where('is_hidden', false) // vendor manually hidden -> not shown to customers
             ->whereHas('vendor', fn ($q) => $q->where('is_approved', true)->where('is_active', true))
             ->with([
-                'vendor:id,business_name,vendor_type,booking_style,latitude,longitude,address,rating_avg,profile_image',
+                'vendor:id,business_name,vendor_type,booking_style,latitude,longitude,address,rating_avg,avg_response_minutes,response_count,profile_image',
                 'primaryImage',
             ]);
 
@@ -110,7 +110,7 @@ class ProductBrowseController extends Controller
                 // Full vendor card: enough to render the "sold by" block and let the
                 // app deep-link to the vendor profile. is_active + winding_down are
                 // included so the appended account_status can actually compute.
-                'vendor:id,business_name,vendor_type,vendor_style,booking_style,rating_avg,profile_image,cover_image,is_accepting_bookings,is_active,winding_down,latitude,longitude,address',
+                'vendor:id,business_name,vendor_type,vendor_style,booking_style,rating_avg,avg_response_minutes,response_count,profile_image,cover_image,is_accepting_bookings,is_active,winding_down,latitude,longitude,address',
                 // Whole gallery, primary image first.
                 'images',
             ])

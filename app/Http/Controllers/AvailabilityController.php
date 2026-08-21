@@ -155,6 +155,7 @@ class AvailabilityController extends Controller
             ->where('vendor_type', 'weddingHall')
             ->select([
                 'id', 'business_name', 'vendor_type', 'rating_avg',
+                'avg_response_minutes', 'response_count',
                 'profile_image', 'cover_image', 'latitude', 'longitude', 'address',
                 'is_accepting_bookings',
             ])
@@ -226,6 +227,7 @@ class AvailabilityController extends Controller
             ->where('booking_style', 'appointment')
             ->select([
                 'id', 'business_name', 'vendor_type', 'rating_avg',
+                'avg_response_minutes', 'response_count',
                 'profile_image', 'cover_image', 'latitude', 'longitude', 'address',
                 'is_accepting_bookings',
             ]);

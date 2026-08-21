@@ -41,6 +41,7 @@ class VendorBrowseController extends Controller
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'rating_avg',
+                'avg_response_minutes', 'response_count',
                 'profile_image', 'latitude', 'longitude', 'address',
                 'is_accepting_bookings',
             ])
@@ -99,6 +100,7 @@ class VendorBrowseController extends Controller
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'vendor_style', 'booking_style',
+                'avg_response_minutes', 'response_count',
                 'bio', 'rating_avg', 'profile_image', 'cover_image',
                 'is_accepting_bookings', 'latitude', 'longitude', 'address',
             ])
@@ -134,6 +136,7 @@ class VendorBrowseController extends Controller
             ->where('is_active', true)
             ->select([
                 'id', 'business_name', 'vendor_type', 'vendor_style', 'booking_style',
+                'avg_response_minutes', 'response_count',
                 'rating_avg', 'profile_image', 'cover_image',
                 'is_accepting_bookings', 'latitude', 'longitude', 'address',
             ]);

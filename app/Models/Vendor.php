@@ -58,6 +58,8 @@ class Vendor extends Authenticatable
         'address',
         'bio',
         'rating_avg',
+        'avg_response_minutes',
+        'response_count',
         'is_approved',
         'is_active',
         'winding_down',
@@ -76,7 +78,7 @@ class Vendor extends Authenticatable
     // profile_image_url -> full public URL, used by the app directly.
     // cover_image_url   -> full public URL of the cover, used by the app directly.
     // account_status    -> readable account state for API responses.
-    protected $appends = ['profile_image_url', 'cover_image_url', 'account_status'];
+    protected $appends = ['profile_image_url', 'cover_image_url', 'account_status', 'response_time'];
 
     public function getProfileImageUrlAttribute(): ?string
     {
@@ -102,6 +104,8 @@ class Vendor extends Authenticatable
             'winding_down'          => 'boolean',
             'is_accepting_bookings' => 'boolean',
             'rating_avg'   => 'decimal:2',
+            'avg_response_minutes' => 'integer',
+            'response_count'       => 'integer',
             'birth_date'   => 'date',
             'latitude'     => 'decimal:8',
             'longitude'    => 'decimal:8',
@@ -127,6 +131,56 @@ class Vendor extends Authenticatable
         }
 
         return $this->winding_down ? 'winding_down' : 'banned';
+    }
+
+    // How quickly this vendor answers a paid booking, as a moderated range
+    // ("usually replies in 1-2 hours") rather than an exact number, which
+    // would be misleading from a small sample.
+    //
+    // Read straight off the stored columns, so this costs nothing on a browse
+    // list of 15 vendors. Maintained by BookingController::touchResponseTime()
+    // whenever the vendor approves or declines.
+    //
+    // Shown to BOTH sides: the vendor sees their own on their dashboard, and
+    // customers see it on every vendor card and profile.
+    public function getResponseTimeAttribute(): ?array
+    {
+        // A column-limited select that didn't load these can't compute — return
+        // null rather than fabricate "New" for a vendor who answers instantly.
+        if (! array_key_exists('avg_response_minutes', $this->attributes)) {
+            return null;
+        }
+
+        $minutes = $this->attributes['avg_response_minutes'];
+
+        if ($minutes === null) {
+            return [
+                'is_new'          => true, // never answered a paid booking yet
+                'label'           => null,
+                'average_minutes' => null,
+                'based_on'        => 0,
+            ];
+        }
+
+        return [
+            'is_new'          => false,
+            'label'           => self::responseTimeLabel((float) $minutes),
+            'average_minutes' => (int) $minutes,
+            'based_on'        => (int) ($this->attributes['response_count'] ?? 0),
+        ];
+    }
+
+    // Moderates a raw minute average into a human range.
+    public static function responseTimeLabel(float $minutes): string
+    {
+        return match (true) {
+            $minutes < 30   => 'under 30 minutes',
+            $minutes < 60   => '30-60 minutes',
+            $minutes < 120  => '1-2 hours',
+            $minutes < 360  => '2-6 hours',
+            $minutes < 1440 => '6-24 hours',
+            default         => 'over a day',
+        };
     }
 
     // Called after a booking ends. If this vendor was winding down and has no
