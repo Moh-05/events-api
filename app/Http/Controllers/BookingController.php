@@ -91,8 +91,11 @@ class BookingController extends Controller
             }
         }
 
+        // Where it's going — snapshotted from a saved address or a one-off pin.
+        $loc = $this->resolveLocationSnapshot($request);
+
         // Booking + its item rows are created together or not at all.
-        $booking = DB::transaction(function () use ($request, $vendor, $products, $lines) {
+        $booking = DB::transaction(function () use ($request, $vendor, $products, $lines, $loc) {
             $booking = Booking::create([
                 'user_id'           => $request->user()->id,
                 'vendor_id'         => $vendor->id,
@@ -103,7 +106,9 @@ class BookingController extends Controller
                 'notes'             => $request->notes,
                 'details'           => $request->details,
                 'delivery_date'     => $this->deriveDeliveryDate($products),
-                'delivery_address'  => $request->delivery_address,
+                'delivery_address'  => $loc['address'] ?? $request->delivery_address,
+                'location_latitude'  => $loc['latitude'] ?? null,
+                'location_longitude' => $loc['longitude'] ?? null,
             ]);
 
             $this->createOrderItems($booking, $products, $lines);
@@ -165,8 +170,11 @@ class BookingController extends Controller
         // The (vendor_id, event_day) unique index is the real double-booking
         // guard: if two requests race past the check above, the DB rejects the
         // second insert and we turn that into the same clean 409.
+        // Where it's happening — snapshotted from a saved address or a one-off pin.
+        $loc = $this->resolveLocationSnapshot($request);
+
         try {
-            $booking = DB::transaction(function () use ($request, $vendor, $product) {
+            $booking = DB::transaction(function () use ($request, $vendor, $product, $loc) {
                 $booking = Booking::create([
                     'user_id'           => $request->user()->id,
                     'vendor_id'         => $vendor->id,
@@ -177,7 +185,9 @@ class BookingController extends Controller
                     'notes'             => $request->notes,
                     'selected_options'  => $request->selected_options, // customer's picks from the product meta
                     'event_date'        => $request->event_date,
-                    'event_location'    => $request->event_location,
+                    'event_location'    => $loc['address'] ?? $request->event_location,
+                    'location_latitude'  => $loc['latitude'] ?? null,
+                    'location_longitude' => $loc['longitude'] ?? null,
                     'duration_hours'    => $request->duration_hours,
                 ]);
 
@@ -657,6 +667,48 @@ class BookingController extends Controller
     // only when they share the same product AND the same selected_options — the
     // same product with different options (white rose vs red rose) stays separate.
     // Each line: { product_id, quantity, options }.
+    // Resolves where the service/order should go, as a SNAPSHOT.
+    //
+    // Three ways a customer can specify it, in priority order:
+    //   1. saved_address_id  -> copy that saved address's text + coordinates
+    //   2. location_latitude/longitude -> a one-off pin they dropped
+    //   3. neither           -> whatever text they typed, no coordinates
+    //
+    // Always a copy, never a reference: if the customer later edits or deletes
+    // the saved address, this booking keeps what was actually agreed — the
+    // same reason item prices are snapshotted at booking time.
+    //
+    // Returns ['address' => ?string, 'latitude' => ?string, 'longitude' => ?string].
+    private function resolveLocationSnapshot(Request $request): array
+    {
+        if ($request->filled('saved_address_id')) {
+            // Scoped to the caller — you can only book to your OWN address.
+            $saved = $request->user()
+                ->savedAddresses()
+                ->find($request->saved_address_id);
+
+            if ($saved) {
+                // details ("Floor 3", "blue gate") is appended, since the
+                // vendor reads one line and the map can't convey it.
+                $text = $saved->details
+                    ? $saved->address . ' — ' . $saved->details
+                    : $saved->address;
+
+                return [
+                    'address'   => $text,
+                    'latitude'  => $saved->latitude,
+                    'longitude' => $saved->longitude,
+                ];
+            }
+        }
+
+        return [
+            'address'   => null, // fall back to whatever text the request carried
+            'latitude'  => $request->location_latitude,
+            'longitude' => $request->location_longitude,
+        ];
+    }
+
     // Computes an order's delivery_date from the vendor's OWN per-product
     // promise (max_delivery_days), not the customer. It is never customer
     // input — StoreOrderBookingRequest prohibits delivery_date outright.

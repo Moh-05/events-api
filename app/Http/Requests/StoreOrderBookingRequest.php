@@ -24,11 +24,19 @@ class StoreOrderBookingRequest extends FormRequest
             'notes'                     => 'sometimes|nullable|string',
             'details'                   => 'sometimes|nullable|array',
             // delivery_date is NO LONGER customer input — the vendor sets a
-            // max_delivery_days policy per product (in its meta), and the
-            // backend computes the real delivery_date from that at order time.
-            // See BookingController::storeOrder().
+            // max_delivery_days policy on each product, and the backend
+            // computes the real delivery_date from that at order time.
+            // See BookingController::deriveDeliveryDate().
             'delivery_date'             => 'prohibited',
             'delivery_address'          => 'sometimes|nullable|string',
+            // Optionally book to one of the customer's saved addresses. The
+            // controller SNAPSHOTS its text + coordinates onto the booking —
+            // the booking never references the saved row, so editing or
+            // deleting it later can't rewrite a past order.
+            'saved_address_id'          => 'sometimes|nullable|integer',
+            // A one-off pin, for a customer who didn't save the place.
+            'location_latitude'         => 'sometimes|nullable|numeric|between:-90,90',
+            'location_longitude'        => 'sometimes|nullable|numeric|between:-180,180',
 
             // Appointment fields don't belong on an order.
             'event_date'     => 'prohibited',

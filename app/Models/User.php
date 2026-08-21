@@ -67,4 +67,13 @@ class User extends Authenticatable
     {
         return $this->hasMany(SavedItem::class);
     }
+
+    // The customer's address book ("Home", "Work", ...). Default first, then
+    // newest — the order the app shows them in.
+    public function savedAddresses()
+    {
+        return $this->hasMany(SavedAddress::class)
+            ->orderByDesc('is_default')
+            ->latest();
+    }
 }

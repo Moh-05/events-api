@@ -20,6 +20,7 @@ use App\Http\Controllers\SupportController;
 use App\Http\Controllers\ContentReportController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\PortfolioController;
+use App\Http\Controllers\SavedAddressController;
 use App\Http\Controllers\SavedItemController;
 use App\Http\Controllers\ChatController;
 use Illuminate\Support\Facades\Route;
@@ -83,6 +84,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/saved/ids', [SavedItemController::class, 'ids']); // just the saved product ids, to fill hearts on browse pages
     Route::post('/saved', [SavedItemController::class, 'store']);
     Route::delete('/saved/{productId}', [SavedItemController::class, 'destroy']);
+
+    // Saved addresses (the customer's address book: Home, Work, ...)
+    Route::get('/addresses', [SavedAddressController::class, 'index']);
+    Route::post('/addresses', [SavedAddressController::class, 'store']);
+    Route::post('/addresses/{id}', [SavedAddressController::class, 'update']);
+    Route::post('/addresses/{id}/default', [SavedAddressController::class, 'setDefault']);
+    Route::delete('/addresses/{id}', [SavedAddressController::class, 'destroy']);
 
     // Payments
     Route::post('/payments/verify', [PaymentController::class, 'verify']);

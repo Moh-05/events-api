@@ -13,6 +13,9 @@ return [
     'logged_out'          => 'تم تسجيل الخروج',
     'account_suspended'   => 'تم تعليق حسابك، من فضلك تواصل مع الدعم',
 
+    // Saved addresses
+    'address_deleted'        => 'تم حذف العنوان',
+
     // Profile
     'profile_image_removed' => 'تمت إزالة صورة الملف الشخصي',
     'cover_image_removed'   => 'تمت إزالة صورة الغلاف',

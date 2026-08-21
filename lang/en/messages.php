@@ -13,6 +13,9 @@ return [
     'logged_out'          => 'Logged out',
     'account_suspended'   => 'Your account has been suspended. Please contact support.',
 
+    // Saved addresses
+    'address_deleted'        => 'Address deleted',
+
     // Profile
     'profile_image_removed' => 'Profile image removed',
     'cover_image_removed'   => 'Cover image removed',

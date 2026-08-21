@@ -22,6 +22,11 @@ class StoreAppointmentBookingRequest extends FormRequest
             'selected_options'  => 'sometimes|nullable|array', // customer's picks from the product meta
             'event_date'        => 'required|date|after:now',
             'event_location'    => 'sometimes|nullable|string',
+            // Same as the order shape: optionally point at a saved address and
+            // the controller snapshots it, or drop a one-off pin.
+            'saved_address_id'   => 'sometimes|nullable|integer',
+            'location_latitude'  => 'sometimes|nullable|numeric|between:-90,90',
+            'location_longitude' => 'sometimes|nullable|numeric|between:-180,180',
             'duration_hours'    => 'sometimes|nullable|integer',
 
             // Order fields don't belong on an appointment.
