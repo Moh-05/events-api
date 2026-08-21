@@ -11,6 +11,26 @@ class VendorProduct extends Model
     // seeder (HaflatiDemoSeeder). No behaviour change — see smart-search.md.
     use HasFactory;
 
+    // is_available is DERIVED from stock, never set by hand.
+    //
+    // The old logic was one-way: sold out -> is_available = false, with nothing
+    // turning it back on when the vendor restocked. A product that hit zero
+    // stayed invisible forever, even after the vendor added more units.
+    //
+    // Recomputing it here, on the model, means every path that changes stock
+    // (vendor edits the product, a booking is approved, a cancellation restores
+    // units, an admin fixes data) keeps the flag correct without having to
+    // remember. stock = null means untracked (appointment packages) — those are
+    // always available and never touched by this.
+    protected static function booted(): void
+    {
+        static::saving(function (VendorProduct $product): void {
+            if ($product->stock !== null) {
+                $product->is_available = $product->stock > 0;
+            }
+        });
+    }
+
     protected $fillable = [
         'vendor_id',
         'name',

@@ -23,13 +23,16 @@ class VendorProductController extends Controller
         ]);
     }
 
-    // Get all available products for a specific vendor
+    // The vendor's OWN product list — everything they have listed, including
+    // sold-out and hidden items. Deliberately NOT filtered by is_available:
+    // a vendor could not see a product that had sold out, which meant they
+    // could not restock it either. Customer-facing endpoints still apply the
+    // full visibility rule; this is the vendor's inventory view.
     public function getVendorProducts(Request $request)
     {
         $user = $request->user();
 
         $products = VendorProduct::where('vendor_id', $user->id)
-            ->where('is_available', true)
             ->with('images')
             ->get();
 
